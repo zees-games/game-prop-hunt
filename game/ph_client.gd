@@ -53,6 +53,9 @@ var chat: DotGameChatClient = null
 var audio: PhAudio = null
 var settings: PhSettings = null
 
+## The player's console. See [method DotConsoleKit.build].
+var console: DotConsoleController = null
+
 ## A hunter's own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
 var view_model: ZeeViewModel = null
@@ -804,6 +807,10 @@ func _build_settings() -> void:
 			elif not DotPlatform.is_web():
 				_capture())
 		settings.menu.busy = func() -> bool: return chat != null and chat.is_typing()
+		# The console (the key under Escape): net_stat and every other setting by name, and
+		# the server's console when one runs in this process. One of the menu's overlays, so
+		# opening it stops the player and frees the pointer exactly as the menu does.
+		console = DotConsoleKit.build(self, settings.settings, settings.menu)
 		_wire_board()
 
 
