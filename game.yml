@@ -32,7 +32,7 @@ cvars:
   ph_hide_seconds: "30"
   ph_players_per_hunter: "3"
   ph_bots: "1"
-  ph_min_players: "3"
+  bot_quota: "3"
 
 # This game's maps are small documents the server sends each client, so a host fetches the
 # map packs its server owner names BEFORE the game loads (into the server-only packs)
