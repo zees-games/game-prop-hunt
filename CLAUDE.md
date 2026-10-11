@@ -37,7 +37,7 @@ props/               kits.json (which Kenney models, at what scale), catalogue.j
 assets/props/        the vendored furniture and nature models (Kenney, CC0)
 taunts/              the taunt sounds and taunts.json (Kenney, CC0); edit freely
 maps/                link to ../mg-prop-hunt-maps/maps
-examples/            headless_run (78), headless_maps (41), headless_net (49), dedicated (39)
+examples/            headless_run (79), headless_maps (41), headless_net (49), dedicated (50)
 tools/               shot.sh/.gd (render a view), measure_props.gd, audio_probe (xvfb only)
 ```
 
