@@ -105,6 +105,8 @@ godot --headless --path . --script tools/measure_props.gd -- --check   # catalog
 
 The maps are their own repository and pack, [mg-prop-hunt-maps](../mg-prop-hunt-maps): `maps/` here is a dot-bootstrap link (`.gitignore` names it), and `game.yml` does not name the pack: the server owner names `gamemann/mg-prop-hunt-maps` (or their own) in their deployment's map config (dot-server-deploy's `cfg/content.yml`, which fills `DotGameDescriptor.maps`). `PhModule._add_delivered_maps` asks dot-game's `DotGameContent.map_dirs(server, "maps")` for every pack the server names, fetched through dot-cloud, and adds each mount's `maps/` to the catalogue at load and after every `ph_reload`. The game's own pack carries only `ph_practice`. A client is sent the one document being played. dot-server-deploy has `content/prophunt/`, `content/prophunt_maps/` and `examples/prophunt_client` (22 checks): the delivered pack boots, a real client joins over a real socket, the maps, prop catalogue and taunts are read from their mounts, and the client builds the server's map with every prop. No `class_name` anywhere in `game/`, because a mounted pack cannot register one.
 
+**The map vote** (`game/ph_vote.gd`, MANUAL, applied at a round's end): under MANUAL `PhVote` opens a passed rock-the-vote itself (dot-vote does not; `rtv_delay_sec` 0), and `_game_load` refreshes the map list after `_add_delivered_maps`. Without either, `!rtv` answers "Rocked. 1 of 1." and nothing opens, or a delivered server's ballot holds only the practice map and never opens. `examples/dedicated` arms both.
+
 **Before publishing**: dot-props (API level 2), dot-team (2), dot-fx (2), dot-game (3) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
 
 ## Still to do
