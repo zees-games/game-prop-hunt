@@ -15,6 +15,15 @@ const PhBindings := preload("ph_bindings.gd")
 ## being honest about drawing: a blindfolded hunter is also held still by a movement modifier
 ## the server owns (see [PhController]), and their gun is the server's to fire.
 ##
+## [b]The glance pieces are dot-ui's.[/b] The clock is a [DotScoreStrip] with the props and
+## hunters still up as its two side plates, in the sides' colours; health is a [DotVitals]
+## whose fill is the player's side colour; "look at a prop and press E" is a [DotKeyPrompt]
+## under the crosshair. Health used to be a number on a disc in the side's colour. The disc
+## said which side you are on and nothing about how much of you is left: a prop's health is
+## a share of a size-derived maximum (10 to 200), so 40 is nearly dead as a wardrobe and
+## whole as a bottle. The bar says the share, its fill keeps the side's colour, and the side
+## is also the plates' colours and the word beside it. Decided 2026-10-11 (hud-pieces).
+##
 ## [b]The keys are read from the bindings, not written here.[/b] The hints in the corner say
 ## the key each action is on NOW, from the same table the menu's Controls page edits, so a
 ## rebound key is never a hint that lies.
@@ -25,6 +34,25 @@ const BLIND_COLOUR := Color(0.01, 0.01, 0.015)
 ## The blindfold is not quite black: a hunter should be able to tell it from a client that
 ## stopped drawing.
 const BLINDFOLD_COLOUR := Color(0.03, 0.025, 0.04)
+
+## Seconds left at which the clock turns red.
+const LOW_CLOCK_SEC := 10.0
+
+## The map name's pale blue, which is also the glance pieces' highlight.
+const MAP_COLOUR := Color(0.80, 0.88, 0.98)
+
+
+## The glance pieces' colours in this game's palette: a dark slate plate that holds over pale
+## school walls, a bright sky and the blindfold alike, the map name's pale blue as highlight.
+## Static so a render tool can use it.
+static func piece_theme() -> Theme:
+	var t := Theme.new()
+	var type := DotHudPiece.THEME_TYPE
+	t.set_color(&"plate", type, Color(0.07, 0.08, 0.13, 0.64))
+	t.set_color(&"plate_edge", type, Color(MAP_COLOUR, 0.3))
+	t.set_color(&"highlight", type, MAP_COLOUR)
+	t.set_color(&"low", type, Color(1.0, 0.35, 0.3))
+	return t
 
 var game: PhGame = null
 var player: PhPlayer = null
@@ -42,16 +70,17 @@ var blind_overlay: ColorRect = null
 var blindfold: ColorRect = null
 
 var _root: Control = null
-var _clock: Label = null
-var _clock_caption: Label = null
-var _map: Label = null
+## The clock, the props and hunters still up either side of it, and the caption and map
+## name under it.
+var strip: DotScoreStrip = null
+## Health, as a share of this body's or disguise's maximum, in the side's colour.
+var vitals: DotVitals = null
+## "Look at a prop" with the disguise key drawn as a key, while a prop is undisguised.
+var prompt: DotKeyPrompt = null
 var _shout: Label = null
 var _hints: Label = null
-var _disc: Panel = null
-var _disc_label: Label = null
 var _as: Label = null
 var _lock: Label = null
-var _field: Label = null
 var _meter_back: ColorRect = null
 var _meter_fill: ColorRect = null
 var _meter_label: Label = null
@@ -89,24 +118,30 @@ func _build() -> void:
 	_blindfold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_blindfold_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.45))
 
-	_clock_caption = _label(18)
-	_clock_caption.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_clock_caption.offset_top = 12.0
-	_clock_caption.offset_bottom = 36.0
-	_clock_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
+	# the root, every piece under it inherits them. See [method piece_theme].
+	_root.theme = piece_theme()
 
-	_clock = _label(34)
-	_clock.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_clock.offset_top = 34.0
-	_clock.offset_bottom = 78.0
-	_clock.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# Top centre, full width because the strip centres itself on its own middle. Its plates
+	# span 388 pixels round the middle, clear of the key hints top left at 1280 x 720.
+	strip = DotScoreStrip.new()
+	strip.name = "Clock"
+	strip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	strip.offset_top = 14.0
+	strip.offset_bottom = 94.0
+	_root.add_child(strip)
 
-	_map = _label(15)
-	_map.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
-	_map.offset_top = 78.0
-	_map.offset_bottom = 100.0
-	_map.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_map.add_theme_color_override("font_color", Color(0.80, 0.88, 0.98))
+	# Under the crosshair: what the disguise key does right now.
+	prompt = DotKeyPrompt.new()
+	prompt.name = "Prompt"
+	prompt.font_size = 19
+	prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	prompt.offset_left = -300.0
+	prompt.offset_right = 300.0
+	prompt.offset_top = 26.0
+	prompt.offset_bottom = 62.0
+	prompt.visible = false
+	_root.add_child(prompt)
 
 	# Top left: the keys this side has, as the player has them bound.
 	_hints = _label(15)
@@ -125,61 +160,45 @@ func _build() -> void:
 	_shout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_shout.add_theme_color_override("font_color", Color(0.99, 0.86, 0.40))
 
-	# Bottom left: the health disc in the side's colour, what you are, and the rotation lock.
-	# Above the chat box, which also draws bottom-left.
-	_disc = Panel.new()
-	_disc.name = "Disc"
-	_disc.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_disc.offset_left = 22.0
-	_disc.offset_right = 102.0
-	_disc.offset_top = -300.0
-	_disc.offset_bottom = -220.0
-	_disc.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(_disc)
-
-	_disc_label = Label.new()
-	_disc_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_disc_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_disc_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_disc_label.add_theme_font_size_override("font_size", 26)
-	_disc_label.add_theme_color_override("font_color", Color.WHITE)
-	_disc_label.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
-	_disc_label.add_theme_constant_override("outline_size", 4)
-	_disc.add_child(_disc_label)
+	# Bottom left: health on its plate, and over it what you are, the rotation lock and the
+	# forced-taunt meter. The plate ends 214 pixels off the bottom, above the chat box's full
+	# eight-row log, which reaches 202 (checked in headless_run).
+	vitals = DotVitals.new()
+	vitals.name = "Vitals"
+	vitals.bar_end = 220.0
+	vitals.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+	vitals.offset_left = 22.0
+	vitals.offset_right = 22.0 + 340.0
+	vitals.offset_top = -270.0
+	vitals.offset_bottom = -214.0
+	vitals.visible = false
+	_root.add_child(vitals)
 
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_as.offset_left = 112.0
+	_as.offset_left = 24.0
 	_as.offset_right = 600.0
-	_as.offset_top = -296.0
-	_as.offset_bottom = -266.0
+	_as.offset_top = -356.0
+	_as.offset_bottom = -328.0
 
 	_lock = _label(15)
 	_lock.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_lock.offset_left = 112.0
+	_lock.offset_left = 24.0
 	_lock.offset_right = 600.0
-	_lock.offset_top = -264.0
-	_lock.offset_bottom = -240.0
+	_lock.offset_top = -328.0
+	_lock.offset_bottom = -304.0
 	_lock.add_theme_color_override("font_color", Color(0.85, 0.92, 1.0))
 
-	# The forced-taunt meter, under the disc's words: how long a prop has before it gives
+	# The forced-taunt meter, just over the health plate: how long a prop has before it gives
 	# itself away for standing still.
 	_meter_back = _bar(Color(0.0, 0.0, 0.0, 0.45))
 	_meter_fill = _bar(Color(0.98, 0.62, 0.20, 0.95))
 	_meter_label = _label(13)
 	_meter_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_meter_label.offset_left = 112.0
-	_meter_label.offset_right = 420.0
-	_meter_label.offset_top = -256.0
-	_meter_label.offset_bottom = -236.0
-
-	_field = _label(18)
-	_field.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
-	_field.offset_left = -460.0
-	_field.offset_right = -24.0
-	_field.offset_top = -64.0
-	_field.offset_bottom = -26.0
-	_field.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_meter_label.offset_left = 232.0
+	_meter_label.offset_right = 520.0
+	_meter_label.offset_top = -294.0
+	_meter_label.offset_bottom = -274.0
 
 	watching_label = _label(20)
 	watching_label.name = "Watching"
@@ -219,10 +238,10 @@ func _bar(colour: Color) -> ColorRect:
 	var rect := ColorRect.new()
 	rect.color = colour
 	rect.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	rect.offset_left = 112.0
-	rect.offset_right = 312.0
-	rect.offset_top = -234.0
-	rect.offset_bottom = -226.0
+	rect.offset_left = 24.0
+	rect.offset_right = 224.0
+	rect.offset_top = -288.0
+	rect.offset_bottom = -280.0
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rect.visible = false
 	_root.add_child(rect)
@@ -263,22 +282,31 @@ func _process(delta: float) -> void:
 	var side := game.team_of(player.player_id) if player != null else 0
 	var left := game.seconds_left()
 
+	var caption := ""
 	match game.phase:
 		PhGame.Phase.HIDE:
-			_clock_caption.text = "Hunters released in"
+			caption = "Hunters released in"
 		PhGame.Phase.SEEK:
-			_clock_caption.text = "Props win in" if game.config.timeout_winner == PhGame.PROPS else "Time left"
+			caption = "Props win in" if game.config.timeout_winner == PhGame.PROPS else "Time left"
 		_:
-			_clock_caption.text = "waiting for players" if not game.sides_are_playable() else "between rounds"
+			caption = "waiting for players" if not game.sides_are_playable() else "between rounds"
 
-	_clock.text = "%d:%02d" % [int(left) / 60, int(left) % 60] if game.phase != PhGame.Phase.IDLE else ""
-	_map.text = str(game.map_doc.get("name", ""))
-	var props_left := game.alive_on(PhGame.PROPS)
-	var hunters_left := game.alive_on(PhGame.HUNTERS)
-	_field.text = "%d %s left  ·  %d %s" % [props_left, "prop" if props_left == 1 else "props",
-		hunters_left, "hunter" if hunters_left == 1 else "hunters"] if game.phase != PhGame.Phase.IDLE else ""
+	# The caption under the clock rather than over it, as the strip draws every game's: it
+	# reads "Props win in · Maple Grove School".
+	var running := game.phase != PhGame.Phase.IDLE
+	strip.show_clock(
+		DotScoreStrip.clock_text(left) if running else "", running and left <= LOW_CLOCK_SEC,
+		caption, str(game.map_doc.get("name", ""))
+	)
+	if running:
+		strip.show_scores(
+			game.alive_on(PhGame.PROPS), game.alive_on(PhGame.HUNTERS), "PROPS LEFT", "HUNTERS",
+			game.side_colour(PhGame.PROPS), game.side_colour(PhGame.HUNTERS)
+		)
+	else:
+		strip.hide_scores()
 
-	_draw_disc(side)
+	_draw_vitals(side)
 	_draw_hints(side)
 	_draw_meter(side)
 	_crosshair.visible = side == PhGame.HUNTERS and player != null and player.is_alive() and not is_blindfolded()
@@ -289,35 +317,38 @@ func _process(delta: float) -> void:
 			_shout.text = ""
 
 
-func _draw_disc(side: int) -> void:
-	var shown := player != null and player.is_alive() and not player.watching and side != 0
-	_disc.visible = shown
+func _draw_vitals(side: int) -> void:
+	var shown := player != null and player.is_alive() and not player.watching and side != 0 \
+		and player.health != null
+	vitals.visible = shown
 	_as.text = ""
 	_lock.text = ""
+	var words := ""
 
-	if not shown:
-		return
+	if shown:
+		# The side's colour as the fill, which is what the disc said; a cross only on a body,
+		# because a chair's health is not a person's.
+		vitals.fill_colour = game.side_colour(side)
+		vitals.show_cross = side == PhGame.HUNTERS or not player.is_disguised()
+		vitals.show_vitals(player.health.health, player.health.max_health)
+		_as.add_theme_color_override("font_color", game.side_colour(side).lightened(0.45))
 
-	var style := StyleBoxFlat.new()
-	style.bg_color = game.side_colour(side)
-	style.set_corner_radius_all(40)
-	style.border_color = Color(1, 1, 1, 0.85)
-	style.set_border_width_all(3)
-	_disc.add_theme_stylebox_override("panel", style)
-	_disc_label.text = "%d" % int(round(player.health.health)) if player.health != null else ""
+		if side != PhGame.PROPS:
+			_as.text = "HUNTER"
+		elif player.is_disguised():
+			_as.text = "You are: %s" % game.props_catalogue.title_of(player.disguise.prop_id)
+			_lock.text = "ROTATION LOCKED" if player.disguise.locked else "rotation free  (%s locks)" % _key(PhBindings.LOCK)
+		elif player.set_aside != null:
+			_as.text = "Showing yourself  (+points)"
+			_lock.text = "%s to hide again" % _key(PhBindings.REVEAL)
+		else:
+			_as.text = "PROP"
+			words = "Look at a prop and become it"
 
-	if side != PhGame.PROPS:
-		_as.text = "HUNTER"
-		return
-
-	if player.is_disguised():
-		_as.text = "You are: %s" % game.props_catalogue.title_of(player.disguise.prop_id)
-		_lock.text = "ROTATION LOCKED" if player.disguise.locked else "rotation free  (%s locks)" % _key(PhBindings.LOCK)
-	elif player.set_aside != null:
-		_as.text = "Showing yourself  (+points)"
-		_lock.text = "%s to hide again" % _key(PhBindings.REVEAL)
+	if words == "" or is_blind():
+		prompt.clear()
 	else:
-		_as.text = "Look at a prop and press %s" % _key(PhBindings.DISGUISE)
+		prompt.show_prompt(words, _key(PhBindings.DISGUISE))
 
 
 func _draw_hints(side: int) -> void:
@@ -355,7 +386,7 @@ func _draw_meter(side: int) -> void:
 	if not shown:
 		return
 
-	_meter_fill.offset_right = 112.0 + 200.0 * clampf(player.taunt_meter, 0.0, 1.0)
+	_meter_fill.offset_right = 24.0 + 200.0 * clampf(player.taunt_meter, 0.0, 1.0)
 	var until := (1.0 - player.taunt_meter) * game.config.auto_taunt_seconds
 	_meter_label.text = "Move, or you taunt in %d s" % int(ceilf(until))
 
@@ -381,7 +412,9 @@ func present_blind(delta: float) -> void:
 
 		if folded and game != null:
 			var left := game.seconds_left()
-			_blindfold_label.text = "Blindfolded while the props hide\n%d:%02d" % [int(left) / 60, int(left) % 60]
+			# The strip's own words, so the two clocks on a hunter's screen never disagree by
+			# the second one rounds down and the other up.
+			_blindfold_label.text = "Blindfolded while the props hide\n%s" % DotScoreStrip.clock_text(left)
 
 
 func is_blind() -> bool:

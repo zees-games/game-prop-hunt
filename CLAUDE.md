@@ -24,7 +24,7 @@ game/
   ph_player.gd       one person: a body or a disguise, its hull, hitboxes, health, reveal, beacon
   ph_game.gd         the simulation: the draw, hide/seek, disguises, taunts, decoys, beacons, bots
   ph_rules.gd        a DotMatchRules whose outcome is whatever PhGame decided
-  ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold
+  ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
   ph_client.gd       one local player, alone or against a server; third person as a prop
   ph_bindings.gd     every key, as dot-menu bindings; ph_settings.gd the Escape menu
@@ -37,7 +37,7 @@ props/               kits.json (which Kenney models, at what scale), catalogue.j
 assets/props/        the vendored furniture and nature models (Kenney, CC0)
 taunts/              the taunt sounds and taunts.json (Kenney, CC0); edit freely
 maps/                link to ../mg-prop-hunt-maps/maps
-examples/            headless_run (79), headless_maps (41), headless_net (49), dedicated (50)
+examples/            headless_run (84), headless_maps (41), headless_net (49), dedicated (50)
 tools/               shot.sh/.gd (render a view), measure_props.gd, audio_probe (xvfb only)
 ```
 
@@ -66,6 +66,10 @@ A shot whose impacts land inside a map prop's box, and not on a player, is a dec
 ## Decision 5: the end of a round finds the last props
 
 With `beacon_props_left` props left or `beacon_seconds_left` seconds to go, every live prop pings: a sound and an expanding ring everybody sees (`DotFxBeacon`, dot-fx), every `beacon_period`.
+
+## The HUD is dot-ui's glance pieces
+
+The clock is a `DotScoreStrip` with the props and hunters still up as its two side plates in the sides' colours, and "Hunters released in · <map>" under it (the blindfold's own clock uses `DotScoreStrip.clock_text` too, so the two never disagree by a second). "Look at a prop and become it" is a `DotKeyPrompt` under the crosshair with the disguise key as bound. **Health is a `DotVitals`, not the old number on a disc**: a prop's health is a share of a size-derived maximum (10 to 200), so a bare number said nothing about how much of you is left; the bar says the share, its fill keeps the side's colour the disc carried, and the cross is drawn only on a body. The plate ends 214 pixels off the bottom, above the chat box's full eight-row log (202). Colours from `PhHud.piece_theme()`. `headless_run` checks the pieces, the plate against the chat log and that the derived `requires.json` asks for dot-ui 4.
 
 ## Sides, points and stats
 
@@ -109,7 +113,7 @@ The maps are their own repository and pack, [mg-prop-hunt-maps](../mg-prop-hunt-
 
 **The map vote** (`game/ph_vote.gd`, MANUAL, applied at a round's end): under MANUAL `PhVote` opens a passed rock-the-vote itself (dot-vote does not; `rtv_delay_sec` 0), and `_game_load` refreshes the map list after `_add_delivered_maps`. Without either, `!rtv` answers "Rocked. 1 of 1." and nothing opens, or a delivered server's ballot holds only the practice map and never opens. `examples/dedicated` arms both. The match answers dot-vote's `round_in_progress_fn` (`world.match_node.is_live()`, set by name because an older shell's dot-vote lacks it), so a `time_up: finish_round` limit that runs out in warmup or between rounds changes at once instead of holding for `finish_round_max_sec`; `dedicated` checks both halves.
 
-**Before publishing**: dot-props (API level 2), dot-team (2), dot-fx (2), dot-game (3) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
+**Before publishing**: dot-props (API level 2), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
 
 ## Still to do
 

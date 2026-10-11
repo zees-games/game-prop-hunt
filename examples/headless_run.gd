@@ -23,7 +23,7 @@ const PhProps := preload("../game/ph_props.gd")
 
 const SECTIONS := 18
 
-const CHECKS := 79
+const CHECKS := 84
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -595,6 +595,55 @@ func _test_the_client() -> void:
 		and client.get("weapons") != null and client.get("view_model") != null,
 		"a hunter's gun is in their hands through the hide",
 		"side %d, phase %d, weapons %s" % [world.team_of(&"local"), world.phase, client.get("weapons")])
+
+	# The HUD's glance pieces are dot-ui's, handed this world's numbers.
+	var hud: Node = client.get("hud")
+	var me: PhPlayer = client.get("player")
+	hud.call("_process", 0.0)
+	var strip: DotScoreStrip = hud.get("strip")
+	var vitals: DotVitals = hud.get("vitals")
+	_check(
+		strip.clock == DotScoreStrip.clock_text(world.seconds_left()) and strip.sides
+		and strip.left_score == world.alive_on(PhGame.PROPS) and strip.right_score == world.alive_on(PhGame.HUNTERS),
+		"the clock is DotScoreStrip's, with the props and hunters still up as its plates",
+		str(strip.describe())
+	)
+	me.health.health = me.health.max_health * 0.2
+	hud.call("_process", 0.0)
+	_check(
+		vitals.visible and vitals.is_low() and vitals.fill_colour == world.side_colour(PhGame.HUNTERS),
+		"health is DotVitals in the side's colour, red at a quarter", str(vitals.describe())
+	)
+	me.health.health = me.health.max_health
+
+	# An undisguised prop is prompted with the disguise key as the player has it bound.
+	world._set_side(&"local", PhGame.PROPS)
+	hud.call("_process", 0.0)
+	var prompt: DotKeyPrompt = hud.get("prompt")
+	var bound := str(client.call("_key", &"ph_disguise"))
+	_check(
+		not me.is_disguised() and prompt.visible and prompt.key == bound and bound != "",
+		"an undisguised prop is prompted by DotKeyPrompt with the bound disguise key", prompt.text()
+	)
+
+	var chat: DotGameChatClient = client.get("chat")
+	var w: DotChatWindow = chat.window
+	var log_top := w.margin_bottom + w.entry_height + float(w.max_lines) * (w.line_height + w.line_gap)
+	var plate_bottom := -(vitals.offset_top + vitals.footprint().end.y)
+	_check(
+		plate_bottom >= log_top,
+		"a full chat log stays under the health plate",
+		"log reaches %.0f px off the bottom, the plate ends %.0f off it" % [log_top, plate_bottom]
+	)
+
+	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so
+	# the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+	var asks := DotAddonApi.derive()
+	_check(
+		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		"the pack asks a shell for dot-ui level 4, the glance pieces",
+		str(asks.get("dot_ui"))
+	)
 
 	remove_child(client)
 	client.free()
