@@ -113,6 +113,6 @@ The maps are their own repository and pack, [mg-prop-hunt-maps](../mg-prop-hunt-
 
 ## Still to do
 
-1. **Put it live.** Create `gamemann/mg-prop-hunt` and `gamemann/mg-prop-hunt-maps`, tag the addons above, rebuild the shell, publish the maps pack before the game.
+1. **Put it live.** Tag the addons above, rebuild the shell, publish the maps pack before the game.
 2. **Try it in a browser**, with people: how long a hide should be and how much a decoy should cost are numbers only play settles.
 3. Better stand-ins: a bot prop picks something near, not something clever.
