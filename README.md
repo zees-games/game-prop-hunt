@@ -21,7 +21,7 @@ The props win if any of them is still hidden when the clock runs out, or if ever
 
 A round draws the hunters fresh: one hunter for every three players by default. Say **!hunter** or **!prop** in chat to ask for a side. Anybody who is out watches the rest of the round. After a few rounds on a map, players vote for the next one (`!rtv`, `!nominate ph_house`).
 
-There are five maps: a small practice house built into the game, and **Maple Grove School**, **Willow Lane**, **Brightline Offices** and **Pinecrest Woods** from [mg-prop-hunt-maps](https://github.com/gamemann/mg-prop-hunt-maps).
+There are five maps: a small practice house built into the game, and **Maple Grove School**, **Willow Lane**, **Brightline Offices** and **Pinecrest Woods** from [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps).
 
 ## Controls
 
@@ -120,7 +120,7 @@ Console commands:
 These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
 
 ## Writing a map
-A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/gamemann/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](maps/README.md) describes the format. The server sends the map to each player when it changes, so players don't need the map files.
+A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](maps/README.md) describes the format. The server sends the map to each player when it changes, so players don't need the map files.
 
 ## Testing
 
@@ -145,7 +145,7 @@ A map is a JSON file: the building as boxes, the furniture as props, the lights,
 - Not yet tried in a browser.
 
 ## Credits
-The furniture is Kenney's Furniture Kit, the trees, plants and rocks his Nature Kit, the players his Blocky Characters, and the taunts come from his Voiceover Pack and Music Jingles ([kenney.nl](https://kenney.nl), CC0). The Nature Kit's colours are toned down when the game loads them. The weapons are from [zee-dot-weapons](https://github.com/gamemann/zee-dot-weapons). Floors, walls and roofs are his Prototype Textures under a pastel; the remaining surfaces (glass, boards, lockers, lines) are drawn in code. Each kit's licence is next to its files.
+The furniture is Kenney's Furniture Kit, the trees, plants and rocks his Nature Kit, the players his Blocky Characters, and the taunts come from his Voiceover Pack and Music Jingles ([kenney.nl](https://kenney.nl), CC0). The Nature Kit's colours are toned down when the game loads them. The weapons are from [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons). Floors, walls and roofs are his Prototype Textures under a pastel; the remaining surfaces (glass, boards, lockers, lines) are drawn in code. Each kit's licence is next to its files.
 
 ## License
 MIT. See [LICENSE](LICENSE). The Kenney art is CC0, which is public domain.
