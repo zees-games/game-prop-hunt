@@ -94,6 +94,7 @@ ph_decoy_penalty 0.2           // share of a shot's damage a hunter takes for hi
 ph_rounds_per_map 4            // rounds on a map before the next one
 ph_spectate_camera 0           // who the dead may watch: 0 anybody, 1 their own side, 2 nobody
 ph_autobhop 0                  // 1 = hold jump to keep hopping
+mp_teammate_passthrough 1      // shots and team-mates: 0 a team-mate is hit and blocks, 1 through one at the muzzle, 2 through every team-mate
 bot_quota 4                    // players a round is kept at with bots; each person who joins replaces one
 bot_quota_mode fill            // fill (as above), fixed (that many bots), per_player (that many per person) or off
 ph_bots 1                      // 0 = no bots
@@ -102,6 +103,8 @@ ph_vote_after 20               // seconds into a map's last round before the vot
 ```
 
 The bot cvars are the family's shared ones (dot-server's `DotBotQuota`). `ph_min_players` still works and sets `bot_quota`; it is deprecated.
+
+`mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
 `--ph-map-ids=<ids>` limits a server to some maps, and every other setting in `game/ph_config.gd` can be given the same way (`--ph-taunt-range=80`). The taunts are listed in `taunts/taunts.json`: edit it to add your own sounds. The vote's settings go in `user://cfg/prophunt_vote.json` (`{"enabled": false}` turns it off); dot-vote's README lists them.
 
