@@ -18,7 +18,7 @@ game/
   ph_map_doc.gd      what a map IS: boxes, props by catalogue id, lights, spawns; validated
   ph_map.gd          a document built: solid boxes, furniture shapes, drawn batches, spawns
   ph_props.gd        the prop catalogue (props/catalogue.json): sizes, models, recolour, parts
-  ph_materials.gd    the surfaces a box is drawn with, textures made in code
+  ph_materials.gd    the surfaces a box is drawn with: Kenney's grid under pastels, the rest made in code
   ph_catalogue.gd    every map the server has, the built-in practice house, which is next
   ph_controller.gd   DotFpsController with the blindfold modifier
   ph_player.gd       one person: a body or a disguise, its hull, hitboxes, health, reveal, beacon
@@ -73,7 +73,9 @@ With `beacon_props_left` props left or `beacon_seconds_left` seconds to go, ever
 
 ## Drawing a map
 
-A map is hundreds of boxes and props. Boxes are batched by material, tint and 12 m chunk into one mesh each, because the Compatibility renderer lights a mesh with at most eight omni lights and a school as one mesh would be lit by eight of its fifty-two. Props are one `MultiMeshInstance3D` per model part. Textures are 128 px images made in code, laid in world space so boxes of a material meet without a seam.
+A map is hundreds of boxes and props. Boxes are batched by material, tint and 12 m chunk into one mesh each, because the Compatibility renderer lights a mesh with at most eight omni lights and a school as one mesh would be lit by eight of its fifty-two. Props are one `MultiMeshInstance3D` per model part. Generated textures are 128 px images made in code, laid in world space (as is the grid) so boxes of a material meet without a seam.
+
+**Colour and light: rooms are pastel, furniture is Kenney's.** Every building surface (floor, wall, ceiling, roof, ground) is Kenney's prototype grid, or his tiles on a floor, under a pastel per surface (`PhMaterials.PASTELS`), the map's tint paled halfway to white on top; glass, boards, lockers, lines, metal and lamps keep their generated look, and furniture keeps its own colours. The light is a dot-lighting document from the map's `environment` (`PhMap.light_document`: its sun angle and colour, sky, horizon as fog from 120 m) with a near-neutral fill at the map's `ambient_energy` and glow only above white, turned down under Compatibility (`PhMap.light_profile`); a cool fill or arena's flat 1.0 fill turned rooms into a lavender haze. Check both renderers (`GODOT=<wrapper adding --rendering-method forward_plus> tools/shot.sh`).
 
 **Kenney's Nature Kit is teal and coral by design**, and beside realistic rooms it read as a cartoon (the first school render had cyan trees with pink trunks). `props/kits.json` gives a kit a `recolour` table, material name to colour, which `PhProps` applies to a copy of each mesh as it loads. Furniture keeps its own colours except the plant.
 
