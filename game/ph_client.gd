@@ -1212,11 +1212,10 @@ func _key_pressed(event: InputEvent) -> bool:
 			_reloading = true
 			return true
 
-		var key := (event as InputEventKey).physical_keycode
-
-		if key >= KEY_1 and key <= KEY_5:
-			_slot = key - KEY_1 + 1
-			return true
+		for i in range(PhBindings.SLOTS.size()):
+			if event.is_action_pressed(PhBindings.SLOTS[i]):
+				_slot = i + 1
+				return true
 
 		return false
 

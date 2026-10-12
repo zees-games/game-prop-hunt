@@ -50,9 +50,9 @@ func _init() -> void:
 	schema = schema_for()
 	config = DotMenuConfig.new()
 	config.brand_name = "Prop Hunt"
-	# The keys are a table here (see [PhBindings]), so the help screen has something to list.
-	config.show_help = true
-	config.show_leave = false
+	# Help and Leave are dot-menu's stock: H opens help, Leave leaves the server or quits a
+	# solo game. Every game in the family has both (the first play test found this one without
+	# Leave).
 	bindings = PhBindings.make()
 	var _layered := config.load_layered()
 
@@ -66,3 +66,11 @@ static func schema_for() -> DotSettingsSchema:
 		DotSettingsDef.Scope.SERVER_CLAMPED
 	))
 	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
+
+
+## The help screen's goal and rules; the keys come from [PhBindings].
+func _fill_help(help: DotMenuHelp) -> void:
+	help.about = "Most players are props: look at something on the map, press E to become it, and keep still. The rest are hunters, blindfolded while the props hide, then given a few minutes to find them. Props win if anybody is left when the clock runs out."
+	help.add_text("Props", "Your health is the size of what you became. Taunt for points, lock your rotation so you stop turning with the view, and tilt to sit the way the real ones do. A prop that keeps quiet too long taunts on its own.")
+	help.add_text("Hunters", "Shooting real furniture costs you health, so read the room for the thing that is slightly wrong before you fire. Near the end the last props give themselves away with a beacon.")
+	help.add_section("Mouse", [["Left", "Fire (hunters); watch the next player while out"], ["Right", "Alternate fire; watch the one before while out"]], &"keys")

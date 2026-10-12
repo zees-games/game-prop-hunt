@@ -10,6 +10,9 @@ extends RefCounted
 ## [b]A prop's keys and a hunter's never share a default.[/b] Reload is R for a hunter, so the
 ## prop's rotation lock is C; a player who is a prop this round and a hunter the next must not
 ## find that the key they reloaded with now does something else in the same round.
+##
+## [b]H is help, in every game of the family[/b] (dot-menu adds the row), so nothing here
+## may default to it.
 
 const DISGUISE := &"ph_disguise"
 const REVEAL := &"ph_reveal"
@@ -24,6 +27,9 @@ const STRAIGHTEN := &"ph_straighten"
 const RELOAD := &"ph_reload"
 const VIEW := &"ph_view"
 const SCOREBOARD := &"ph_scoreboard"
+## A hunter's weapon slots, 1 to 5. Rows, read through their actions, so the Controls page can
+## move them and the help screen lists them; they were keycodes in the client until 2026-10-11.
+const SLOTS: Array[StringName] = [&"ph_slot_1", &"ph_slot_2", &"ph_slot_3", &"ph_slot_4", &"ph_slot_5"]
 
 
 static func make() -> DotMenuBindings:
@@ -40,6 +46,8 @@ static func make() -> DotMenuBindings:
 	keys.add(TILT_RIGHT, &"bind_tilt_right", "Lean right", "Right", "Props")
 	keys.add(STRAIGHTEN, &"bind_straighten", "Stand upright", "Z", "Props")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Hunters")
+	for i in range(SLOTS.size()):
+		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Weapon slot %d" % (i + 1), str(i + 1), "Hunters")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	return keys
