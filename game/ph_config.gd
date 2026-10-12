@@ -118,8 +118,13 @@ extends DotConfig
 ## Every prop still alive is beaconed once this few are left. 0 never.
 @export_range(0, 32, 1) var beacon_props_left: int = 1
 
-## Every prop still alive is beaconed once this few seconds are left. 0 never.
-@export_range(0.0, 600.0, 1.0) var beacon_seconds_left: float = 30.0
+## Every prop still alive is beaconed once this few seconds are left. 0 never, the default:
+## with it at 30 the stand-in props won 4 rounds in 20 at medium (94 of 100 found), and with it
+## off 11 in 24, because every hunter there is by then walks to every prop still in, and a
+## round the props had held for four and a half minutes was lost in the last half minute (as
+## game-hide-n-seek found). The last prop's beacon ([member beacon_props_left]) is what ends a
+## round nobody can find anybody in.
+@export_range(0.0, 600.0, 1.0) var beacon_seconds_left: float = 0.0
 
 ## Seconds between a beacon's pings.
 @export_range(0.25, 10.0, 0.25) var beacon_period: float = 2.0

@@ -31,19 +31,21 @@ Past 1.0 it tests the thing: fires at it for 1.1 s. A prop that bleeds is found 
 
 ## Measured
 
-`examples/headless_bots` (in `./game.sh test`, eight rounds by default, `-- --rounds N --difficulty D`, `PH_BOTS_TRACE=1` prints positions, each death and why): eight stand-ins, the game's own draw (three hunters, five props), 32 ticks a second, deterministic, the four delivered maps in turn.
+`examples/headless_bots` (in `./game.sh test`, twenty-four rounds by default, six a map, about four minutes; `-- --rounds N --first N --difficulty D`, `PH_BOTS_TRACE=1` prints positions, each death and why): eight stand-ins, the game's own draw (three hunters, five props), 32 ticks a second, deterministic, the four delivered maps in turn.
 
-| | medium, 20 rounds | easy, 8 | hard, 8 |
+| 24 rounds | easy | medium | hard |
 | --- | --- | --- | --- |
-| a prop lasts, mean | 150 s | 204 s | 162 s |
-| props found | 92 of 100 | 34 of 40 | 39 of 40 |
-| rounds the props win | 3 of 20 | 3 of 8 | 1 of 8 |
-| tests on props / on furniture | 56 / 57 | 30 / 21 | 27 / 30 |
-| hunters killed by decoys | 0 of 60 | 0 of 24 | 1 of 24 |
+| a prop lasts, mean | 207 s | 156 s | 119 s |
+| props found | 71 of 120 | 89 of 120 | 99 of 120 |
+| rounds the props win | 16 of 24 | 11 of 24 | 7 of 24 |
+| tests on props / on furniture | 84 / 53 | 77 / 61 | 71 / 36 |
+| hunters killed by decoys | 0 of 72 | 0 of 72 | 1 of 72 |
 
-At medium: every prop disguised when the seek starts, fit 0.84 (others of the kind round it), 15 m apart on average, 1.3 s moving per prop-minute (moves before a forced taunt). Many finds come in the last 30 s, from the beacon. Measured on the maps as dressed 2026-10-12 (lunch on the tables, crates, a camp); before the dressing the same rounds gave 145 s and 6 of 20. The stand-ins before this pass, on the same rounds: every prop found inside 70 s, most of them at the first forced taunt, and every prop "fleeing" at the seek's start (the disguise's new maximum read as a shot).
+Medium on the next 24 seeds (`--first 24`): 10 of 24. At medium every prop is disguised when the seek starts, fit 0.84 (others of the kind round it), 15 m apart on average, 1.2 s moving per prop-minute (moves before a forced taunt). Measured 2026-10-12 with the time beacon off (`beacon_seconds_left` 0, the default now). With it at 30 s the same rounds gave the props 4 of 20 and 94 of 100 found, many of them in the last half minute, because every hunter then walks to every prop still in; that is what decided the balance, as it did in game-hide-n-seek. Before the maps were dressed (lunch on the tables, crates, a camp) the props won 6 of 20; the stand-ins before the first bots pass lost every prop inside 70 s.
 
-The suite holds medium to bands: all disguised, fit at least 0.5, at most 3 s moving per prop-minute, the props win between a tenth and nine tenths of rounds, a find in at least half, furniture tests at most three times the prop tests, at most one hunter in five killed by decoys, the board's "props left" equal to the props alive after every death, and at most one hiding place in fifty cut off from the props' start (78 of 319 on the school were, until its north classrooms' boards stopped running across their doors).
+**The maps are not even**: of 24 medium rounds plus the next 24, the props won 11 of 12 on the school, 7 of 12 on the office, 2 of 12 in the house and 1 of 12 in the woods. The suite holds the mean, not each map.
+
+The suite holds medium to bands: all disguised, fit at least 0.5, at most 3 s moving per prop-minute, **the props win 35-55% of rounds**, a find in at least half, furniture tests at most three times the prop tests, at most one hunter in five killed by decoys, the board's "props left" equal to the props alive after every death, and at most one hiding place in fifty cut off from the props' start (78 of 319 on the school were, until its north classrooms' boards stopped running across their doors). `--difficulty easy` wants the props winning at least half the rounds, `hard` at most two in five.
 
 ## Looking at it
 

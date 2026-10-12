@@ -90,7 +90,7 @@ ph_forced_taunt_points 0       // points for one the game forced
 ph_reveal_cooldown 10          // seconds before a prop can show itself again
 ph_reveal_points 1             // points a second while a prop shows itself
 ph_beacon_props_left 1         // beacon every prop once this few are left (0 never)
-ph_beacon_seconds_left 30      // beacon every prop with this many seconds left (0 never)
+ph_beacon_seconds_left 0       // beacon every prop with this many seconds left (0 never)
 ph_decoy_penalty 0.2           // share of a shot's damage a hunter takes for hitting furniture (0 off)
 ph_rounds_per_map 4            // rounds on a map before the next one
 ph_spectate_camera 0           // who the dead may watch: 0 anybody, 1 their own side, 2 nobody

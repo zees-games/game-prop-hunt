@@ -20,13 +20,16 @@ const PhBots := preload("../game/ph_bots.gd")
 ## - every prop is disguised when the hunters are let go, as something that belongs where it
 ##   stands (others of its kind round it), and the props are apart;
 ## - a disguised prop keeps still unless it was shot (seconds moving per prop-minute);
-## - the props win some rounds and the hunters others, and the hunters find somebody in most;
+## - at medium a close game: the props win 35-55% of rounds (a hunt that finds everybody is as
+##   broken as one that finds nobody), and the hunters find somebody in most; easy leaves the
+##   props at least half the rounds, hard at most two in five;
 ## - the hunters test props more than furniture, and the decoy penalty kills few of them;
 ## - the board's "props left" is the props alive, after every find;
 ## - every place a prop may hide is reachable from where the props start (the school's
 ##   bathrooms once had a toilet in each doorway).
 ##
-## `-- --rounds N` plays more (the default keeps `./game.sh test` short), `-- --first N` starts
+## Twenty-four rounds by default, six a map, about four minutes: a band on eight rounds was a
+## band on noise. `-- --rounds N` plays another number, `-- --first N` starts
 ## at the Nth round's map and seed, `-- --difficulty hard` plays another preset, and
 ## `PH_BOTS_TRACE=1` prints where everybody is every few seconds. Without `maps/` linked it plays
 ## the practice house.
@@ -38,6 +41,11 @@ const TICK := 1.0 / float(TICK_RATE)
 const BOTS := 8
 
 const SECTIONS := 3
+
+## The share of rounds the props win: a band at medium, a floor at easy, a ceiling at hard.
+const PROPS_WIN := Vector2(0.35, 0.55)
+const EASY_PROPS_WIN := 0.5
+const HARD_PROPS_WIN := 0.4
 
 var _passed := 0
 var _failed := 0
@@ -62,7 +70,7 @@ func _run() -> void:
 	print("prophunt bots")
 	print("")
 	var args := OS.get_cmdline_user_args()
-	var rounds := maxi(1, int(_arg(args, "--rounds", "8")))
+	var rounds := maxi(1, int(_arg(args, "--rounds", "24")))
 	var difficulty := _arg(args, "--difficulty", "medium")
 	var first := maxi(0, int(_arg(args, "--first", "0")))
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
@@ -121,11 +129,15 @@ func _run() -> void:
 	if difficulty == "medium":
 		_check(fit / n >= 0.5, "props hide as what belongs where they stand (others of the kind round them)", "fit %.2f" % (fit / n))
 		_check(moving / n <= 3.0, "a disguised prop keeps still unless shot", "%.1f s moving per prop-minute" % (moving / n))
-		_check(props_won * 10 >= results.size() and props_won * 10 <= results.size() * 9,
-			"the props win some rounds and the hunters others", "props won %d of %d" % [props_won, results.size()])
+		_check(float(props_won) >= PROPS_WIN.x * n and float(props_won) <= PROPS_WIN.y * n,
+			"a close game: the props win %.0f-%.0f%% of rounds" % [PROPS_WIN.x * 100.0, PROPS_WIN.y * 100.0], "props won %d of %d" % [props_won, results.size()])
 		_check(rounds_with_find * 2 >= results.size(), "the hunters find somebody in at least half the rounds", "%d of %d" % [rounds_with_find, results.size()])
 		_check(tests_furniture <= maxi(tests_props * 3, 4 * results.size()), "the hunters do not shoot the furniture to pieces", "%d furniture tests, %d prop tests" % [tests_furniture, tests_props])
 		_check(decoy_deaths * 5 <= hunters, "the decoy penalty kills at most one hunter in five", "%d of %d" % [decoy_deaths, hunters])
+	elif difficulty == "easy":
+		_check(float(props_won) >= EASY_PROPS_WIN * n, "at easy the props win at least %.0f%% of rounds" % (EASY_PROPS_WIN * 100.0), "props won %d of %d" % [props_won, results.size()])
+	elif difficulty == "hard":
+		_check(float(props_won) <= HARD_PROPS_WIN * n, "at hard the props win at most %.0f%% of rounds" % (HARD_PROPS_WIN * 100.0), "props won %d of %d" % [props_won, results.size()])
 	_completed += 1
 
 	_section("every place a prop may hide is reachable from the props' start")

@@ -77,7 +77,7 @@ Short forms; the reasoning is in the linked file.
 **Taunts, beacons, sides**
 
 - Taunts start with the seek, play from where the prop stands to `taunt_range`; standing still `auto_taunt_seconds` (60, as game-hide-n-seek) taunts for you. The list is `taunts/taunts.json`. [design](docs/design.md#decision-4-taunts-are-a-choice-with-a-price-and-standing-still-is-not-free)
-- The last props ping (`beacon_props_left`, `beacon_seconds_left`, `DotFxBeacon`). [design](docs/design.md#decision-5-the-end-of-a-round-finds-the-last-props)
+- The last prop pings (`beacon_props_left` 1); the time beacon (`beacon_seconds_left`) is off by default because it decided rounds the props had held (`DotFxBeacon`). [design](docs/design.md#decision-5-the-end-of-a-round-finds-the-last-props)
 - Sides are `DotTeamRotation` (RANDOM, QUEUE, SWAP); `!hunter`/`!prop`/`!any` are wishes. Stats are `PhProgress` over dot-stats and dot-achievements. [design](docs/design.md#sides-points-and-stats)
 - `PhGame` has no `var rotation` (it shadowed `Node3D.rotation`); the draw's memory is `hunter_history`. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
@@ -107,7 +107,7 @@ Short forms; the reasoning is in the linked file.
 
 ```bash
 ./game.sh test                                         # parse, then all five suites
-timeout 900 godot --headless --path . res://examples/headless_bots.tscn -- --rounds 20   # the bots' numbers
+timeout 900 godot --headless --path . res://examples/headless_bots.tscn -- --difficulty hard   # the bots' numbers at another preset (24 rounds, ~4 min)
 python3 ../mg-prop-hunt-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --ph-map-ids=ph_school

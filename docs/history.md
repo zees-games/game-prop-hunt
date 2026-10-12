@@ -2,6 +2,10 @@
 
 Bug stories worth keeping, newest first. The rule each one left is in `CLAUDE.md`.
 
+## The last half minute decided the rounds (2026-10-12)
+
+With the bots playing properly the props still won 3 of 20 rounds at medium, 92 of 100 found, many of them in the last 30 s: the time beacon (`beacon_seconds_left` 30) showed every prop still in to every hunter, and a round the props had held was lost there. Off by default now (11 of 24); the last prop's beacon still ends a round nobody can find anybody in. game-hide-n-seek had found the same the same morning. The suite's band was a tenth to nine tenths of eight rounds, which 3 of 20 passed; it is 35-55% of twenty-four now.
+
 ## The bots did not know how to play, and the school was in the way (2026-10-12)
 
 Christian's first play test: "The bots don't know how to play the game at all", "Random things in the middle of the hallway and a sink blocking a room?", sinks and boxes sliding and tumbling, and "4 props left" on the board for the whole hunt.

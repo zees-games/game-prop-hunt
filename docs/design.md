@@ -38,7 +38,7 @@ The catalogue grew from 163 to 204 props: a chosen few of Kenney's Food Kit (bot
 
 ## Decision 5: the end of a round finds the last props
 
-With `beacon_props_left` props left or `beacon_seconds_left` seconds to go, every live prop pings: a sound and an expanding ring everybody sees (`DotFxBeacon`, dot-fx), every `beacon_period`.
+With `beacon_props_left` props left (1) or `beacon_seconds_left` seconds to go (0, off), every live prop pings: a sound and an expanding ring everybody sees (`DotFxBeacon`, dot-fx), every `beacon_period`. **The time beacon is off by default**: at 30 s it gave every hunter a walk to every prop still in, and the props won 4 rounds in 20 at medium, most lost in the last half minute; off, 11 in 24 ([bots](bots.md#measured)). The last prop's beacon is what still ends a round nobody can find anybody in.
 
 ## Sides, points and stats
 
