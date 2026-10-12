@@ -47,6 +47,9 @@ enum Kind {
 	TAUNT,
 	## The furniture bit back: to the hunter who shot it, how much it cost.
 	DECOY,
+	## A breakable piece of the map was shot to bits: which, from where, and whether quietly
+	## (told to a joiner, no debris).
+	BROKEN,
 }
 
 enum Ask {
@@ -461,6 +464,30 @@ static func write_decoy(amount: float) -> PackedByteArray:
 static func read_decoy(r: DotNetReader) -> Dictionary:
 	var amount := r.read_float_range(0.0, 1000.0, 14)
 	return {"amount": amount, "ok": r.ok()}
+
+
+## Map prop indices: a school is four hundred and fifty props, so 16 bits leaves room.
+const PROP_INDEX_BITS := 16
+
+
+static func write_broken(index: int, direction: Vector3, quiet: bool) -> PackedByteArray:
+	var w := _w()
+	w.write_uint(clampi(index, 0, (1 << PROP_INDEX_BITS) - 1), PROP_INDEX_BITS)
+	var d := direction.normalized() if direction.length() > 0.001 else Vector3.ZERO
+	w.write_float_range(d.x, -1.0, 1.0, 8)
+	w.write_float_range(d.y, -1.0, 1.0, 8)
+	w.write_float_range(d.z, -1.0, 1.0, 8)
+	w.write_bool(quiet)
+	return w.to_bytes()
+
+
+static func read_broken(r: DotNetReader) -> Dictionary:
+	var index := r.read_uint(PROP_INDEX_BITS)
+	var x := r.read_float_range(-1.0, 1.0, 8)
+	var y := r.read_float_range(-1.0, 1.0, 8)
+	var z := r.read_float_range(-1.0, 1.0, 8)
+	var quiet := r.read_bool()
+	return {"index": index, "direction": Vector3(x, y, z), "quiet": quiet, "ok": r.ok()}
 
 
 ## A turn: [enum PhGame.Turn].

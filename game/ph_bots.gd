@@ -746,6 +746,8 @@ func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
 	# The map's own pieces, near and in view.
 	for i in range(props.size()):
 		var prop: Dictionary = props[i]
+		if bool(prop.get("broken", false)):
+			continue
 		var frame: Transform3D = prop["transform"]
 		var middle := frame.origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0)
 		if absf(middle.x - eye.x) > DOUBT_REACH or absf(middle.z - eye.z) > DOUBT_REACH:

@@ -85,6 +85,10 @@ func _initialize() -> void:
 				"offset": offset_xyz,
 				"disguise": not fixed.has(model),
 			})
+			# Breakable: health a shot takes before it breaks (kits.json "breaks", by pattern).
+			var breaks := _breaks_for(model, kit)
+			if breaks > 0.0:
+				(props[props.size() - 1] as Dictionary)["breaks"] = breaks
 
 			if not pieces.is_empty():
 				shaped[id] = DotPropPieces.encode(pieces)
@@ -194,6 +198,16 @@ func _bounds(node: Node, parent: Transform3D) -> AABB:
 
 
 ## The kit's scale, or the first of its `scales` patterns (`tree_*`) that matches the model.
+## The health a model breaks at, from its kit's "breaks" ({pattern: health}); 0 for one that
+## does not break.
+static func _breaks_for(model: String, kit: Dictionary) -> float:
+	var breaks: Dictionary = kit.get("breaks", {})
+	for pattern: String in breaks:
+		if model.match(pattern):
+			return float(breaks[pattern])
+	return 0.0
+
+
 static func _scale_for(model: String, kit: Dictionary) -> float:
 	var scales: Dictionary = kit.get("scales", {})
 	for pattern: String in scales:
@@ -210,6 +224,10 @@ static func _snake(name: String) -> String:
 	var out := ""
 	for i in range(name.length()):
 		var c := name[i]
+		# The Food and Survival kits name files with dashes (soda-bottle).
+		if c == "-":
+			out += "_"
+			continue
 		if c == c.to_upper() and c != c.to_lower() and i > 0 and name[i - 1] != "_":
 			out += "_"
 		out += c.to_lower()

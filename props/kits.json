@@ -31,6 +31,28 @@
           0.52,
           0.24
         ]
+      },
+      "breaks": {
+        "lamp*": 20,
+        "computerScreen": 25,
+        "computerKeyboard": 10,
+        "computerMouse": 10,
+        "laptop": 20,
+        "radio": 20,
+        "televisionVintage": 40,
+        "televisionModern": 40,
+        "speakerSmall": 20,
+        "toaster": 20,
+        "kitchenBlender": 15,
+        "kitchenCoffeeMachine": 20,
+        "kitchenMicrowave": 30,
+        "pottedPlant": 25,
+        "plantSmall*": 15,
+        "books": 15,
+        "cardboardBox*": 30,
+        "trashcan": 30,
+        "bear": 20,
+        "pillow*": 10
       }
     },
     {
@@ -98,6 +120,58 @@
           0.76,
           0.6
         ]
+      },
+      "breaks": {
+        "pot_*": 25,
+        "flower_*": 5,
+        "crop_*": 15,
+        "mushroom_*": 10
+      }
+    },
+    {
+      "id": "food",
+      "dir": "assets/props/food",
+      "scale": 0.57,
+      "credit": "Kenney Food Kit (CC0)",
+      "fixed": [],
+      "scales": {
+        "plate": 0.3,
+        "bowl": 0.35,
+        "pot": 0.45,
+        "pot-stew": 0.45,
+        "frying-pan": 0.45,
+        "mug": 0.42,
+        "cup-coffee": 0.42,
+        "cutting-board": 0.45,
+        "pizza-box": 0.42,
+        "watermelon": 0.66,
+        "cake": 0.5,
+        "soda-can": 0.35
+      },
+      "breaks": {
+        "*": 12
+      }
+    },
+    {
+      "id": "survival",
+      "dir": "assets/props/survival",
+      "scale": 2.6,
+      "credit": "Kenney Survival Kit (CC0)",
+      "fixed": [
+        "signpost"
+      ],
+      "scales": {
+        "bottle": 2.4,
+        "bottle-large": 2.4,
+        "bedroll": 3.0,
+        "tent-canvas": 4.2
+      },
+      "breaks": {
+        "bottle*": 15,
+        "bucket": 25,
+        "box": 40,
+        "box-open": 35,
+        "barrel-open": 60
       }
     }
   ],
@@ -118,6 +192,30 @@
     "plant_bushDetailed": "Leafy bush",
     "crop_pumpkin": "Pumpkin",
     "crop_melon": "Melon",
-    "campfire_logs": "Campfire"
+    "campfire_logs": "Campfire",
+    "soda-bottle": "Soda bottle",
+    "bottle-ketchup": "Ketchup",
+    "bottle-musterd": "Mustard",
+    "bottle-oil": "Bottle of oil",
+    "carton-small": "Small carton",
+    "cup-coffee": "Coffee cup",
+    "pot-stew": "Stew pot",
+    "frying-pan": "Frying pan",
+    "loaf-round": "Round loaf",
+    "knife-block": "Knife block",
+    "pepper-mill": "Pepper mill",
+    "wine-red": "Bottle of wine",
+    "soda-can": "Soda can",
+    "cutting-board": "Cutting board",
+    "pizza-box": "Pizza boxes",
+    "barrel-open": "Open barrel",
+    "box-large": "Large crate",
+    "box-open": "Open crate",
+    "box": "Crate",
+    "bottle": "Water bottle",
+    "bottle-large": "Water jug",
+    "campfire-pit": "Fire pit",
+    "resource-wood": "Firewood",
+    "tent-canvas": "Tent"
   }
 }

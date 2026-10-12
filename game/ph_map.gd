@@ -50,9 +50,13 @@ var draw_world: bool = false
 ## The normalised document this was built from.
 var doc: Dictionary = {}
 
-## Every prop in the map: `{id, transform, size, shapes}`. The transform's origin is the middle
-## of the prop's footprint on the floor.
+## Every prop in the map: `{id, transform, size, shapes, broken}`. The transform's origin is the
+## middle of the prop's footprint on the floor.
 var props: Array[Dictionary] = []
+
+## Prop index -> where it is drawn: `[[MultiMesh, instance, Transform3D], ...]`, or a stand-in
+## node. What [method break_prop] hides and [method restore_all] puts back.
+var _drawn_at: Dictionary = {}
 
 var _solid: StaticBody3D = null
 var _furniture: StaticBody3D = null
@@ -112,6 +116,7 @@ func clear() -> void:
 		child.queue_free()
 
 	props.clear()
+	_drawn_at.clear()
 	_missing.clear()
 	_bounds = AABB()
 	_solid = null
@@ -239,12 +244,12 @@ func _build_props() -> void:
 			_furniture.add_child(shape)
 			shapes.append(shape)
 
-		props.append({"id": prop_id, "transform": frame, "size": size, "shapes": shapes})
+		props.append({"id": prop_id, "transform": frame, "size": size, "shapes": shapes, "broken": false})
 
 		if draw_world:
 			if not by_id.has(prop_id):
 				by_id[prop_id] = []
-			(by_id[prop_id] as Array).append(frame)
+			(by_id[prop_id] as Array).append([frame, props.size() - 1])
 
 	if not draw_world:
 		return
@@ -254,10 +259,11 @@ func _build_props() -> void:
 		var parts := catalogue.parts(prop_id)
 
 		if parts.is_empty():
-			for frame: Transform3D in frames:
+			for placed: Array in frames:
 				var stand_in := catalogue.instance(prop_id)
-				stand_in.transform = frame
+				stand_in.transform = placed[0]
 				_drawn.add_child(stand_in)
+				_drawn_at[int(placed[1])] = stand_in
 			continue
 
 		for part: Array in parts:
@@ -267,7 +273,12 @@ func _build_props() -> void:
 			multi.instance_count = frames.size()
 
 			for i in range(frames.size()):
-				multi.set_instance_transform(i, (frames[i] as Transform3D) * (part[1] as Transform3D))
+				var placed: Array = frames[i]
+				var at := (placed[0] as Transform3D) * (part[1] as Transform3D)
+				multi.set_instance_transform(i, at)
+				if not _drawn_at.has(int(placed[1])):
+					_drawn_at[int(placed[1])] = []
+				(_drawn_at[int(placed[1])] as Array).append([multi, i, at])
 
 			var drawn := MultiMeshInstance3D.new()
 			drawn.name = "Props_%s" % String(prop_id)
@@ -427,6 +438,8 @@ func prop_from_hit(collider: Object, shape_index: int) -> int:
 func prop_containing(point: Vector3) -> int:
 	for index in range(props.size()):
 		var prop: Dictionary = props[index]
+		if bool(prop["broken"]):
+			continue
 		var size: Vector3 = prop["size"]
 		var local: Vector3 = (prop["transform"] as Transform3D).affine_inverse() * point
 		var half := size * 0.5 + Vector3.ONE * HIT_MARGIN
@@ -443,6 +456,69 @@ func prop_containing(point: Vector3) -> int:
 			return index
 
 	return -1
+
+
+## Breaks prop [param index]: nothing collides with it or draws it until [method restore_all].
+## False when it was already broken or there is no such prop. Whether it MAY break is the
+## game's (the catalogue's `breaks`).
+func break_prop(index: int) -> bool:
+	if index < 0 or index >= props.size() or bool(props[index]["broken"]):
+		return false
+
+	props[index]["broken"] = true
+
+	for shape: CollisionShape3D in props[index]["shapes"]:
+		shape.disabled = true
+
+	var drawn: Variant = _drawn_at.get(index)
+
+	if drawn is Node3D:
+		(drawn as Node3D).visible = false
+	elif drawn is Array:
+		for entry: Array in drawn:
+			var at: Transform3D = entry[2]
+			(entry[0] as MultiMesh).set_instance_transform(int(entry[1]), Transform3D(Basis().scaled(Vector3.ZERO), at.origin))
+
+	return true
+
+
+## Every broken prop whole again: a new round.
+func restore_all() -> void:
+	for index in range(props.size()):
+		if not bool(props[index]["broken"]):
+			continue
+
+		props[index]["broken"] = false
+
+		for shape: CollisionShape3D in props[index]["shapes"]:
+			shape.disabled = false
+
+		var drawn: Variant = _drawn_at.get(index)
+
+		if drawn is Node3D:
+			(drawn as Node3D).visible = true
+		elif drawn is Array:
+			for entry: Array in drawn:
+				(entry[0] as MultiMesh).set_instance_transform(int(entry[1]), entry[2])
+
+
+func broken_indices() -> PackedInt32Array:
+	var out := PackedInt32Array()
+	for index in range(props.size()):
+		if bool(props[index]["broken"]):
+			out.append(index)
+	return out
+
+
+## The meshes prop [param index] is drawn with, each `[Mesh, Transform3D]` in the world: what
+## its debris is made of. Empty on a server.
+func drawn_parts(index: int) -> Array:
+	var out: Array = []
+	var drawn: Variant = _drawn_at.get(index)
+	if drawn is Array:
+		for entry: Array in drawn:
+			out.append([(entry[0] as MultiMesh).mesh, entry[2]])
+	return out
 
 
 func prop_id(index: int) -> StringName:

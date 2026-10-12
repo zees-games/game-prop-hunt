@@ -42,7 +42,7 @@ game/
   net/               the codec (MAP, DISGUISE, TAUNT, DECOY…), the link, the player behaviour,
                      the bridge, and PhInterest (the blindfold on the wire)
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
-assets/props/        the vendored furniture and nature models (Kenney, CC0)
+assets/props/        the vendored models (Kenney, CC0): furniture, nature, food, survival (a chosen few each)
 taunts/              the taunt sounds and taunts.json (Kenney, CC0); edit freely
 maps/                link to ../mg-prop-hunt-maps/maps
 examples/            headless_run, headless_maps, headless_bots, headless_net, dedicated (each counts its sections and checks)
@@ -72,6 +72,7 @@ Short forms; the reasoning is in the linked file.
 - `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s: offline from the world's rig (`headless_run`), online from the owner-only `net_magazine`/`net_reserve` (`headless_net`), both armed. [hud](docs/hud.md)
 - Offline, the client's buttons go onto the world's own sample through `PhPlayer.command_stamp` (set in `PhClient._adopt`); never stamp `controller.current_command` for the world. [history](docs/history.md#offline-no-hunters-shot-ever-landed-2026-10-12)
 - The furniture is one static body, so nothing a hunter does moves a prop out of the box the decoy check reads. [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
+- Breakable furniture (`props/kits.json` "breaks", measured into the catalogue) breaks once the shots on it add up: `PhMap.break_prop` disables its shapes and hides its drawn instances, the decoy is still charged, BROKEN tells every client (a joiner quietly), and a round restores everything on both ends. Debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
 
 **Taunts, beacons, sides**
 

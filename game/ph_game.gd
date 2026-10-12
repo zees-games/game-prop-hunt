@@ -11,6 +11,7 @@ const PhProps := preload("ph_props.gd")
 const PhRules := preload("ph_rules.gd")
 const PhSpectate := preload("ph_spectate.gd")
 const PhBots := preload("ph_bots.gd")
+const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
@@ -90,6 +91,10 @@ signal refused(player_id: StringName, why: String)
 ## A hunter shot the furniture and paid for it.
 signal decoy_hit(player_id: StringName, amount: float)
 
+## A breakable piece of the map's furniture was shot to bits (index into [code]map.props[/code]),
+## from [param direction]. Both ends; a client throws its debris.
+signal prop_broken(index: int, direction: Vector3)
+
 signal achievement_earned(player_id: StringName, title: String, points: int)
 signal player_armed(player_id: StringName, weapon_id: StringName)
 
@@ -160,6 +165,9 @@ var _decided: bool = false
 var _winner: int = 0
 var _winner_name: String = ""
 
+## Map prop index -> damage taken this round, for the breakable ones. Server side.
+var _prop_damage: Dictionary = {}
+
 ## The stand-ins' brains and the map's survey for them (`ph_bots.gd`). Server side and solo.
 var bots: PhBots = PhBots.new(self)
 
@@ -192,6 +200,7 @@ func _ready() -> void:
 	_build_progress()
 	_build_taunts()
 	taunted.connect(_on_taunted_for_bots)
+	prop_broken.connect(_on_prop_broken_debris)
 
 	if authoritative:
 		catalogue = PhCatalogue.new()
@@ -660,6 +669,11 @@ func _on_round_started(number: int) -> void:
 	_winner_name = ""
 	seek_elapsed = 0.0
 	bots.reset()
+
+	# Every broken piece whole again. A client does the same on the ROUND event.
+	_prop_damage.clear()
+	if map != null:
+		map.restore_all()
 
 	if taunts != null:
 		taunts.reset()
@@ -1411,6 +1425,7 @@ func _advance_weapons() -> void:
 			shot.tick = _tick
 			var _resolved := combat.resolve_shot(shot)
 			_charge_for_decoys(player, shot)
+			_break_furniture(shot)
 
 
 ## What shooting the furniture costs: a share of the damage the shot would have done, off the
@@ -1458,6 +1473,76 @@ func _charge_for_decoys(player: PhPlayer, shot: DotShot) -> void:
 		progress.on_decoy(player.player_id)
 
 	decoy_hit.emit(player.player_id, amount)
+
+
+## Shooting breakable furniture breaks it. Server side.
+##
+## [b]Breaking is not a free guess.[/b] The decoy penalty is charged for every pellet first
+## ([method _charge_for_decoys]); a bottle shot to bits cost the hunter as much as a sofa. What
+## breaks is the catalogue's (`props/kits.json` "breaks": glass, food, lamps, screens, plants,
+## boxes), and only once the shots that landed on it add up to its number.
+func _break_furniture(shot: DotShot) -> void:
+	if map == null or props_catalogue == null:
+		return
+
+	var struck: Array[Vector3] = []
+
+	for damage in shot.damages:
+		if damage != null:
+			struck.append(damage.point)
+
+	for point in shot.impacts:
+		var on_somebody := false
+
+		for hit in struck:
+			if hit.distance_to(point) < 0.02:
+				on_somebody = true
+				break
+
+		if on_somebody:
+			continue
+
+		var index := map.prop_containing(point)
+
+		if index < 0:
+			continue
+
+		var limit := props_catalogue.breaks(map.prop_id(index))
+
+		if limit <= 0.0:
+			continue
+
+		var taken := float(_prop_damage.get(index, 0.0)) + shot.damage
+		_prop_damage[index] = taken
+
+		if taken >= limit and map.break_prop(index):
+			prop_broken.emit(index, shot.direction)
+			DotLog.debug(CHANNEL, "furniture broke", {"prop": String(map.prop_id(index)), "index": index})
+
+
+## A client: the server broke prop [param index]. [param quiet] for one told on joining, which
+## broke before it came and throws no debris.
+func apply_broken(index: int, direction: Vector3, quiet: bool) -> void:
+	if map == null or not map.break_prop(index):
+		return
+
+	if not quiet:
+		prop_broken.emit(index, direction)
+
+
+## Throws a broken prop's pieces, where anything is drawn.
+func _on_prop_broken_debris(index: int, direction: Vector3) -> void:
+	if not draw_world or map == null or index < 0 or index >= map.props.size():
+		return
+
+	var prop: Dictionary = map.props[index]
+	var size: Vector3 = prop["size"]
+	var centre: Vector3 = (prop["transform"] as Transform3D) * Vector3(0.0, size.y * 0.5, 0.0)
+	var debris := PhDebris.new()
+	debris.name = "Debris_%d" % index
+	add_child(debris)
+	debris.burst(map.drawn_parts(index), centre, size, direction,
+		physics.layer_mask(&"world") if physics != null else 1, _round_seed + index)
 
 
 func weapon_command_for(player: PhPlayer) -> DotWeaponCommand:

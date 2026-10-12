@@ -103,6 +103,7 @@ func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 			"size": size,
 			"offset": _v3(entry.get("offset")),
 			"disguise": bool(entry.get("disguise", true)),
+			"breaks": float(entry.get("breaks", 0.0)),
 			"pieces": DotPropPieces.decode(all_pieces.get(String(id), [])),
 		}
 		order.append(id)
@@ -153,6 +154,12 @@ func shapes_of(id: StringName) -> Array:
 
 func title_of(id: StringName) -> String:
 	return str((props.get(id, {}) as Dictionary).get("title", id))
+
+
+## How much shooting breaks [param id] (as a map's furniture), or 0 for a piece that never
+## breaks. `props/kits.json` names which by pattern: glass, food, lamps, screens, plants, boxes.
+func breaks(id: StringName) -> float:
+	return float((props.get(id, {}) as Dictionary).get("breaks", 0.0))
 
 
 ## Whether a player may hide as [param id]. A ceiling fan is in a map and cannot be worn.

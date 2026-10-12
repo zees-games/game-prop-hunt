@@ -29,7 +29,7 @@ const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 13
-const CHECKS := 57
+const CHECKS := 59
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -154,6 +154,10 @@ func _test_the_codec() -> void:
 
 	var decoy := PhEvents.read_decoy(DotNetReader.new(PhEvents.write_decoy(4.5)))
 	_check(bool(decoy["ok"]) and absf(float(decoy["amount"]) - 4.5) < 0.1, "DECOY", str(decoy))
+
+	var broken := PhEvents.read_broken(DotNetReader.new(PhEvents.write_broken(451, Vector3(0.0, 0.0, -1.0), true)))
+	_check(bool(broken["ok"]) and int(broken["index"]) == 451 and (broken["direction"] as Vector3).distance_to(Vector3(0.0, 0.0, -1.0)) < 0.02
+		and bool(broken["quiet"]), "BROKEN", str(broken))
 
 	var turned := PhEvents.read_turn(DotNetReader.new(PhEvents.write_turn(PhGame.Turn.TILT_LEFT)))
 	var asked := PhEvents.read_ask_taunt(DotNetReader.new(PhEvents.write_ask_taunt(&"whistle")))
@@ -451,6 +455,22 @@ func _test_a_decoy_is_charged() -> void:
 			String(server_me.weapons.arsenal.current_def().id) if server_me.weapons != null and server_me.weapons.arsenal.current_def() != null else "nothing"])
 	_check(_heard.has("decoy") and float(_heard["decoy"]) > 0.0, "and the client was told, for its flash",
 		str(_heard.get("decoy")))
+
+	# A breakable piece the server breaks is broken on the client too.
+	var index := -1
+	for i in range(_server_game.map.props.size()):
+		if _server_game.props_catalogue.breaks(_server_game.map.prop_id(i)) > 0.0:
+			index = i
+			break
+	var piece: Dictionary = _server_game.map.props[index]
+	var shot := DotShot.new()
+	shot.damage = 10000.0
+	shot.direction = Vector3(0.0, 0.0, -1.0)
+	shot.impacts.append((piece["transform"] as Transform3D).origin + Vector3(0.0, (piece["size"] as Vector3).y * 0.5, 0.0))
+	_server_game._break_furniture(shot)
+	await _steps(6)
+	_check(bool(_server_game.map.props[index]["broken"]) and bool(_client_game.map.props[index]["broken"]),
+		"furniture the server breaks is broken on the client", String(_server_game.map.prop_id(index)))
 	_finished()
 
 

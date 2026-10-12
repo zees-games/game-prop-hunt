@@ -64,6 +64,500 @@
   },
   "props": [
     {
+      "id": "food_apple",
+      "title": "Apple",
+      "kit": "food",
+      "model": "assets/props/food/apple.glb",
+      "scale": 0.57,
+      "size": [
+        0.112,
+        0.109,
+        0.112
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_banana",
+      "title": "Banana",
+      "kit": "food",
+      "model": "assets/props/food/banana.glb",
+      "scale": 0.57,
+      "size": [
+        0.078,
+        0.112,
+        0.359
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_bottle_ketchup",
+      "title": "Ketchup",
+      "kit": "food",
+      "model": "assets/props/food/bottle-ketchup.glb",
+      "scale": 0.57,
+      "size": [
+        0.082,
+        0.224,
+        0.095
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_bottle_musterd",
+      "title": "Mustard",
+      "kit": "food",
+      "model": "assets/props/food/bottle-musterd.glb",
+      "scale": 0.57,
+      "size": [
+        0.082,
+        0.224,
+        0.095
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_bottle_oil",
+      "title": "Bottle of oil",
+      "kit": "food",
+      "model": "assets/props/food/bottle-oil.glb",
+      "scale": 0.57,
+      "size": [
+        0.08,
+        0.354,
+        0.08
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_bowl",
+      "title": "Bowl",
+      "kit": "food",
+      "model": "assets/props/food/bowl.glb",
+      "scale": 0.35,
+      "size": [
+        0.176,
+        0.075,
+        0.203
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_cake",
+      "title": "Cake",
+      "kit": "food",
+      "model": "assets/props/food/cake.glb",
+      "scale": 0.5,
+      "size": [
+        0.32,
+        0.137,
+        0.32
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_carton",
+      "title": "Carton",
+      "kit": "food",
+      "model": "assets/props/food/carton.glb",
+      "scale": 0.57,
+      "size": [
+        0.131,
+        0.337,
+        0.131
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_carton_small",
+      "title": "Small carton",
+      "kit": "food",
+      "model": "assets/props/food/carton-small.glb",
+      "scale": 0.57,
+      "size": [
+        0.131,
+        0.223,
+        0.131
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_cup_coffee",
+      "title": "Coffee cup",
+      "kit": "food",
+      "model": "assets/props/food/cup-coffee.glb",
+      "scale": 0.42,
+      "size": [
+        0.091,
+        0.059,
+        0.12
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.009
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_cutting_board",
+      "title": "Cutting board",
+      "kit": "food",
+      "model": "assets/props/food/cutting-board.glb",
+      "scale": 0.45,
+      "size": [
+        0.261,
+        0.027,
+        0.369
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_frying_pan",
+      "title": "Frying pan",
+      "kit": "food",
+      "model": "assets/props/food/frying-pan.glb",
+      "scale": 0.45,
+      "size": [
+        0.296,
+        0.054,
+        0.46
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.089
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_knife_block",
+      "title": "Knife block",
+      "kit": "food",
+      "model": "assets/props/food/knife-block.glb",
+      "scale": 0.57,
+      "size": [
+        0.362,
+        0.378,
+        0.126
+      ],
+      "offset": [
+        -0.021,
+        0.009,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_loaf",
+      "title": "Loaf",
+      "kit": "food",
+      "model": "assets/props/food/loaf.glb",
+      "scale": 0.57,
+      "size": [
+        0.33,
+        0.252,
+        0.209
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_loaf_round",
+      "title": "Round loaf",
+      "kit": "food",
+      "model": "assets/props/food/loaf-round.glb",
+      "scale": 0.57,
+      "size": [
+        0.44,
+        0.167,
+        0.293
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_mug",
+      "title": "Mug",
+      "kit": "food",
+      "model": "assets/props/food/mug.glb",
+      "scale": 0.42,
+      "size": [
+        0.144,
+        0.115,
+        0.12
+      ],
+      "offset": [
+        -0.02,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_pepper_mill",
+      "title": "Pepper mill",
+      "kit": "food",
+      "model": "assets/props/food/pepper-mill.glb",
+      "scale": 0.57,
+      "size": [
+        0.09,
+        0.312,
+        0.09
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_pineapple",
+      "title": "Pineapple",
+      "kit": "food",
+      "model": "assets/props/food/pineapple.glb",
+      "scale": 0.57,
+      "size": [
+        0.137,
+        0.269,
+        0.14
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_pizza_box",
+      "title": "Pizza boxes",
+      "kit": "food",
+      "model": "assets/props/food/pizza-box.glb",
+      "scale": 0.42,
+      "size": [
+        0.396,
+        0.37,
+        0.4
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_plate",
+      "title": "Plate",
+      "kit": "food",
+      "model": "assets/props/food/plate.glb",
+      "scale": 0.3,
+      "size": [
+        0.268,
+        0.027,
+        0.268
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_pot",
+      "title": "Pot",
+      "kit": "food",
+      "model": "assets/props/food/pot.glb",
+      "scale": 0.45,
+      "size": [
+        0.296,
+        0.162,
+        0.37
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_pot_stew",
+      "title": "Stew pot",
+      "kit": "food",
+      "model": "assets/props/food/pot-stew.glb",
+      "scale": 0.45,
+      "size": [
+        0.296,
+        0.162,
+        0.37
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_soda_bottle",
+      "title": "Soda bottle",
+      "kit": "food",
+      "model": "assets/props/food/soda-bottle.glb",
+      "scale": 0.57,
+      "size": [
+        0.103,
+        0.331,
+        0.089
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_soda_can",
+      "title": "Soda can",
+      "kit": "food",
+      "model": "assets/props/food/soda-can.glb",
+      "scale": 0.35,
+      "size": [
+        0.079,
+        0.123,
+        0.079
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_watermelon",
+      "title": "Watermelon",
+      "kit": "food",
+      "model": "assets/props/food/watermelon.glb",
+      "scale": 0.66,
+      "size": [
+        0.301,
+        0.314,
+        0.301
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
+      "id": "food_wine_red",
+      "title": "Bottle of wine",
+      "kit": "food",
+      "model": "assets/props/food/wine-red.glb",
+      "scale": 0.57,
+      "size": [
+        0.109,
+        0.398,
+        0.094
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 12.0
+    },
+    {
       "id": "furniture_bathroom_cabinet",
       "title": "Bathroom cabinet",
       "kit": "furniture",
@@ -187,7 +681,8 @@
         0.0,
         0.285
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_bed_bunk",
@@ -403,7 +898,8 @@
         0.0,
         0.109
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "furniture_cabinet_bed",
@@ -511,7 +1007,8 @@
         0.0,
         0.244
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 30.0
     },
     {
       "id": "furniture_cardboard_box_open",
@@ -529,7 +1026,8 @@
         0.0,
         0.244
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 30.0
     },
     {
       "id": "furniture_ceiling_fan",
@@ -709,7 +1207,8 @@
         0.0,
         0.136
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_computer_mouse",
@@ -727,7 +1226,8 @@
         0.0,
         0.098
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_computer_screen",
@@ -745,7 +1245,8 @@
         0.0,
         0.12
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 25.0
     },
     {
       "id": "furniture_desk",
@@ -889,7 +1390,8 @@
         0.0,
         0.125
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "furniture_kitchen_cabinet",
@@ -1051,7 +1553,8 @@
         0.0,
         0.276
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_kitchen_fridge",
@@ -1141,7 +1644,8 @@
         0.0,
         0.241
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 30.0
     },
     {
       "id": "furniture_kitchen_sink",
@@ -1213,7 +1717,8 @@
         0.0,
         0.138
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lamp_round_table",
@@ -1231,7 +1736,8 @@
         0.0,
         0.138
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lamp_square_ceiling",
@@ -1249,7 +1755,8 @@
         0.0,
         0.138
       ],
-      "disguise": false
+      "disguise": false,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lamp_square_floor",
@@ -1267,7 +1774,8 @@
         0.0,
         0.138
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lamp_square_table",
@@ -1285,7 +1793,8 @@
         0.0,
         0.138
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lamp_wall",
@@ -1303,7 +1812,8 @@
         0.0,
         -0.173
       ],
-      "disguise": false
+      "disguise": false,
+      "breaks": 20.0
     },
     {
       "id": "furniture_laptop",
@@ -1321,7 +1831,8 @@
         0.0,
         0.276
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_lounge_chair",
@@ -1501,7 +2012,8 @@
         0.0,
         0.102
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_pillow_blue",
@@ -1519,7 +2031,8 @@
         0.0,
         0.073
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_pillow_blue_long",
@@ -1537,7 +2050,8 @@
         0.0,
         0.102
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_pillow_long",
@@ -1555,7 +2069,8 @@
         0.0,
         0.102
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "furniture_plant_small1",
@@ -1573,7 +2088,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "furniture_plant_small2",
@@ -1591,7 +2107,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "furniture_plant_small3",
@@ -1609,7 +2126,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "furniture_potted_plant",
@@ -1627,7 +2145,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 25.0
     },
     {
       "id": "furniture_radio",
@@ -1645,7 +2164,8 @@
         0.0,
         0.112
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_rug_doormat",
@@ -1843,7 +2363,8 @@
         0.0,
         0.153
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_stool_bar",
@@ -2095,7 +2616,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 40.0
     },
     {
       "id": "furniture_television_vintage",
@@ -2113,7 +2635,8 @@
         0.0,
         0.31
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 40.0
     },
     {
       "id": "furniture_toaster",
@@ -2131,7 +2654,8 @@
         0.0,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 20.0
     },
     {
       "id": "furniture_toilet",
@@ -2185,7 +2709,8 @@
         0.0,
         -0.012
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 30.0
     },
     {
       "id": "furniture_washer",
@@ -2275,7 +2800,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "nature_crop_pumpkin",
@@ -2293,7 +2819,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 15.0
     },
     {
       "id": "nature_fence_planks",
@@ -2347,7 +2874,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 5.0
     },
     {
       "id": "nature_flower_red_a",
@@ -2365,7 +2893,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 5.0
     },
     {
       "id": "nature_flower_yellow_a",
@@ -2383,7 +2912,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 5.0
     },
     {
       "id": "nature_grass_large",
@@ -2509,7 +3039,8 @@
         0.125,
         -0.009
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 10.0
     },
     {
       "id": "nature_plant_bush",
@@ -2599,7 +3130,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 25.0
     },
     {
       "id": "nature_pot_small",
@@ -2617,7 +3149,8 @@
         0.125,
         0.0
       ],
-      "disguise": true
+      "disguise": true,
+      "breaks": 25.0
     },
     {
       "id": "nature_rock_large_a",
@@ -2993,6 +3526,282 @@
       "offset": [
         0.0,
         0.225,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_barrel",
+      "title": "Barrel",
+      "kit": "survival",
+      "model": "assets/props/survival/barrel.glb",
+      "scale": 2.6,
+      "size": [
+        0.615,
+        0.894,
+        0.615
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_barrel_open",
+      "title": "Open barrel",
+      "kit": "survival",
+      "model": "assets/props/survival/barrel-open.glb",
+      "scale": 2.6,
+      "size": [
+        0.615,
+        0.894,
+        0.615
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 60.0
+    },
+    {
+      "id": "survival_bedroll",
+      "title": "Bedroll",
+      "kit": "survival",
+      "model": "assets/props/survival/bedroll.glb",
+      "scale": 3.0,
+      "size": [
+        0.931,
+        0.375,
+        1.823
+      ],
+      "offset": [
+        0.0,
+        0.15,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_bottle",
+      "title": "Water bottle",
+      "kit": "survival",
+      "model": "assets/props/survival/bottle.glb",
+      "scale": 2.4,
+      "size": [
+        0.126,
+        0.369,
+        0.146
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 15.0
+    },
+    {
+      "id": "survival_bottle_large",
+      "title": "Water jug",
+      "kit": "survival",
+      "model": "assets/props/survival/bottle-large.glb",
+      "scale": 2.4,
+      "size": [
+        0.174,
+        0.345,
+        0.201
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 15.0
+    },
+    {
+      "id": "survival_box",
+      "title": "Crate",
+      "kit": "survival",
+      "model": "assets/props/survival/box.glb",
+      "scale": 2.6,
+      "size": [
+        0.65,
+        0.65,
+        0.65
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 40.0
+    },
+    {
+      "id": "survival_box_large",
+      "title": "Large crate",
+      "kit": "survival",
+      "model": "assets/props/survival/box-large.glb",
+      "scale": 2.6,
+      "size": [
+        0.65,
+        0.65,
+        1.3
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_box_open",
+      "title": "Open crate",
+      "kit": "survival",
+      "model": "assets/props/survival/box-open.glb",
+      "scale": 2.6,
+      "size": [
+        0.65,
+        0.796,
+        0.65
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 35.0
+    },
+    {
+      "id": "survival_bucket",
+      "title": "Bucket",
+      "kit": "survival",
+      "model": "assets/props/survival/bucket.glb",
+      "scale": 2.6,
+      "size": [
+        0.375,
+        0.499,
+        0.375
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true,
+      "breaks": 25.0
+    },
+    {
+      "id": "survival_campfire_pit",
+      "title": "Fire pit",
+      "kit": "survival",
+      "model": "assets/props/survival/campfire-pit.glb",
+      "scale": 2.6,
+      "size": [
+        0.722,
+        0.284,
+        0.7
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_chest",
+      "title": "Chest",
+      "kit": "survival",
+      "model": "assets/props/survival/chest.glb",
+      "scale": 2.6,
+      "size": [
+        0.677,
+        0.669,
+        0.707
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.015
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_resource_wood",
+      "title": "Firewood",
+      "kit": "survival",
+      "model": "assets/props/survival/resource-wood.glb",
+      "scale": 2.6,
+      "size": [
+        0.533,
+        0.162,
+        0.226
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_signpost",
+      "title": "Signpost",
+      "kit": "survival",
+      "model": "assets/props/survival/signpost.glb",
+      "scale": 2.6,
+      "size": [
+        0.557,
+        1.196,
+        0.112
+      ],
+      "offset": [
+        0.014,
+        0.0,
+        -0.009
+      ],
+      "disguise": false
+    },
+    {
+      "id": "survival_tent_canvas",
+      "title": "Tent",
+      "kit": "survival",
+      "model": "assets/props/survival/tent-canvas.glb",
+      "scale": 4.2,
+      "size": [
+        2.355,
+        2.064,
+        2.356
+      ],
+      "offset": [
+        0.0,
+        0.0,
+        -0.023
+      ],
+      "disguise": true
+    },
+    {
+      "id": "survival_workbench",
+      "title": "Workbench",
+      "kit": "survival",
+      "model": "assets/props/survival/workbench.glb",
+      "scale": 2.6,
+      "size": [
+        0.847,
+        0.745,
+        0.769
+      ],
+      "offset": [
+        -0.039,
+        0.0,
         0.0
       ],
       "disguise": true

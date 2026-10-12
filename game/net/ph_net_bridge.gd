@@ -260,6 +260,10 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
 				notice(peer_id, why))
+		# Everybody: a bottle shot to bits is a bottle gone for everybody, and its debris is
+		# what tells a hunter across the room that somebody is shooting there.
+		game.prop_broken.connect(func(index: int, direction: Vector3) -> void:
+			_broadcast(PhEvents.Kind.BROKEN, PhEvents.write_broken(index, direction, false)))
 		game.decoy_hit.connect(func(id: StringName, amount: float) -> void:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
@@ -971,9 +975,12 @@ func _admit(peer_id: int) -> void:
 		game.config.taunt_range
 	))
 
-	# The map, before anything that stands on it.
+	# The map, before anything that stands on it, and what of it is already broken.
 	if not _map_body.is_empty():
 		_tell(peer_id, PhEvents.Kind.MAP, _map_body)
+		if game.map != null:
+			for index in game.map.broken_indices():
+				_tell(peer_id, PhEvents.Kind.BROKEN, PhEvents.write_broken(index, Vector3.ZERO, true))
 
 	for other in _behaviours.keys():
 		_tell(peer_id, PhEvents.Kind.JOIN, _join_body(int(other)))
@@ -1147,6 +1154,9 @@ func _on_event(message: DotNetMessage) -> void:
 				if bool(round_info["began"]):
 					game.phase_elapsed = 0.0
 					game.seek_elapsed = 0.0
+					# The server put every broken piece back.
+					if game.map != null:
+						game.map.restore_all()
 
 				round_changed.emit(
 					int(round_info["round"]),
@@ -1225,6 +1235,11 @@ func _on_event(message: DotNetMessage) -> void:
 
 			if bool(cost["ok"]):
 				decoy_received.emit(float(cost["amount"]))
+		PhEvents.Kind.BROKEN:
+			var broke := PhEvents.read_broken(reader)
+
+			if bool(broke["ok"]):
+				game.apply_broken(int(broke["index"]), broke["direction"], bool(broke["quiet"]))
 
 
 func _apply_hello(reader: DotNetReader) -> void:

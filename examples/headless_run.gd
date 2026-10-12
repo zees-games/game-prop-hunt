@@ -23,9 +23,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 23
+const SECTIONS := 24
 
-const CHECKS := 112
+const CHECKS := 117
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -68,6 +68,7 @@ func _run() -> void:
 	await _test_taunts()
 	await _test_shots()
 	await _test_decoys()
+	await _test_breaking()
 	await _test_the_round()
 	await _test_the_beacon()
 	_test_interest()
@@ -533,6 +534,73 @@ func _test_decoys() -> void:
 	_check(not hunter.is_alive() and died.size() == 1 and died[0][1] == PhGame.DIED_DECOY,
 		"and enough of them finish the hunter, as the furniture's")
 	_finished()
+
+
+## Christian's first play test: "props should be breakable and more should be added". A pot
+## plant shot enough breaks: nothing collides with it or draws it, the shots still cost the
+## decoy penalty, and the next round has it back.
+func _test_breaking() -> void:
+	_section("breakable furniture breaks when shot, still costs, and is back next round")
+	var breakable := 0
+	for id: StringName in game_catalogue_ids():
+		if _props_catalogue.breaks(id) > 0.0:
+			breakable += 1
+	_check(_props_catalogue.props.size() >= 200 and breakable >= 50,
+		"the catalogue is larger and much of it breaks", "%d props, %d break" % [_props_catalogue.props.size(), breakable])
+
+	var game := await _seek_round(func(c: PhConfig) -> void:
+		c.decoy_penalty = 0.05
+		c.hunter_health = 400.0)
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	var index := -1
+	for i in range(game.map.props.size()):
+		var prop: Dictionary = game.map.props[i]
+		if prop["id"] == &"furniture_potted_plant" and (prop["transform"] as Transform3D).origin.y < 0.1:
+			index = i
+			break
+	var plant: Dictionary = game.map.props[index]
+	var middle: Vector3 = (plant["transform"] as Transform3D).origin + Vector3(0.0, (plant["size"] as Vector3).y * 0.5, 0.0)
+	# Somewhere 2.5 m off with a clear view of it: a plant stands against a wall.
+	var away := Vector3.INF
+	for k in range(16):
+		var spot := Vector3(middle.x, 0.05, middle.z) + Vector3(cos(TAU * k / 16.0), 0.0, sin(TAU * k / 16.0)) * 2.5
+		var probe := DotPropDisguise.of(&"x", plant["size"])
+		if game._clear_between(spot + Vector3(0.0, 1.6, 0.0), middle + (spot - middle).normalized() * 0.3 * probe.size.x, true) \
+				and game._clear_between(spot + Vector3(0.0, 0.3, 0.0), spot + Vector3(0.0, 1.7, 0.0), true):
+			away = spot
+			break
+	_stand_facing(hunter, away, middle)
+
+	var broke: Array = []
+	game.prop_broken.connect(func(i: int, _d: Vector3) -> void: broke.append(i))
+	var cost: Array = []
+	game.decoy_hit.connect(func(_id: StringName, amount: float) -> void: cost.append(amount))
+	for i in range(TICK_RATE * 6):
+		_aim(hunter, middle)
+		_fire(hunter, true)
+		await _step(game, 1)
+		if not broke.is_empty():
+			break
+	_fire(hunter, false)
+	await _step(game, 2)
+
+	_check(broke == [index] and bool(game.map.props[index]["broken"]), "a pot plant shot enough breaks", str(broke))
+	_check(game._clear_between(hunter.eye_position(), middle, true) and game.map.prop_containing(middle) < 0,
+		"and is gone: a shot passes where it stood, and no decoy is charged there again")
+	_check(not cost.is_empty(), "the shots that broke it still cost the decoy penalty (%d)" % cost.size())
+	await _end_round(game)
+	_check(not bool(game.map.props[index]["broken"]) and game.map.prop_containing(middle) == index, "the next round has it back")
+	_finished()
+
+
+var _props_catalogue: PhProps = null
+
+
+func game_catalogue_ids() -> Array:
+	if _props_catalogue == null:
+		_props_catalogue = PhProps.new()
+		var _n := _props_catalogue.load_file()
+	return _props_catalogue.props.keys()
 
 
 func _test_the_round() -> void:
