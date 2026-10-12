@@ -9,6 +9,8 @@ const PhNetBridge := preload("../game/net/ph_net_bridge.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 const PhEvent := preload("../game/net/ph_event.gd")
 const PhRequest := preload("../game/net/ph_request.gd")
+const PhClient := preload("../game/ph_client.gd")
+const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
@@ -26,8 +28,8 @@ const PhRequest := preload("../game/net/ph_request.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 12
-const CHECKS := 52
+const SECTIONS := 13
+const CHECKS := 57
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -82,6 +84,7 @@ func _run() -> void:
 		await _test_turning_and_taunting()
 		await _test_a_joiner_is_told_what_everybody_wears()
 		await _test_a_decoy_is_charged()
+		await _test_the_drawn_gun_takes_the_server_count()
 		await _test_the_round_ends()
 		await _test_leaving()
 
@@ -448,6 +451,83 @@ func _test_a_decoy_is_charged() -> void:
 			String(server_me.weapons.arsenal.current_def().id) if server_me.weapons != null and server_me.weapons.arsenal.current_def() != null else "nothing"])
 	_check(_heard.has("decoy") and float(_heard["decoy"]) > 0.0, "and the client was told, for its flash",
 		str(_heard.get("decoy")))
+	_finished()
+
+
+## A connected hunter's drawn gun takes the server's ammunition count, read from the owner-only
+## snapshot fields, once it has gone quiet.
+##
+## [b]The online half of `PhClient.correct_drawn`, which only the offline half had a check for[/b]
+## (headless_run reads the world's rig). A real PhClient, not in the tree so it builds no netcode
+## of its own, is handed this suite's client bridge and draws its gun the way `_on_armed` does.
+## The server's count is set apart from the drawn one, as a refused shot or a refill leaves it.
+## Armed: with the online branch of `_server_count` returning nothing, or `correct_drawn` not
+## writing, the last checks fail.
+func _test_the_drawn_gun_takes_the_server_count() -> void:
+	_section("a connected hunter's drawn gun takes the server's ammunition count")
+	var server_me := _server_me()
+	var server_rig: ZeeWeaponRig = server_me.weapons
+	var server_def := server_rig.current_def() if server_rig != null else null
+	var armed := server_def != null and server_def.uses_magazine() and _mine() != null
+	_check(armed, "the server's hunter holds a gun with a magazine (from the section before)")
+	if not armed:
+		_finished()
+		return
+
+	# The server's count, apart from anything a fresh drawn gun holds: a magazine part spent and
+	# a reserve the client never saw. Snapshots carry it to the owner only.
+	var magazine := maxi(server_def.magazine / 3, 1)
+	var reserve := 41
+	server_rig.arsenal.current().magazine = magazine
+	server_rig.arsenal.ammo().set_count(server_def.ammo_type, reserve)
+	await _steps(SNAPSHOT_RATE)
+
+	var client: Node = PhClient.new()
+	var camera := Camera3D.new()
+	_client_game.get_parent().add_child(camera)
+	client.set(&"_offline", false)
+	client.set(&"bridge", _client_bridge)
+	client.set(&"_watch_id", SESSION)
+	client.set(&"game", _client_game)
+	client.set(&"player", _mine())
+	client.set(&"camera", camera)
+	client.call(&"_arm_locally", server_def.id)
+	var drawn: ZeeWeaponRig = client.get(&"weapons")
+	# Drawn as `_net_physics` would: the slot the arming picked, until the switch is over.
+	var command := DotWeaponCommand.new()
+	command.slot = int(client.get(&"_slot"))
+	for i in range(SERVER_TICK_RATE):
+		if drawn == null or (drawn.arsenal.current_slot() == command.slot and not drawn.arsenal.is_switching()):
+			break
+		var _o := drawn.simulate_tick(command, _tick + i)
+
+	var source: Dictionary = client.call(&"_server_count")
+	_check(drawn != null and drawn.current_def() != null and drawn.current_def().id == server_def.id
+		and drawn.arsenal.current().magazine == server_def.magazine,
+		"the client draws the server's gun, full, as a fresh drawn gun is",
+		"%s %d" % [String(drawn.current_def().id) if drawn != null and drawn.current_def() != null else "-",
+			drawn.arsenal.current().magazine if drawn != null and drawn.arsenal.current() != null else -1])
+	_check(_client_bridge._behaviours.get(SESSION) is PhPlayerNet and int(source.get("magazine", -1)) == magazine
+		and int(source.get("reserve", -1)) == reserve and int(source.get("slot", -1)) == server_def.slot,
+		"its server count is the owner-only snapshot fields", str(source))
+
+	client.set(&"_drawn_quiet", 0.0)
+	var early: bool = client.call(&"correct_drawn")
+	_check(not early and drawn.arsenal.current().magazine == server_def.magazine,
+		"not corrected while a shot could still be in flight")
+
+	client.set(&"_drawn_quiet", PhClient.DRAWN_SETTLE_SEC)
+	var corrected: bool = client.call(&"correct_drawn")
+	_check(corrected and drawn.arsenal.current().magazine == magazine
+		and drawn.arsenal.ammo().count(server_def.ammo_type) == reserve,
+		"once quiet, the drawn gun takes the server's magazine and reserve",
+		"drawn %d / %d, server %d / %d" % [drawn.arsenal.current().magazine,
+			drawn.arsenal.ammo().count(server_def.ammo_type), magazine, reserve])
+
+	client.call(&"_disarm_locally")
+	camera.queue_free()
+	client.free()
+	await _steps(2)
 	_finished()
 
 
