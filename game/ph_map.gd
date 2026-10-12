@@ -22,9 +22,11 @@ const PhProps := preload("ph_props.gd")
 ## one draw call per chair mesh, not two hundred. They never move: a prop a player is hiding AS
 ## is the player, drawn by [PhPlayer]; the props here are the room.
 ##
-## [b]A prop's collision is its catalogue box, turned the way the map turns it.[/b] What a
-## hunter's shot stops on, what a disguise copies and what a player walks into are all the same
-## box, so the three can never disagree about where the sofa is.
+## [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
+## it.[/b] A tree is its trunk, branch stubs and leaf clumps, a table its top and legs (dot-props'
+## [DotPropPieces], measured offline into `props/pieces.json`). What a hunter's shot stops on and
+## what a player walks into are the same shapes, so the two can never disagree about where the
+## sofa is; what a disguise copies is still the prop's size.
 
 const CHANNEL := "ph.map"
 
@@ -48,7 +50,7 @@ var draw_world: bool = false
 ## The normalised document this was built from.
 var doc: Dictionary = {}
 
-## Every prop in the map: `{id, transform, size, shape}`. The transform's origin is the middle
+## Every prop in the map: `{id, transform, size, shapes}`. The transform's origin is the middle
 ## of the prop's footprint on the floor.
 var props: Array[Dictionary] = []
 
@@ -226,15 +228,18 @@ func _build_props() -> void:
 		), EULER_ORDER_YXZ)
 		var frame := Transform3D(basis, PhMapDoc.v3(raw["at"]))
 
-		var shape := CollisionShape3D.new()
-		var cube := BoxShape3D.new()
-		cube.size = size
-		shape.shape = cube
-		shape.transform = frame * Transform3D(Basis.IDENTITY, Vector3(0.0, size.y * 0.5, 0.0))
-		shape.set_meta(&"ph_prop", props.size())
-		_furniture.add_child(shape)
+		# Its pieces (a tree's trunk, branches and clumps), or its box when it has none.
+		var shapes: Array = []
 
-		props.append({"id": prop_id, "transform": frame, "size": size, "shape": shape})
+		for part: Array in catalogue.shapes_of(prop_id):
+			var shape := CollisionShape3D.new()
+			shape.shape = part[0]
+			shape.transform = frame * (part[1] as Transform3D)
+			shape.set_meta(&"ph_prop", props.size())
+			_furniture.add_child(shape)
+			shapes.append(shape)
+
+		props.append({"id": prop_id, "transform": frame, "size": size, "shapes": shapes})
 
 		if draw_world:
 			if not by_id.has(prop_id):
@@ -425,6 +430,13 @@ func prop_containing(point: Vector3) -> int:
 		var size: Vector3 = prop["size"]
 		var local: Vector3 = (prop["transform"] as Transform3D).affine_inverse() * point
 		var half := size * 0.5 + Vector3.ONE * HIT_MARGIN
+		var pieces := catalogue.pieces_of(prop["id"]) if catalogue != null else []
+
+		# A shot through the gap under a tree's leaves hit no furniture, so it is no decoy.
+		if not pieces.is_empty():
+			if DotPropPieces.contains(pieces, local, HIT_MARGIN):
+				return index
+			continue
 
 		if absf(local.x) <= half.x and local.y >= -HIT_MARGIN and local.y <= size.y + HIT_MARGIN \
 				and absf(local.z) <= half.z:

@@ -22,8 +22,17 @@ const CHANNEL := "ph.props"
 
 const CATALOGUE := "res://props/catalogue.json"
 
-## id -> `{id, title, kit, model, scale, size: Vector3, offset: Vector3, disguise}`.
+## The part-shaped collision `tools/measure_props.gd` cuts out of the models with dot-props'
+## [DotPropPieces]: a tree as a trunk, branches and leaf clumps, a table as a top and legs. A
+## map prop not in it collides as its box. A disguise never uses these: its hull and hitbox are
+## functions of the size.
+const PIECES := "res://props/pieces.json"
+
+## id -> `{id, title, kit, model, scale, size: Vector3, offset: Vector3, disguise, pieces}`.
 var props: Dictionary = {}
+
+## id -> the prop's collision shapes, built once from its pieces and shared by every copy of it.
+var _shapes: Dictionary = {}
 
 ## The ids, sorted, for a menu and for a stable order.
 var order: Array[StringName] = []
@@ -46,7 +55,7 @@ static var _recoloured: Dictionary = {}
 
 ## Reads the catalogue. Returns how many props it holds; 0 is a server with nothing to hide
 ## as, which is said once and loudly.
-func load_file(path: String = CATALOGUE) -> int:
+func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 	var text := FileAccess.get_file_as_string(PhPaths.rebase(path))
 	var parsed: Variant = JSON.parse_string(text) if text != "" else null
 
@@ -57,6 +66,12 @@ func load_file(path: String = CATALOGUE) -> int:
 	props.clear()
 	order.clear()
 	recolour.clear()
+	_shapes.clear()
+
+	# Optional: without it every prop is its box, as before the file existed.
+	var pieces_text := FileAccess.get_file_as_string(PhPaths.rebase(pieces_path)) if pieces_path != "" else ""
+	var pieces_doc: Variant = JSON.parse_string(pieces_text) if pieces_text != "" else null
+	var all_pieces: Dictionary = (pieces_doc as Dictionary).get("pieces", {}) if pieces_doc is Dictionary else {}
 
 	var colours: Variant = (parsed as Dictionary).get("recolour", {})
 
@@ -88,6 +103,7 @@ func load_file(path: String = CATALOGUE) -> int:
 			"size": size,
 			"offset": _v3(entry.get("offset")),
 			"disguise": bool(entry.get("disguise", true)),
+			"pieces": DotPropPieces.decode(all_pieces.get(String(id), [])),
 		}
 		order.append(id)
 
@@ -105,6 +121,34 @@ func entry(id: StringName) -> Dictionary:
 
 func size_of(id: StringName) -> Vector3:
 	return (props.get(id, {}) as Dictionary).get("size", Vector3.ZERO)
+
+
+## [param id]'s convex pieces in its own frame (origin the middle of its footprint on the
+## floor), or empty when it collides as its box.
+func pieces_of(id: StringName) -> Array:
+	return (props.get(id, {}) as Dictionary).get("pieces", [])
+
+
+## [param id]'s collision: one shape per piece, or one box of its size standing on the origin.
+## Each is `[Shape3D, Transform3D]` in the prop's frame. Built once per id and shared.
+func shapes_of(id: StringName) -> Array:
+	if _shapes.has(id):
+		return _shapes[id]
+
+	var out: Array = []
+	var pieces := pieces_of(id)
+
+	if pieces.is_empty():
+		var size := size_of(id)
+		var cube := BoxShape3D.new()
+		cube.size = size
+		out.append([cube, Transform3D(Basis.IDENTITY, Vector3(0.0, size.y * 0.5, 0.0))])
+	else:
+		for shape in DotPropPieces.shapes(pieces):
+			out.append([shape, Transform3D.IDENTITY])
+
+	_shapes[id] = out
+	return out
 
 
 func title_of(id: StringName) -> String:
