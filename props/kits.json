@@ -64,10 +64,13 @@
         "hanging_moss",
         "lily_large",
         "fence_simple",
-        "fence_planks"
+        "fence_planks",
+        "climbtree_oak",
+        "climbtree_fork"
       ],
       "scales": {
-        "tree_*": 4.5
+        "tree_*": 4.5,
+        "climbtree_*": 1.0
       },
       "recolour": {
         "grass": [
@@ -216,6 +219,8 @@
     "bottle-large": "Water jug",
     "campfire-pit": "Fire pit",
     "resource-wood": "Firewood",
-    "tent-canvas": "Tent"
+    "tent-canvas": "Tent",
+    "climbtree_oak": "Climbing oak",
+    "climbtree_fork": "Forked climbing tree"
   }
 }
