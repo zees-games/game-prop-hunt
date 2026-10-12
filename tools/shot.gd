@@ -11,6 +11,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 var _view := "hunter"
 var _seconds := 3.0
 var _board := false
+var _lean := 0
 var _out := "res://screenshots/shot.png"
 var _at := Vector3.INF
 var _look := Vector3.INF
@@ -27,6 +28,8 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--view="):
 			_view = arg.trim_prefix("--view=")
+		elif arg.begins_with("--lean="):
+			_lean = arg.trim_prefix("--lean=").to_int()
 		elif arg == "--board":
 			_board = true
 		elif arg.begins_with("--seconds="):
@@ -98,6 +101,9 @@ func _run() -> void:
 			var _worn := game.disguise_as(local.player_id, _as)
 			if _at != Vector3.INF:
 				local.place_at(_at, 0.0)
+			# Leant forward this many steps (6 is on its side, 12 on its nose at 15 degrees a step).
+			for _i in range(_lean):
+				var _turned := game.turn(local.player_id, PhGame.Turn.TILT_FORWARD)
 			await _seconds_of(_seconds)
 		"blind":
 			await _seconds_of(1.0)
