@@ -157,6 +157,9 @@ func _build_boxes() -> void:
 			cube.size = size
 			shape.shape = cube
 			shape.transform = frame
+			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
+			# shape's meta; "wood_floor", "tile_small" and the rest fold onto its surfaces).
+			shape.set_meta(&"surface", str(box.get("mat", "")))
 			_solid.add_child(shape)
 
 		if not draw_world or not bool(box.get("visible", true)):

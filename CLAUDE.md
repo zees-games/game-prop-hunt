@@ -84,6 +84,7 @@ Short forms; the reasoning is in the linked file.
 **HUD and menus**
 
 - The HUD is dot-ui's pieces (`DotScoreStrip`, `DotKeyPrompt`, `DotVitals`, `DotAmmoCounter`) in the menu's theme and HUD size, live (`PhHud.follow_menu`, dot-menu's `follow_hud` by name); `PhHud.piece_theme()` is the accent only (the map blue), never plate, text or ink, and the HUD's Labels set no colour of their own except accent lines; the health plate ends above the chat box's full log. The pack needs dot-ui 4 (`requires.json`). [hud](docs/hud.md)
+- **Sound follows the map document**: each box's `mat` is its collision shape's `surface` meta (footsteps by surface, dot-audio's `DotAudioFootsteps`), every `ceiling`/`roof` box is an indoor ambience zone, and the outdoor bed and ground come from `PhAudio.MAP_SOUND` or the document's `ambience`/`surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` (−17 LUFS band, `loudness_trim_db`).
 - **H is help and M is the map list** (dot-menu's stock keys): nothing in `PhBindings` may default to either; `headless_run` and `dedicated` check it. A map choice never reaches `_on_taunt_picked`. [hud](docs/hud.md)
 
 **Maps and drawing**
