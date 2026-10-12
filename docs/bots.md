@@ -1,0 +1,50 @@
+# Bots
+
+The stand-ins are `game/ph_bots.gd`, built on dot-bot: its settings (`bot_difficulty` and every `bot_*` cvar, solo at the console too), its view turning and trigger (`DotBotAim`), and its hiding helpers (`DotBotNav`, `DotBotHiding`, `DotBotSearch`). `PhGame._drive_bots` calls `bots.drive()` before the bodies move; `_bot_shoot` and `_bot_aim_of` are kept as thin wrappers for the suites.
+
+## What the first play test saw
+
+Christian, 2026-10-11: "The bots don't know how to play the game at all." In the video four stand-in props stood in the school's hallway as sinks and bins (the props start in the hallway, and a stand-in became the nearest thing it could, where it stood), hopping whenever it thought it was stuck, so the "furniture" slid and jumped about. The stand-in hunter walked from one random prop to the next. The board said "4 props left" for the whole hunt because nobody found anybody: the count was right, the hunt was not.
+
+## The map is surveyed once
+
+When a map is built (on the server, or solo), `DotBotNav` bakes where a body can walk from the walls and the furniture, and a place is put beside each piece of floor furniture a prop may become (one side of it, on the mesh). `DotBotHiding.survey` scores each place by the share of eighty watchers' sight lines that reach it. Each place remembers its piece: that piece is the disguise, its facing the lock. A quarter of a second of game time after the bake, always the same tick, so a seeded round replays the same.
+
+## A prop hides as what belongs there
+
+A place counts for more the more of its kind stand round it within 6 m (a chair among thirty is lost, a sink in a corridor is not), and less the more it is seen; the two are halved into what `DotBotHiding.choose` reads as exposure. Places near other props' places and near the hunters' start are scored down, and only places it can walk to before the hunters are let go count; `bot_map_knowledge` is how far down the list it looks. It walks the mesh as a person (sidestepping when stuck, hopping only as a person: a sink in mid-air was the play test's sliding furniture), turns to the piece's own facing, becomes it, locks it, and keeps still. Late, it becomes the thing at once and keeps going: a moving chair is a risk, a person is certain death.
+
+During the seek it watches for hunters. Shot (health lost under the same disguise; a new disguise changes the maximum and carries the share, which is not a shot), it runs to a place out of that hunter's sight. Before the standing-still clock forces a taunt (60 s) it moves to another place of its kind within 12 m, or any place there, when no hunter has been in sight for 3 s; with one watching, it keeps still and takes the taunt. About once in four minutes it taunts of its own accord, never with a hunter seen in the last half minute.
+
+## A hunter searches and tests what looks wrong
+
+It searches with a `DotBotSearch` over the same places: likely ones first as far as `bot_map_knowledge` goes, near first, never where another hunter is going. A taunt it hears (within `taunt_range`) puts the places round it first and sends it there.
+
+Everything in view within 12 m gathers suspicion (looked at every fourth tick), faster the closer and the more aggressive (`bot_aggression`):
+
+- a base for nothing (`ph_bot_suspicion`, 12 hundredths);
+- +0.35 for a piece alone of its kind within 3.5 m;
+- for a piece it remembers (a draw per hunter and piece, `bot_map_knowledge` divided by 1 + 0.6 × others of its kind near): real furniture it remembers drops to 15%, a prop it remembers was not there gains 1.2. A third sink is noticed; a thirty-first chair is not;
+- +0.5 tilted, +1.4 within 5 m of a taunt heard in the last 10 s.
+
+Past 1.0 it tests the thing: fires at it for 1.1 s. A prop that bleeds is found and hunted until it dies or is lost (then the places round where it went first); real furniture costs the decoy penalty and is crossed off for the round; a prop that did not bleed (a miss) is believed for 20 s. One test at a time, four seconds apart, and below 40% health only what it is nearly sure of. A prop seen moving, showing a face, or beaconed is shot on sight (`bot_fov`, `bot_sight` capped at 25 m, line of sight clear of furniture).
+
+## Measured
+
+`examples/headless_bots` (in `./game.sh test`, eight rounds by default, `-- --rounds N --difficulty D`, `PH_BOTS_TRACE=1` prints positions, each death and why): eight stand-ins, the game's own draw (three hunters, five props), 32 ticks a second, deterministic, the four delivered maps in turn.
+
+| | medium, 20 rounds | easy, 8 | hard, 8 |
+| --- | --- | --- | --- |
+| a prop lasts, mean | 145 s | 200 s | 144 s |
+| props found | 92 of 100 | 35 of 40 | 39 of 40 |
+| rounds the props win | 6 of 20 | 3 of 8 | 1 of 8 |
+| tests on props / on furniture | 58 / 37 | 22 / 12 | 20 / 18 |
+| hunters killed by decoys | 1 of 60 | 0 of 24 | 0 of 24 |
+
+At medium: every prop disguised when the seek starts, fit 0.88 (others of the kind round it), 14 m apart on average, 0.8 s moving per prop-minute (all of it a move before a forced taunt). Many finds come in the last 30 s, from the beacon. The stand-ins before this, on the same rounds: every prop found inside 70 s, most of them at the first forced taunt, and every prop "fleeing" at the seek's start (the disguise's new maximum read as a shot).
+
+The suite holds medium to bands: all disguised, fit at least 0.5, at most 3 s moving per prop-minute, the props win between a tenth and nine tenths of rounds, a find in at least half, furniture tests at most three times the prop tests, at most one hunter in five killed by decoys, the board's "props left" equal to the props alive after every death, and at most one hiding place in fifty cut off from the props' start (78 of 319 on the school were, until its north classrooms' boards stopped running across their doors).
+
+## Looking at it
+
+`tools/shot.sh --view=round --seconds=4 --ph-minimum-players=7 --ph-map-ids=ph_school --ph-hide-seconds=14` plays a round offline on its own clock (you a hunter, the stand-ins props), prints where every prop hid and as what, and saves the hunter's view; `--at=x,y,z --look=x,y,z` looks at a hiding place instead.

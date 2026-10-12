@@ -5,6 +5,7 @@ The current design, one subject per file. The rules that bite are one line each 
 | File | What |
 | --- | --- |
 | [design.md](design.md) | what this game is beside the other asymmetric ones; the five decisions (hulls, the blindfold on the wire, decoys, taunts, beacons); sides, points and stats |
+| [bots.md](bots.md) | the stand-ins: hiding as what belongs where you stand, searching, testing what looks wrong; the measured rounds |
 | [hud.md](hud.md) | the HUD as dot-ui pieces, the ammunition counter and its correction, help (H), the map list (M) |
 | [drawing.md](drawing.md) | batching a map, colour and light, recolouring a kit |
 | [delivery.md](delivery.md) | the maps pack, the map vote, what must be tagged before publishing, `project.godot` |

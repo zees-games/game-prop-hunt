@@ -6,6 +6,7 @@ extends Node
 const PhClient := preload("../game/ph_client.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
+const PhPlayer := preload("../game/ph_player.gd")
 
 var _view := "hunter"
 var _seconds := 3.0
@@ -59,7 +60,7 @@ func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
 	var local = _client.get("player")
-	var hunter := _view in ["hunter", "blind"]
+	var hunter := _view in ["hunter", "blind", "round"]
 
 	# The person at this keyboard on the side the view is about; one stand-in on the other.
 	var other_side_drawn := false
@@ -72,6 +73,11 @@ func _run() -> void:
 			other_side_drawn = true
 		game._set_side(id, side)
 
+	if _view == "round":
+		# Everybody else hides, as stand-ins do: the round plays on its own clock.
+		for id: StringName in game.players:
+			if game.players[id] != local:
+				game._set_side(id, PhGame.PROPS)
 	game._place_everybody()
 	game._arm_hunters()
 	game._set_phase(PhGame.Phase.HIDE)
@@ -95,6 +101,18 @@ func _run() -> void:
 			await _seconds_of(_seconds)
 		"blind":
 			await _seconds_of(1.0)
+		"round":
+			# A round in progress: the stand-ins hide on the round's own clock, then the seek
+			# runs [code]--seconds[/code]; from the hunter's eyes, or from [code]--at[/code].
+			while game.phase != PhGame.Phase.SEEK:
+				await _frames(1)
+			await _seconds_of(_seconds)
+			for id: StringName in game.players:
+				var who: PhPlayer = game.players[id]
+				print("  %s %s at %s as %s" % [id, "hunter" if game.team_of(id) == PhGame.HUNTERS else "prop",
+					who.controller.state.position.snapped(Vector3.ONE * 0.1), who.disguise.prop_id if who.is_disguised() else "-"])
+			if _at != Vector3.INF:
+				_free_camera().look_at_from_position(_at, _look)
 		"hunter":
 			game._set_phase(PhGame.Phase.SEEK)
 			if _at != Vector3.INF:

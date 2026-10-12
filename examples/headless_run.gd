@@ -23,9 +23,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 22
+const SECTIONS := 23
 
-const CHECKS := 109
+const CHECKS := 112
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -63,6 +63,7 @@ func _run() -> void:
 	await _test_disguise()
 	await _test_reveal()
 	await _test_turning()
+	await _test_lean_on_the_floor()
 	await _test_room()
 	await _test_taunts()
 	await _test_shots()
@@ -375,6 +376,65 @@ func _test_turning() -> void:
 	_check(is_equal_approx(prop.disguise.pitch, game.config.tilt_step), "a tilt leans it by the step")
 	var _upright := game.turn(prop.player_id, PhGame.Turn.STRAIGHTEN)
 	_check(is_zero_approx(prop.disguise.pitch) and is_zero_approx(prop.disguise.roll), "and it stands up again")
+	_finished()
+
+
+## Christian's first play test: "When I'm a water bottle and default up, I should be able to
+## put it on each side or on its nose ... WITHOUT going into the ground (since that'd be
+## cheating)." Every prop a player may become, turned every way a player can turn it (each side,
+## back, front, upside down), drawn: the lowest point of its real meshes stays on the floor, the
+## feet stay on it, and the hull is as tall as the leant prop.
+func _test_lean_on_the_floor() -> void:
+	_section("every prop turned every way up rests on the floor, never in it")
+	var game := await _hide_round()
+	var prop: PhPlayer = game.players_on(PhGame.PROPS)[0]
+	# Where the floor is: where the body comes to rest (a spawn is a few centimetres above it).
+	await _step(game, 16)
+	var floor_y := prop.controller.state.position.y
+	var spot := prop.controller.state.position
+	var turns := [
+		[], [PhGame.Turn.TILT_LEFT], [PhGame.Turn.TILT_RIGHT], [PhGame.Turn.TILT_FORWARD], [PhGame.Turn.TILT_BACK],
+		[PhGame.Turn.TILT_FORWARD, PhGame.Turn.TILT_FORWARD],
+	]
+	var presses := int(round(90.0 / game.config.tilt_step))
+	var worst_mesh := INF
+	var worst_feet := INF
+	var hull_short := 0
+	var turned := 0
+	var asked := 0
+	var tried := 0
+	for id: StringName in game.props_catalogue.props:
+		if not game.props_catalogue.may_disguise(id) or not DotPropDisguise.may_take(game.props_catalogue.size_of(id), game.rules).ok:
+			continue
+		tried += 1
+		var parts: Array = game.props_catalogue.parts(id)
+		for way: Array in turns:
+			# Its own body again, directly: reveal's cooldown is another test's business.
+			prop.apply_disguise(DotPropDisguise.new())
+			prop.place_at(spot, 0.0)
+			await _step(game, 1)
+			if not game.disguise_as(prop.player_id, id):
+				continue
+			for t: int in way:
+				for _p in range(presses):
+					asked += 1
+					if game.turn(prop.player_id, t):
+						turned += 1
+			await _step(game, 2)
+			var feet := prop.controller.state.position
+			worst_feet = minf(worst_feet, feet.y - floor_y)
+			var frame := prop.disguise.model_transform(feet, prop.controller.state.yaw)
+			for part: Array in parts:
+				var box: AABB = (frame * (part[1] as Transform3D)) * (part[0] as Mesh).get_aabb()
+				worst_mesh = minf(worst_mesh, box.position.y - floor_y)
+			var standing := prop.disguise.standing_size().y
+			if prop.hull_height() + 0.001 < minf(standing, game.rules.hull_max_height):
+				hull_short += 1
+	_check(worst_mesh > -0.03, "the lowest point of any prop's meshes, at any turn, is on the floor",
+		"%d props x %d ways; lowest %.3f m" % [tried, turns.size(), worst_mesh])
+	_check(worst_feet > -0.01, "and the feet never sink", "lowest %.3f m" % worst_feet)
+	_check(hull_short == 0 and turned * 10 >= asked * 9, "the hull is as tall as the leant prop, and the turns are allowed in the open",
+		"%d short; %d of %d presses turned" % [hull_short, turned, asked])
 	_finished()
 
 

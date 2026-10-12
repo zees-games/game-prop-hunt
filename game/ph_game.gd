@@ -10,6 +10,7 @@ const PhProgress := preload("ph_progress.gd")
 const PhProps := preload("ph_props.gd")
 const PhRules := preload("ph_rules.gd")
 const PhSpectate := preload("ph_spectate.gd")
+const PhBots := preload("ph_bots.gd")
 const PhController := preload("ph_controller.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
@@ -159,11 +160,8 @@ var _decided: bool = false
 var _winner: int = 0
 var _winner_name: String = ""
 
-## Bots: player id -> what they are doing. See [method _drive_bots].
-var _bot: Dictionary = {}
-
-## The target id a suspicion shot engages: no player has it.
-const SUSPECT_TARGET := -7
+## The stand-ins' brains and the map's survey for them (`ph_bots.gd`). Server side and solo.
+var bots: PhBots = PhBots.new(self)
 
 ## What the stand-ins are called, solo and on a server; past the end dot-bot numbers them.
 const BOT_NAMES := ["Lamp", "Ottoman", "Houseplant", "Toaster", "Bookcase", "Teddy", "Fridge", "Stool"]
@@ -193,6 +191,7 @@ func _ready() -> void:
 	_build_spectate()
 	_build_progress()
 	_build_taunts()
+	taunted.connect(_on_taunted_for_bots)
 
 	if authoritative:
 		catalogue = PhCatalogue.new()
@@ -559,7 +558,7 @@ func remove_player(player_id: StringName) -> void:
 
 	players.erase(player_id)
 	sides.erase(player_id)
-	_bot.erase(player_id)
+	bots.forget(player_id)
 
 	if taunts != null:
 		taunts.forget(player_id)
@@ -660,7 +659,7 @@ func _on_round_started(number: int) -> void:
 	_winner = 0
 	_winner_name = ""
 	seek_elapsed = 0.0
-	_bot.clear()
+	bots.reset()
 
 	if taunts != null:
 		taunts.reset()
@@ -1079,7 +1078,7 @@ func _make_room(player: PhPlayer, next: DotPropDisguise) -> bool:
 	if world == null or physics == null or player.controller == null:
 		return true
 
-	var hull := DotPropDisguise.hull(next.size, rules) if next.is_disguised() \
+	var hull := next.standing_hull(rules) if next.is_disguised() \
 		else Vector2(PhPlayer.BODY_RADIUS, PhPlayer.BODY_HEIGHT)
 	var at := player.controller.state.position
 	var space := world.direct_space_state
@@ -1207,7 +1206,10 @@ func turn(id: StringName, how: int) -> bool:
 	if player == null or not player.is_disguised() or not player.is_alive():
 		return false
 
-	var d := player.disguise
+	# Turned on a copy: a lean changes the hull (a bookcase laid down is long and low, stood on
+	# its end tall), and a hull that does not fit where the prop is gets room made or is refused,
+	# as a new disguise does. Never into a wall, never under the floor.
+	var d := player.disguise.duplicate_value()
 	var changed := true
 
 	match how:
@@ -1226,11 +1228,17 @@ func turn(id: StringName, how: int) -> bool:
 		_:
 			changed = false
 
-	if changed:
-		player.apply_disguise(d)
-		disguise_changed.emit(id)
+	if not changed:
+		return false
 
-	return changed
+	if how != Turn.LOCK and not d.standing_hull(rules).is_equal_approx(player.disguise.standing_hull(rules)) \
+			and not _make_room(player, d):
+		refused.emit(id, "There is no room to turn it that way here.")
+		return false
+
+	player.apply_disguise(d)
+	disguise_changed.emit(id)
+	return true
 
 
 ## A prop taunts, by choice. [param taunt_id] empty picks one. Server side.
@@ -1586,44 +1594,19 @@ func apply_disguise_wire(id: StringName, wire: Dictionary) -> void:
 
 # --- Bots ------------------------------------------------------------------
 
-## What a stand-in does. A prop walks to a piece of furniture it may become, becomes it, and
-## stands still somewhere near others like it; a hunter wanders the props' half of the map,
-## shoots any prop it can see the face of, and now and then shoots something it suspects.
+## What the stand-ins press this tick: [code]ph_bots.gd[/code] (hide as what belongs where you
+## stand, search the rooms, test what looks wrong).
 func _drive_bots() -> void:
-	for id: StringName in players:
-		var player: PhPlayer = players[id]
-
-		if not player.is_bot or not player.is_alive() or player.watching:
-			continue
-
-		var command := DotFpsCommand.new()
-		command.yaw = player.controller.state.yaw
-		command.pitch = player.controller.state.pitch
-		_bot_aim_of(player).view_from(command.yaw, command.pitch)
-
-		if phase == Phase.IDLE:
-			pass
-		elif team_of(id) == PROPS:
-			_bot_hide(player, command)
-		elif phase == Phase.SEEK:
-			_bot_seek(player, command)
-
-		player.controller.apply_command(command)
+	bots.drive()
 
 
-func _bot_state(player: PhPlayer) -> Dictionary:
-	if not _bot.has(player.player_id):
-		_bot[player.player_id] = {
-			"target": -1, "goal": Vector3.INF, "since": _tick, "stuck": [player.controller.state.position, _tick],
-			# How it turns, aims and when it may fire: dot-bot's, on this game's bot_difficulty.
-			"aim": DotBotAim.new(hash(String(player.player_id)), DotBotSettings.of(self)),
-		}
-
-	return _bot[player.player_id]
+## A taunt is a shout every stand-in hunter in earshot hears.
+func _on_taunted_for_bots(id: StringName, _taunt_id: StringName, _forced: bool) -> void:
+	bots.on_taunted(id)
 
 
 func _bot_aim_of(player: PhPlayer) -> DotBotAim:
-	return _bot_state(player)["aim"]
+	return bots.aim_of(player)
 
 
 ## The game clock in seconds, for the bots' aim.
@@ -1631,258 +1614,10 @@ func _bot_now() -> float:
 	return float(_tick) / float(maxi(tick_rate, 1))
 
 
-## Turns a stand-in toward [param at] the way a person turns: at the settings' speed, never in
-## one tick. Writes the view into [param command].
-func _bot_look(player: PhPlayer, command: DotFpsCommand, at: Vector3) -> void:
-	var view := _bot_aim_of(player).look_at_point(player.eye_position(), at, 1.0 / float(maxi(tick_rate, 1)))
-	command.yaw = view.x
-	command.pitch = clampf(view.y, -89.0, 89.0)
-
-
-func _bot_hide(player: PhPlayer, command: DotFpsCommand) -> void:
-	var state := _bot_state(player)
-
-	if player.is_disguised():
-		# Turned to face somewhere fixed and left alone, like a person who has found a spot. A
-		# taunt now and then, for the points.
-		if not player.disguise.locked:
-			var _locked := turn(player.player_id, Turn.LOCK)
-
-		var draw := random.stream_for(&"bot_taunt", _tick + int(player.entity_id % 4096))
-
-		if phase == Phase.SEEK and draw.next_range_f(0.0, 1.0) < 0.002:
-			var _taunted := taunt(player.player_id)
-
-		return
-
-	var target := int(state["target"])
-
-	if target < 0 or target >= map.props.size():
-		target = _bot_pick_prop(player)
-		state["target"] = target
-
-	if target < 0:
-		return
-
-	var prop: Dictionary = map.props[target]
-	var size: Vector3 = prop["size"]
-	var centre: Vector3 = (prop["transform"] as Transform3D).origin + Vector3(0.0, size.y * 0.5, 0.0)
-	var eye := player.eye_position()
-	var flat := Vector3(centre.x - eye.x, 0.0, centre.z - eye.z)
-
-	if flat.length() > rules.reach * 0.6:
-		_bot_look(player, command, Vector3(centre.x, eye.y, centre.z))
-		_bot_walk(command, flat)
-		_bot_unstick(player, command)
-		return
-
-	# Close enough: look at it and become it.
-	var look := centre - eye
-	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
-	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
-	player.controller.apply_command(command)
-	player.controller.state.yaw = command.yaw
-	player.controller.state.pitch = command.pitch
-
-	# Becomes it directly rather than by the look a person's request goes through. The look is
-	# there to keep a CLIENT honest about what it is pointing at; a stand-in is the server's
-	# own, and one whose ray met a rug or the prop in front kept asking every tick for the
-	# rest of the round, standing in the open (rendered in a browser, 2026-10-09).
-	if not disguise_as(player.player_id, map.prop_id(target)):
-		var tried: Array = state.get("tried", [])
-		tried.append(target)
-		state["tried"] = tried
-		state["target"] = -1
-
-
-## A prop the bot may become, near it but not on top of the hunters' spawn.
-func _bot_pick_prop(player: PhPlayer) -> int:
-	var best := -1
-	var best_score := INF
-	var at := player.controller.state.position
-	var draw := random.stream_for(&"bot_prop", round_number * 4096 + int(player.entity_id % 4096))
-
-	var tried: Array = _bot_state(player).get("tried", [])
-
-	for index in range(map.props.size()):
-		var prop: Dictionary = map.props[index]
-		var prop_id: StringName = prop["id"]
-
-		if tried.has(index) or not props_catalogue.may_disguise(prop_id) or not DotPropDisguise.may_take(prop["size"], rules).ok:
-			continue
-
-		var distance := at.distance_to((prop["transform"] as Transform3D).origin)
-		var score := distance + draw.next_range_f(0.0, 12.0)
-
-		if score < best_score:
-			best_score = score
-			best = index
-
-	return best
-
-
-func _bot_seek(player: PhPlayer, command: DotFpsCommand) -> void:
-	var state := _bot_state(player)
-
-	# A person who has paid for a few wrong guesses stops guessing: the first build's stand-in
-	# hunter emptied a magazine through a sofa at a prop behind it and killed itself on the
-	# decoy charge in its first round (examples/dedicated found it).
-	var careful := player.health != null and player.health.health < player.health.max_health * 0.4
-
-	# Anybody whose own face this bot can see, it shoots.
-	var seen := _bot_seen_prop(player)
-
-	if seen != null:
-		var at := seen.controller.state.position + Vector3(0.0, minf(seen.hull_height(), 1.4) * 0.6, 0.0)
-		command.set_button(DotFpsCommand.BUTTON_USER_0, _bot_shoot(player, command, seen.entity_id, at, seen.controller.state.velocity))
-		return
-
-	var goal: Vector3 = state["goal"]
-
-	if goal == Vector3.INF or player.controller.state.position.distance_to(goal) < 1.5 or _tick - int(state["since"]) > tick_rate * 12:
-		goal = _bot_wander_goal(player)
-		state["goal"] = goal
-		state["since"] = _tick
-
-	var flat := Vector3(goal.x, 0.0, goal.z) - Vector3(player.controller.state.position.x, 0.0, player.controller.state.position.z)
-	var eye := player.eye_position()
-	_bot_look(player, command, Vector3(goal.x, eye.y, goal.z))
-	_bot_walk(command, flat)
-	_bot_unstick(player, command)
-
-	# Suspicion: now and then, a shot at the nearest piece of furniture, which is how a person
-	# finds a prop and how they pay for guessing wrong.
-	var draw := random.stream_for(&"bot_suspect", _tick + int(player.entity_id % 4096))
-
-	if not careful and draw.next_range_f(0.0, 100.0) < config.bot_suspicion / float(maxi(tick_rate, 1)):
-		var near := _bot_nearest_hideable(player)
-
-		if near != Vector3.INF:
-			state["suspect"] = near
-			state["suspect_until"] = _tick + tick_rate
-
-	# A suspicion is followed through for a second: turn onto the piece, then fire once the
-	# view is on it, as a person does, rather than a shot on the tick the thought came.
-	var suspect: Vector3 = state.get("suspect", Vector3.INF)
-
-	if suspect != Vector3.INF and not careful:
-		if _tick > int(state.get("suspect_until", 0)):
-			state["suspect"] = Vector3.INF
-			_bot_aim_of(player).forget()
-		else:
-			command.move = Vector2.ZERO
-			command.set_button(DotFpsCommand.BUTTON_USER_0, _bot_shoot(player, command, SUSPECT_TARGET, suspect, Vector3.ZERO))
-
-
-func _bot_seen_prop(player: PhPlayer) -> PhPlayer:
-	var eye := player.eye_position()
-	var forward := player.aim_direction()
-
-	for other in players_on(PROPS):
-		if not other.is_alive() or other.watching:
-			continue
-
-		var at := other.controller.state.position + Vector3(0.0, 0.8, 0.0)
-		var toward := at - eye
-
-		# Inside the bot's view cone and sight (bot_fov, bot_sight), and never beyond 25 m, the
-		# furthest a prop's face reads as a face.
-		var profile := DotBotSettings.of(self).profile
-		if toward.length() > minf(25.0, profile.sight) or rad_to_deg(forward.angle_to(toward)) > profile.fov * 0.5:
-			continue
-
-		# Its own face, or a prop that moved where the bot could see.
-		if other.is_disguised() and Vector2(other.controller.state.velocity.x, other.controller.state.velocity.z).length() < 1.0:
-			continue
-
-		# Clear of the furniture too: a shot through a sofa at somebody behind it is a shot
-		# into the sofa, and the sofa charges for it.
-		if _clear_between(eye, at, true):
-			return other
-
-	return null
-
-
-func _bot_nearest_hideable(player: PhPlayer) -> Vector3:
-	var best := Vector3.INF
-	var closest := 6.0
-	var eye := player.eye_position()
-
-	for prop: Dictionary in map.props:
-		var centre: Vector3 = (prop["transform"] as Transform3D).origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0)
-		var distance := eye.distance_to(centre)
-
-		if distance < closest:
-			closest = distance
-			best = centre
-
-	for other in players_on(PROPS):
-		if other.is_alive() and other.is_disguised():
-			var at := other.controller.state.position + Vector3(0.0, other.hull_height() * 0.5, 0.0)
-			if eye.distance_to(at) < closest:
-				closest = eye.distance_to(at)
-				best = at
-
-	return best
-
-
-func _bot_wander_goal(player: PhPlayer) -> Vector3:
-	var draw := random.stream_for(&"bot_wander", _tick + int(player.entity_id % 4096))
-
-	if map.props.is_empty():
-		return player.controller.state.position
-
-	var prop: Dictionary = map.props[draw.next_range_i(0, map.props.size() - 1)]
-	return (prop["transform"] as Transform3D).origin
-
-
-## Aims a stand-in hunter at [param at] (target [param id]) and says whether it fires this tick:
-## dot-bot's [DotBotAim], so the view turns at `bot_turn_rate`, the first shots miss by
-## `bot_aim_error` and settle, and the trigger waits `bot_reaction` after first sight.
+## Aims a stand-in hunter at [param at] (target [param id]) and says whether it fires this tick.
+## See [code]PhBots.shoot[/code].
 func _bot_shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
-	var aim := _bot_aim_of(player)
-	var eye := player.eye_position()
-	var now := _bot_now()
-	var _new := aim.engage(id, eye, at, now)
-	var view := aim.track(eye, at, velocity, now, 1.0 / float(maxi(tick_rate, 1)))
-	command.yaw = view.x
-	command.pitch = clampf(view.y, -89.0, 89.0)
-	var fire := aim.trigger(now, eye.distance_to(at))
-	if fire:
-		aim.note_shot(eye, at, now)
-	return fire
-
-
-## Walks along [param world_dir] (flat, world space) whatever way the view is turned.
-func _bot_walk(command: DotFpsCommand, world_dir: Vector3) -> void:
-	var flat := Vector3(world_dir.x, 0.0, world_dir.z)
-	if flat.length() < 0.01:
-		command.move = Vector2.ZERO
-		return
-	flat = flat.normalized()
-	var yaw := deg_to_rad(command.yaw)
-	var forward := Vector3(-sin(yaw), 0.0, -cos(yaw))
-	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
-	command.move = Vector2(flat.dot(right), flat.dot(forward)).limit_length(1.0)
-
-
-func _bot_unstick(player: PhPlayer, command: DotFpsCommand) -> void:
-	var state := _bot_state(player)
-	var mark: Array = state["stuck"]
-	var at := player.controller.state.position
-
-	if _tick - int(mark[1]) < tick_rate:
-		return
-
-	var stuck := Vector2(at.x - (mark[0] as Vector3).x, at.z - (mark[0] as Vector3).z).length() < 0.4
-
-	if stuck and player.controller.state.mode == DotFpsState.Mode.GROUND:
-		command.set_button(DotFpsCommand.BUTTON_JUMP, true)
-		# And a new goal, because the old one is through something.
-		state["goal"] = Vector3.INF
-		state["target"] = -1
-
-	state["stuck"] = [at, _tick]
+	return bots.shoot(player, command, id, at, velocity)
 
 
 ## Whether nothing solid is between two points: the walls, and with [param furniture] the

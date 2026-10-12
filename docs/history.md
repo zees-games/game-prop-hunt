@@ -2,6 +2,15 @@
 
 Bug stories worth keeping, newest first. The rule each one left is in `CLAUDE.md`.
 
+## The bots did not know how to play, and the school was in the way (2026-10-12)
+
+Christian's first play test: "The bots don't know how to play the game at all", "Random things in the middle of the hallway and a sink blocking a room?", sinks and boxes sliding and tumbling, and "4 props left" on the board for the whole hunt.
+
+- **The hallway's sinks and bins were stand-ins.** The props start in the school's hallway; a stand-in walked to the nearest piece it could become (the bathroom's sinks, the bins) and became it where it stood, out in the hallway. When it thought it was stuck it hopped, so a disguised sink rose to shoulder height and slid: the furniture that "slides and tumbles" was never the map's (that is one static body). The new stand-ins (`ph_bots.gd`, [bots.md](bots.md)) hide beside a piece of their kind and never hop disguised.
+- **"4 props left" was true.** The count is `alive_on`, which drops with every death; nobody died. `headless_bots` now checks the board against the props alive after every find.
+- **The map had its own faults**, found by a doorway check added to mg-prop-hunt-maps' builder and by `headless_bots`' reachability count: a bathroom sink actually in the hallway; a toilet inside each bathroom's door (the stalls were on the door's wall); the two north classrooms' boards across their doors at chest height (78 of 319 hiding places on the school could not be walked to); a window run cutting into the front doors; on the house, the kitchen counter across the door to the kids' room, the television across the living room's opening, the bathtub at the back door and a fence 0.3 m outside the back wall across two doors; on the woods, the garden's gate opening onto a row of melons.
+- **Every stand-in prop "fled" at the seek's start**: it read the drop in health from a new disguise's maximum as a shot.
+
 ## The hunter's weapons were "completely broken" (2026-10-12)
 
 Christian's first play test: the hunter's gun was a green sniper, a purple rifle, a hammer, a pistol, a frag, with no slot logic; no ammunition counter, only "R Reload 1-3 Weapons"; no impacts; and health stayed at 100 while he shot sinks and boxes.

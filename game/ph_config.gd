@@ -80,7 +80,9 @@ extends DotConfig
 
 ## Degrees one press of a tilt key turns a prop, and the most it may lean.
 @export_range(1.0, 90.0, 1.0) var tilt_step: float = 15.0
-@export_range(0.0, 180.0, 1.0) var max_tilt: float = 90.0
+## 180 so a prop goes every way up: on either side, on its back, on its nose (Christian's water
+## bottle). The hull is the leant box's, so it never goes under the floor.
+@export_range(0.0, 180.0, 1.0) var max_tilt: float = 180.0
 
 # --- Taunts ----------------------------------------------------------------
 
@@ -91,7 +93,9 @@ extends DotConfig
 @export var taunt_file: String = "taunts/taunts.json"
 
 ## Seconds a prop may stand within [member auto_taunt_radius] before a taunt is forced. 0 never.
-@export_range(0.0, 600.0, 1.0) var auto_taunt_seconds: float = 45.0
+## 60, as game-hide-n-seek: Christian's first play test found 45 forced taunts too soon. The
+## owner's `ph_auto_taunt_seconds`.
+@export_range(0.0, 600.0, 1.0) var auto_taunt_seconds: float = 60.0
 @export_range(0.1, 20.0, 0.1) var auto_taunt_radius: float = 1.5
 
 ## Whether a prop sees the meter filling toward a forced taunt.
@@ -202,7 +206,10 @@ extends DotConfig
 # How a stand-in hunter turns, aims and how quickly it fires are dot-bot's `bot_*` settings,
 # shared by every game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...).
 
-## Chance in a hundred, a second, that a stand-in hunter shoots at a prop it walks past.
+## How much a stand-in hunter doubts a piece of furniture it has no other reason to doubt, in
+## hundredths: the base its suspicion grows from (a piece alone of its kind, one it remembers
+## was not there, one tilted, one near a taunt add to it). 0 tests nothing without a reason;
+## more tests more furniture and pays more decoy penalty. See `ph_bots.gd`.
 @export_range(0.0, 100.0, 1.0) var bot_suspicion: float = 12.0
 
 # --- Watching --------------------------------------------------------------

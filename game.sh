@@ -32,7 +32,7 @@
 GAME_NAME="Prop Hunt"
 PACK="prophunt"
 EXTRA_PACKS="prophunt_maps:mg-prop-hunt-maps"
-SUITES="headless_run headless_maps headless_net dedicated"
+SUITES="headless_run headless_maps headless_bots headless_net dedicated"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail

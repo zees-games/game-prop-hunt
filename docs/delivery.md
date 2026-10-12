@@ -4,7 +4,7 @@ The maps are their own repository and pack, [mg-prop-hunt-maps](../mg-prop-hunt-
 
 **The map vote** (`game/ph_vote.gd`, MANUAL, applied at a round's end): under MANUAL `PhVote` opens a passed rock-the-vote itself (dot-vote does not; `rtv_delay_sec` 0), and `_game_load` refreshes the map list after `_add_delivered_maps`. Without either, `!rtv` answers "Rocked. 1 of 1." and nothing opens, or a delivered server's ballot holds only the practice map and never opens. `examples/dedicated` arms both. The match answers dot-vote's `round_in_progress_fn` (`world.match_node.is_live()`, set by name because an older shell's dot-vote lacks it), so a `time_up: finish_round` limit that runs out in warmup or between rounds changes at once instead of holding for `finish_round_max_sec`; `dedicated` checks both halves.
 
-**Before publishing**: dot-props (API level 2), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
+**Before publishing**: dot-props (API level 4: a leant prop resting on the floor), dot-bot (2: the hiding helpers the stand-ins use), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4) and dot-menu must be tagged and in the client shell, or the pack fails to parse in it.
 
 ## Project settings
 

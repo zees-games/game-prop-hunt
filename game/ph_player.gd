@@ -241,7 +241,8 @@ func apply_disguise(next: DotPropDisguise) -> void:
 		return
 
 	if disguise.is_disguised() and rules != null:
-		var hull := DotPropDisguise.hull(disguise.size, rules)
+		# The leant box's hull: a bottle on its side is low and long (dot-props' standing_hull).
+		var hull := disguise.standing_hull(rules)
 		t.radius = hull.x
 		t.stand_height = hull.y
 		# A prop does not crouch: it is the height it is. The crouch height equal to the stand
@@ -276,7 +277,7 @@ func eye_position() -> Vector3:
 	var height := EYE_HEIGHT
 
 	if is_disguised():
-		height = clampf(disguise.size.y * 0.8, 0.2, 2.0)
+		height = clampf(disguise.standing_size().y * 0.8, 0.2, 2.0)
 
 	return controller.state.position + Vector3(0.0, height, 0.0)
 
@@ -354,11 +355,11 @@ func _fit_hitboxes() -> void:
 		prop.enabled = disguised
 
 		if disguised:
+			# The box turned about its middle, the middle at half the leant height: what is drawn.
 			var size := disguise.size
-			var turn := prop_basis()
 			prop.half_extents = size * 0.5
-			prop.transform = Transform3D(turn, turn * Vector3(0.0, size.y * 0.5, 0.0))
-			hitboxes.bounds_offset = Vector3(0.0, size.y * 0.5, 0.0)
+			prop.transform = disguise.box_transform(controller.state.yaw if controller != null else 0.0)
+			hitboxes.bounds_offset = Vector3(0.0, disguise.middle_height(), 0.0)
 			hitboxes.bounds_radius = maxf(size.length() * 0.6, 0.5)
 		else:
 			hitboxes.bounds_offset = Vector3(0.0, 0.9, 0.0)
@@ -510,7 +511,9 @@ func _present_prop(shown: bool, at: Vector3) -> void:
 	prop_model.visible = shown
 
 	if shown:
-		prop_model.global_transform = Transform3D(prop_basis(), at)
+		# Lifted so the lowest corner rests on the floor whatever the lean (dot-props'
+		# model_transform): turned about its foot, half a bottle on its side was under the floor.
+		prop_model.global_transform = disguise.model_transform(at, controller.state.yaw if controller != null else 0.0)
 
 
 ## Breaks this player's body apart: a hunter killed by the furniture. Client side.

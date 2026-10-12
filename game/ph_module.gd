@@ -402,7 +402,7 @@ func _add_tunables(world: PhGame) -> void:
 	# the family uses. On the game as metadata, where its bots read it; never the registry.
 	var _bot_cvars := DotBotSettings.of(world).bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
 	_tunable("ph_bot_suspicion", config.bot_suspicion,
-		"Chance in a hundred, a second, that a stand-in hunter shoots something it suspects",
+		"How much a stand-in hunter doubts furniture with no other reason to, in hundredths (0 tests nothing without a reason)",
 		func(value: float) -> void: config.bot_suspicion = clampf(value, 0.0, 100.0))
 
 

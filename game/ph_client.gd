@@ -648,7 +648,7 @@ func _place_camera() -> void:
 
 	# dot-core's boom (it was a spring arm, which cast a ray and snapped to its hit), swept
 	# from the eye or the prop's middle, the height above it added in the world's up.
-	var size := player.disguise.size if player.is_disguised() else Vector3(0.7, 1.8, 0.7)
+	var size := player.disguise.standing_size() if player.is_disguised() else Vector3(0.7, 1.8, 0.7)
 	_arm = DotCameraBoom.new()
 	_arm.name = "Chase"
 	_arm.spring_length = CHASE_BACK + maxf(size.x, size.z)
