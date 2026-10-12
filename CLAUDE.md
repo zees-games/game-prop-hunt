@@ -87,6 +87,7 @@ A map is hundreds of boxes and props. Boxes are batched by material, tint and 12
 
 ## What running it found
 
+- **Offline, no hunter's shot ever landed** (2026-10-12): `PhClient._drive_offline` stamped fire, alt and reload onto `controller.current_command`, and `PhPlayer.simulate` then applied a fresh `sampler.sample()` over it, so the world's rig never saw a trigger (the play test's "shots that do not register", and part of why decoys never cost him). The buttons go onto the world's own sample through `PhPlayer.command_stamp`, set in `PhClient._adopt`; never stamp `current_command` for the world. `headless_run`'s "offline, the client's trigger" is armed. Found by game-zombie-zone's play test (its docs/history.md).
 - **Spawns inside sofas**: six, on three maps, because a spawn is written before a room is furnished. Found by `headless_maps`; mg-prop-hunt-maps' builder now moves them itself.
 - **A pool of grass, a dark band round the gym, and washed-out daylight**: all three found by rendering, none by a check. The maps repo's CLAUDE.md has each.
 - **A chair's 98 health was 97.9 on the client**: 12 bits over 0..1000 for `net_max_health`. 14 now.

@@ -22,9 +22,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 19
+const SECTIONS := 20
 
-const CHECKS := 90
+const CHECKS := 91
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -72,6 +72,7 @@ func _run() -> void:
 	await _test_bots()
 	await _test_the_client()
 	await _test_help_and_menu()
+	await _test_offline_trigger()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -679,6 +680,26 @@ func _test_the_client() -> void:
 
 ## The family's rule since the first play test: H opens help in every game, nothing else in
 ## the table is on H, and the Escape menu has Help & commands and Leave.
+## Offline the world samples the local player's movement itself, so the client's buttons
+## have to go onto that sample. They were stamped on the controller's command and then sampled
+## over, and offline no hunter's trigger ever reached the world's gun (found by
+## game-zombie-zone's play test; the same lines were here).
+func _test_offline_trigger() -> void:
+	_section("offline, the client's trigger reaches the world's gun")
+	var game := await _world()
+	var me := game.add_player(&"local", "You", 0, true)
+	await _step(game, 2)
+	var client: Node = (load("res://game/ph_client.gd") as GDScript).new()
+	client.set("game", game)
+	client.call("_adopt", me)
+	client.set("_firing", true)
+	me.simulate(game.current_tick() + 1, 1.0 / float(TICK_RATE))
+	var pressed := game.weapon_command_for(me).is_pressed(DotWeaponCommand.BUTTON_ATTACK)
+	_check(me.sampler != null and pressed, "the world's weapon command has the trigger the client holds")
+	client.free()
+	_finished()
+
+
 func _test_help_and_menu() -> void:
 	_section("H opens help, and the Escape menu has Help and Leave")
 	var settings := PhSettings.new()

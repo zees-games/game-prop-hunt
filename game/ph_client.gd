@@ -281,6 +281,11 @@ func _adopt(candidate: PhPlayer) -> void:
 	_follow_side()
 	_build_camera()
 
+	# Offline the world samples this player's movement itself, so the buttons go onto that
+	# sample (`command_stamp`); stamping `current_command` below only reaches the drawn gun.
+	if _offline:
+		player.command_stamp = _stamp
+
 	if settings != null:
 		settings.bind_camera(camera)
 		if player.sampler != null:
