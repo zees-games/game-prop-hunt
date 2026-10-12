@@ -7,6 +7,7 @@ const PhSettings := preload("ph_settings.gd")
 const PhServices := preload("ph_services.gd")
 const PhNetBridge := preload("net/ph_net_bridge.gd")
 const PhNetCommand := preload("net/ph_net_command.gd")
+const PhPlayerNet := preload("net/ph_player_net.gd")
 
 const PhConfig := preload("ph_config.gd")
 const PhGame := preload("ph_game.gd")
@@ -513,6 +514,7 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 		return
 
 	if weapons != null:
+		_give_locally(weapon_id)
 		_select_locally(weapon_id)
 		return
 
@@ -542,13 +544,26 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 		_disarm_locally()
 		return
 
-	var _given := weapons.give_everything()
+	# [b]Only what the server armed, one weapon as each is armed[/b] (`player_armed`), never the
+	# whole pack. `give_everything` put all twenty-seven in five slots, so each slot held
+	# whichever weapon was given last: keys 1-3 drew a hammer, a pistol and a purple rifle, the
+	# heavy slot a green sniper, none of them the gun the server fired (the play test's "weapons
+	# appear with no slot logic"). headless_run's "the drawn gun is the armed one" holds it.
+	_give_locally(weapon_id)
 
 	weapons.used.connect(func(outcome: DotWeaponOutcome) -> void:
 		if audio != null and camera != null:
 			var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
 	_select_locally(weapon_id)
+
+
+func _give_locally(weapon_id: StringName) -> void:
+	if weapons == null or weapon_id == &"":
+		return
+	var given := weapons.give(weapon_id)
+	if not given.ok:
+		DotLog.warn(CHANNEL, "the drawn rig refused a weapon", {"weapon": String(weapon_id), "why": given.error.message})
 
 
 func _select_locally(weapon_id: StringName) -> void:
@@ -646,6 +661,8 @@ func _build_hud() -> void:
 	hud = PhHud.new()
 	hud.name = "Hud"
 	hud.key_fn = _key
+	# The counter reads the gun the hunter sees (corrected from the server's by correct_drawn).
+	hud.weapons_fn = func() -> ZeeWeaponRig: return weapons
 	add_child(hud)
 
 
@@ -1002,6 +1019,81 @@ func _drive_view_model(command: DotFpsCommand) -> void:
 
 	weapon_command.slot = _slot
 	var _outcome := weapons.simulate_tick(weapon_command, game.round_number * 100000 + Engine.get_physics_frames())
+
+	var busy := weapon_command.is_pressed(DotWeaponCommand.BUTTON_ATTACK) \
+		or weapon_command.is_pressed(DotWeaponCommand.BUTTON_RELOAD) \
+		or weapons.arsenal.is_reloading() or weapons.arsenal.is_switching()
+	_drawn_quiet = 0.0 if busy else _drawn_quiet + 1.0 / float(maxi(game.tick_rate, 1))
+	var _corrected := correct_drawn()
+
+
+## Seconds the drawn gun must be quiet before the server's count may overwrite it: longer than a
+## shot's trip to the server and its snapshot back, so no shot still in flight is undone.
+## game-zombie-zone's `VIEW_RIG_SETTLE_SEC`.
+const DRAWN_SETTLE_SEC := 0.6
+
+## Simulated seconds the drawn gun has gone without a trigger, a reload or a switch.
+var _drawn_quiet: float = 0.0
+
+
+## Brings the drawn gun's magazine and reserve (what the HUD counts) to the server's once it has
+## been quiet [constant DRAWN_SETTLE_SEC]: online from this player's owner-only snapshot fields,
+## offline from the world's own rig. True when it changed anything.
+##
+## [b]The drawn gun predicts, so it can be wrong, and nothing else puts it right.[/b] A shot the
+## server refused (a blindfold tick, a stand-in's round start) or a fresh round's refill leaves the
+## counter on the client's own sum otherwise, as zombie-zone's 15 / 105 did.
+func correct_drawn() -> bool:
+	if weapons == null or weapons.arsenal == null or _drawn_quiet < DRAWN_SETTLE_SEC:
+		return false
+
+	var source := _server_count()
+
+	if source.is_empty() or bool(source.busy):
+		return false
+
+	var arsenal := weapons.arsenal
+	var held := arsenal.current()
+
+	if held == null or int(source.slot) != arsenal.current_slot() or arsenal.is_reloading() or arsenal.is_switching():
+		return false
+
+	var changed := false
+
+	if held.def.uses_magazine() and held.magazine != int(source.magazine):
+		held.magazine = clampi(int(source.magazine), 0, held.def.magazine)
+		changed = true
+
+	if held.def.ammo_type != &"" and not held.def.infinite_reserve \
+			and arsenal.ammo().count(held.def.ammo_type) != int(source.reserve):
+		arsenal.ammo().set_count(held.def.ammo_type, maxi(int(source.reserve), 0))
+		changed = true
+
+	return changed
+
+
+## The server's count for this player's gun: `{magazine, reserve, slot, busy}`, or empty.
+func _server_count() -> Dictionary:
+	if _offline:
+		var world: ZeeWeaponRig = player.weapons if player != null else null
+		if world == null or world == weapons or world.arsenal == null or world.arsenal.current() == null:
+			return {}
+		var def := world.current_def()
+		return {
+			"magazine": world.arsenal.current().magazine,
+			"reserve": world.arsenal.ammo().count(def.ammo_type) if def.ammo_type != &"" else 0,
+			"slot": world.arsenal.current_slot(),
+			"busy": world.arsenal.is_reloading() or world.arsenal.is_switching(),
+		}
+
+	var mine: Variant = bridge._behaviours.get(_watch_id) if bridge != null else null
+	if not (mine is PhPlayerNet):
+		return {}
+	var behaviour := mine as PhPlayerNet
+	return {
+		"magazine": behaviour.net_magazine, "reserve": behaviour.net_reserve, "slot": behaviour.net_slot,
+		"busy": behaviour.net_reloading or behaviour.net_switching,
+	}
 
 
 func _process(delta: float) -> void:

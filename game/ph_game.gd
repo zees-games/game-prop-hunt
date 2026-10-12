@@ -863,6 +863,11 @@ func _place_everybody() -> void:
 
 
 func _arm_hunters() -> void:
+	var clash := hunter_slot_clash(config.hunter_weapons)
+	if clash != "" and clash != _warned_clash:
+		_warned_clash = clash
+		DotLog.warn(CHANNEL, "two hunter weapons share a slot, so only the last is carried", {"weapons": clash})
+
 	for player in players_on(HUNTERS):
 		for weapon_id in config.hunter_weapons:
 			var _armed := arm(player, StringName(weapon_id))
@@ -874,6 +879,23 @@ func _arm_hunters() -> void:
 			if def != null:
 				var _selected := player.weapons.arsenal.select(def.slot, _tick)
 				player.wanted_slot = def.slot
+
+
+## The hunter weapons in [param ids] that share a slot with an earlier one, as "a/b" pairs, or
+## an empty string. A second weapon in a slot replaces the first, silently, in dot-weapon.
+static func hunter_slot_clash(ids: PackedStringArray) -> String:
+	var by_slot := {}
+	var pairs := PackedStringArray()
+	for id in ids:
+		for def in ZeeWeaponPack.weapons():
+			if def.id == StringName(id):
+				if by_slot.has(def.slot):
+					pairs.append("%s/%s" % [by_slot[def.slot], id])
+				by_slot[def.slot] = id
+	return ", ".join(pairs)
+
+
+var _warned_clash := ""
 
 
 func _set_phase(to: int) -> void:

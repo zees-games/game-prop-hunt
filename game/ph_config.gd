@@ -124,8 +124,14 @@ extends DotConfig
 
 @export_group("Hunters")
 
-## The weapons a hunter is handed, by id from zee-dot-weapons.
-@export var hunter_weapons: PackedStringArray = PackedStringArray(["smg", "shotgun", "hatchet"])
+## The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first.
+##
+## [b]One per slot.[/b] A weapon takes the slot its document names and a second one in that slot
+## replaces the first: the old default ("smg", "shotgun", "hatchet") put the SMG and the shotgun
+## both in slot 3, so a hunter carried a shotgun and a hatchet and keys 1-3 had one empty. The
+## defaults are the hatchet (1), the pistol (2) and the SMG (3), the keys' order; the shotgun is
+## a primary, so it replaces the SMG, not joins it. `PhGame._arm_hunters` warns of a clash.
+@export var hunter_weapons: PackedStringArray = PackedStringArray(["smg", "pistol", "hatchet"])
 
 ## What shooting the furniture costs a hunter: this fraction of the damage the shot would have
 ## done comes off their own health. 0 turns it off.

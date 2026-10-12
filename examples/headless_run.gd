@@ -23,9 +23,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 21
+const SECTIONS := 22
 
-const CHECKS := 97
+const CHECKS := 107
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -75,6 +75,7 @@ func _run() -> void:
 	await _test_help_and_menu()
 	await _test_the_map_menu()
 	await _test_offline_trigger()
+	await _test_hunter_weapons()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -731,6 +732,94 @@ func _test_help_and_menu() -> void:
 		"the Escape menu has Help & commands and Leave")
 	settings.close()
 	settings.queue_free()
+	await get_tree().process_frame
+	_finished()
+
+
+## The play test: "weapons are completely broken". The drawn rig was given the whole pack, so each
+## slot held whatever was given last (a hammer, a pistol, a purple rifle, a green sniper) and never
+## the gun the server fired; the default loadout put the SMG and the shotgun in one slot; and the
+## HUD said "1-3 Weapons" and nothing about what was in hand. Armed: with `give_everything` back
+## the first check fails; without `correct_drawn` the last does.
+func _test_hunter_weapons() -> void:
+	_section("a hunter draws the guns the server armed, counted on the HUD and corrected from it")
+	_check(PhGame.hunter_slot_clash(PhConfig.new().hunter_weapons) == "",
+		"no two of the default hunter weapons share a slot", PhGame.hunter_slot_clash(PhConfig.new().hunter_weapons))
+	_check(PhGame.hunter_slot_clash(PackedStringArray(["smg", "shotgun"])) == "smg/shotgun",
+		"and two that do are named")
+
+	var client: Node = (load("res://game/ph_client.gd") as GDScript).new()
+	client.set(&"force_offline", true)
+	client.set(&"config_file", "user://cfg/headless-none.json")
+	add_child(client)
+	for i in 8:
+		await get_tree().process_frame
+	var world: PhGame = client.get("game")
+	world.wish_side(&"local", PhGame.HUNTERS)
+	world._on_round_started(world.round_number + 1)
+	for i in 4:
+		await get_tree().physics_frame
+
+	var me: PhPlayer = client.get("player")
+	var drawn: ZeeWeaponRig = client.get("weapons")
+	var held: Array[String] = []
+	var same := drawn != null and me.weapons != null and drawn != me.weapons
+	for slot in range(1, 6):
+		var mine := drawn.arsenal.slot_at(slot) if drawn != null else null
+		var theirs := me.weapons.arsenal.slot_at(slot) if me.weapons != null else null
+		var a := String(mine.def.id) if mine != null else "-"
+		var b := String(theirs.def.id) if theirs != null else "-"
+		held.append("%d:%s/%s" % [slot, a, b])
+		same = same and a == b
+	_check(same, "the drawn gun holds exactly the server's weapons, slot for slot", " ".join(held))
+	_check(drawn != null and drawn.arsenal.current_slot() == me.weapons.arsenal.current_slot(),
+		"and holds the same one")
+
+	# Blindfolded through the hide, the counter is under the cover with everything else; seeking.
+	var hud: Node = client.get("hud")
+	hud.call("_process", 0.0)
+	var counter: DotAmmoCounter = hud.get("ammo")
+	_check(counter != null and not counter.visible, "no counter under the blindfold")
+	world._set_phase(PhGame.Phase.SEEK)
+	hud.call("_process", 0.0)
+	var def := drawn.current_def() if drawn != null else null
+	var expected := "%d | %d" % [drawn.arsenal.current().magazine, drawn.arsenal.ammo().count(def.ammo_type)] if def != null else "?"
+	_check(counter != null and counter.visible and def != null and counter.weapon_name == def.display_name
+		and counter.count_text() == expected,
+		"a hunter's HUD has DotAmmoCounter, counting the drawn gun",
+		"%s %s, want %s" % [counter.weapon_name if counter else "-", counter.count_text() if counter else "-", expected])
+
+	# Bottom right, clear of the chat box and the health plate bottom left, and of the ballot
+	# top right: the anchors put it in the bottom-right quarter at any frame size.
+	_check(counter.anchor_left == 1.0 and counter.anchor_top == 1.0 and counter.offset_left >= -480.0
+		and counter.offset_top >= -120.0 and counter.get_theme_color(&"plate", DotHudPiece.THEME_TYPE).a > 0.0,
+		"it sits bottom right, in the game's theme, clear of the chat, the health plate and the ballot")
+
+	# A shot the server never heard: the drawn gun is five down. It holds while it could still be
+	# in flight, and takes the world's count once quiet.
+	var world_count := me.weapons.arsenal.current().magazine
+	drawn.arsenal.current().magazine = maxi(world_count - 5, 0)
+	client.set("_drawn_quiet", 0.0)
+	for i in 10:
+		await get_tree().physics_frame
+	var early := drawn.arsenal.current().magazine
+	for i in 60:
+		await get_tree().physics_frame
+	_check(early == maxi(world_count - 5, 0) and drawn.arsenal.current().magazine == world_count,
+		"the drawn gun takes the server's count once quiet, and not before",
+		"after 10 ticks %d, after 70 %d, server %d" % [early, drawn.arsenal.current().magazine, world_count])
+
+	# The play test's "no damage shooting sinks and boxes" after he had walked into them: the
+	# furniture is one static body, so nothing a hunter does moves a prop out of the box the
+	# decoy check reads (`PhMap.prop_containing`, from the document).
+	_check(world.map.get("_furniture") is StaticBody3D, "furniture cannot be pushed out of the place a decoy is judged at")
+
+	world._set_side(&"local", PhGame.PROPS)
+	hud.call("_process", 0.0)
+	_check(not counter.visible, "a prop has no counter")
+
+	remove_child(client)
+	client.free()
 	await get_tree().process_frame
 	_finished()
 

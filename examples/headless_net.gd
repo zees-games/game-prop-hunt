@@ -433,10 +433,13 @@ func _test_a_decoy_is_charged() -> void:
 	var server_me := _server_me()
 	server_me.place_at(LOOK_FROM, 0.0)
 	await _steps(20)
-	var aim := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.5, 0.0))
+	# At the seat. The chair is its pieces now (legs, seat, back), and at 0.5 m a single ray goes
+	# between the seat and the back: the shotgun's pellets caught the chair there and the SMG,
+	# the hunters' first gun since the loadout stopped putting both in slot 3, did not.
+	var aim := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.35, 0.0))
 	await _steps(6, aim)
 	var health := server_me.health.health
-	var fire := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.5, 0.0))
+	var fire := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.35, 0.0))
 	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
 	await _steps(SERVER_TICK_RATE * 2, fire)
 	await _steps(6, aim)

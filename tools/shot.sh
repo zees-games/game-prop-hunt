@@ -7,6 +7,7 @@
 #   tools/shot.sh --view=prop --as=furniture_chair                # a prop in third person, hidden
 #   tools/shot.sh --view=blind                                    # a hunter while the props hide
 #   tools/shot.sh --view=hunter --board                           # with the Tab scoreboard open
+#   tools/shot.sh --view=hunter --fire=12 --aim-prop              # trigger held (slowed) at the nearest furniture: flash, tracers, impacts, the counter, a decoy's cost
 #   tools/shot.sh --view=overview --out=res://screenshots/x.png   # any --ph-* is the game's config
 #
 # xvfb-run because this needs a rendering context: `--headless` gives a null renderer and saves
@@ -27,7 +28,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --ph-*)      config+=("$arg") ;;
-        --at=*|--look=*|--as=*|--board|--name=*) extra+=("$arg") ;;
+        --at=*|--look=*|--as=*|--board|--name=*|--fire=*|--aim-prop) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

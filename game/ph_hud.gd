@@ -77,6 +77,11 @@ var strip: DotScoreStrip = null
 var vitals: DotVitals = null
 ## "Look at a prop" with the disguise key drawn as a key, while a prop is undisguised.
 var prompt: DotKeyPrompt = null
+## Bottom right, a hunter's: the weapon in hand and `magazine | reserve`. See [method _draw_ammo].
+var ammo: DotAmmoCounter = null
+## The rig the counter reads: the gun the client draws (`PhClient.weapons`), which the server's
+## count corrects (`PhClient._correct_drawn`). Unset, the player's own rig.
+var weapons_fn: Callable = Callable()
 var _shout: Label = null
 var _hints: Label = null
 var _as: Label = null
@@ -173,6 +178,20 @@ func _build() -> void:
 	vitals.offset_bottom = -214.0
 	vitals.visible = false
 	_root.add_child(vitals)
+
+	# Bottom right, a hunter's: what is in hand and how much is in it. The chat box and the
+	# health plate are bottom left and the ballot top right, so nothing it shares a corner with;
+	# a ballot that does reach it dims it (DotHudPiece's cover), and headless_run checks the
+	# corners. "1-3 Weapons" on the hints said what to press and nothing said what you held.
+	ammo = DotAmmoCounter.new()
+	ammo.name = "Ammo"
+	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	ammo.offset_left = -420.0
+	ammo.offset_right = -24.0
+	ammo.offset_top = -100.0
+	ammo.offset_bottom = -24.0
+	ammo.visible = false
+	_root.add_child(ammo)
 
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -307,6 +326,7 @@ func _process(delta: float) -> void:
 		strip.hide_scores()
 
 	_draw_vitals(side)
+	_draw_ammo(side)
 	_draw_hints(side)
 	_draw_meter(side)
 	_crosshair.visible = side == PhGame.HUNTERS and player != null and player.is_alive() and not is_blindfolded()
@@ -349,6 +369,40 @@ func _draw_vitals(side: int) -> void:
 		prompt.clear()
 	else:
 		prompt.show_prompt(words, _key(PhBindings.DISGUISE))
+
+
+## The counter, from the rig the hunter draws: the magazine and the reserve, low at a quarter of
+## a magazine (when a reload is worth starting); a melee weapon by its name alone.
+func _draw_ammo(side: int) -> void:
+	var rig: ZeeWeaponRig = null
+	if weapons_fn.is_valid():
+		rig = weapons_fn.call() as ZeeWeaponRig
+	elif player != null and is_instance_valid(player):
+		rig = player.weapons
+
+	var def := rig.current_def() if rig != null and is_instance_valid(rig) and rig.arsenal != null else null
+	var shown := def != null and side == PhGame.HUNTERS and player != null and player.is_alive() \
+		and not player.watching and not is_blindfolded()
+	ammo.visible = shown
+
+	if not shown:
+		ammo.clear()
+		return
+
+	var title := def.display_name if def.display_name != "" else String(def.id)
+
+	if def.ammo_type == &"" or rig.arsenal.current() == null:
+		ammo.show_ammo(title, -1, -1)
+		return
+
+	var held := rig.arsenal.current()
+	var reserve := rig.arsenal.ammo().count(def.ammo_type)
+
+	if def.magazine > 0:
+		ammo.show_ammo(title, held.magazine, reserve,
+			float(held.magazine) <= float(def.magazine) * 0.25, def.infinite_reserve)
+	else:
+		ammo.show_ammo(title, reserve, -1, reserve <= 0, false)
 
 
 func _draw_hints(side: int) -> void:
