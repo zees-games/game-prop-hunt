@@ -241,9 +241,10 @@ func cli_prefix() -> String:
 	return "--ph-"
 
 
-## How many hunters a round with [param players] in it has.
-func hunters_for(players: int) -> int:
-	return DotTeamRotation.count_for(players, players_per_hunter, min_hunters, max_hunters)
+## How many hunters a round with [param players] in it has. [param per] is a map's own
+## players per hunter (0: the server's); the server's least and most hunters hold either way.
+func hunters_for(players: int, per: float = 0.0) -> int:
+	return DotTeamRotation.count_for(players, per if per > 0.0 else players_per_hunter, min_hunters, max_hunters)
 
 
 ## The disguise rules, from this configuration.

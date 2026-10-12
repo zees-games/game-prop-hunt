@@ -727,7 +727,9 @@ func _draw_sides() -> void:
 				PROPS:
 					wishes[id] = -1
 
-	var want := config.hunters_for(keys.size())
+	# A map may ask for its own share of hunters: a big school with a hiding place every few
+	# metres wants more of them than a cottage (`ph-bots-map-spread-1`).
+	var want := config.hunters_for(keys.size(), float(map_doc.get("players_per_hunter", 0.0)))
 	var picked: Dictionary = DotTeamRotation.pick(
 		keys, want, config.hunter_pick as DotTeamRotation.Mode, hunter_history, _round_seed, wishes
 	)

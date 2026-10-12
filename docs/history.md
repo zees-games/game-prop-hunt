@@ -2,6 +2,10 @@
 
 Bug stories worth keeping, newest first. The rule each one left is in `CLAUDE.md`.
 
+## The props won the school and lost the woods (2026-10-12)
+
+`headless_bots` held the props to 35-55% of rounds over the four maps, and 11 in 24 passed, while the school gave them 11 rounds in 12 and the woods 1. A mean over maps is no band on any of them. The density of hiding places decided it (319 on the school, 68 in the woods), so the maps now set their own share of hunters (`players_per_hunter`) and the suite holds each map to its own band.
+
 ## The last half minute decided the rounds (2026-10-12)
 
 With the bots playing properly the props still won 3 of 20 rounds at medium, 92 of 100 found, many of them in the last 30 s: the time beacon (`beacon_seconds_left` 30) showed every prop still in to every hunter, and a round the props had held was lost there. Off by default now (11 of 24); the last prop's beacon still ends a round nobody can find anybody in. game-hide-n-seek had found the same the same morning. The suite's band was a tenth to nine tenths of eight rounds, which 3 of 20 passed; it is 35-55% of twenty-four now.

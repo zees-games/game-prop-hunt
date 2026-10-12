@@ -23,15 +23,18 @@ const PhBots := preload("../game/ph_bots.gd")
 ## - at medium a close game: the props win 35-55% of rounds (a hunt that finds everybody is as
 ##   broken as one that finds nobody), and the hunters find somebody in most; easy leaves the
 ##   props at least half the rounds, hard at most two in five;
+## - and each map on its own a close game too (25-65% of its rounds), not only the four together;
 ## - the hunters test props more than furniture, and the decoy penalty kills few of them;
 ## - the board's "props left" is the props alive, after every find;
 ## - every place a prop may hide is reachable from where the props start (the school's
 ##   bathrooms once had a toilet in each doorway).
 ##
-## Twenty-four rounds by default, six a map, about four minutes: a band on eight rounds was a
-## band on noise. `-- --rounds N` plays another number, `-- --first N` starts
-## at the Nth round's map and seed, `-- --difficulty hard` plays another preset, and
-## `PH_BOTS_TRACE=1` prints where everybody is every few seconds. Without `maps/` linked it plays
+## Forty-eight rounds by default, twelve a map, about eight minutes: a band on eight rounds was a
+## band on noise, and each map is held to its own band once it has twelve. `-- --rounds N` plays
+## another number, `-- --first N` starts at the Nth round's map and seed, `-- --map ph_house`
+## plays that map's rounds of the rotation only, `-- --difficulty hard` plays another preset, and
+## `PH_BOTS_TRACE=1` prints where everybody is every few seconds; `PH_ROUND_SECONDS` and
+## `PH_HIDE_SECONDS` set the server's ceilings for a measurement. Without `maps/` linked it plays
 ## the practice house.
 
 const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods"]
@@ -45,6 +48,11 @@ const SECTIONS := 3
 ## The share of rounds the props win: a band at medium, a floor at easy, a ceiling at hard.
 const PROPS_WIN := Vector2(0.35, 0.55)
 const EASY_PROPS_WIN := 0.5
+
+## Each map on its own at medium, once it has played this many rounds: wider than the mean's
+## band, because twelve rounds is still a small sample.
+const MAP_PROPS_WIN := Vector2(0.25, 0.65)
+const MAP_ROUNDS := 12
 const HARD_PROPS_WIN := 0.4
 
 var _passed := 0
@@ -70,19 +78,28 @@ func _run() -> void:
 	print("prophunt bots")
 	print("")
 	var args := OS.get_cmdline_user_args()
-	var rounds := maxi(1, int(_arg(args, "--rounds", "24")))
+	var rounds := maxi(1, int(_arg(args, "--rounds", "48")))
+	# One map only: its own rounds of the rotation (the 2nd, 6th, 10th... for the house), so a
+	# round played this way is the same round the whole run plays.
+	var only := _arg(args, "--map", "")
 	var difficulty := _arg(args, "--difficulty", "medium")
 	var first := maxi(0, int(_arg(args, "--first", "0")))
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
 
 	_section("%d rounds of stand-ins at %s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)"])
-	for r in range(first, first + rounds):
+	var played := 0
+	var r := first
+	while played < rounds:
 		var map_id: String = MAPS[r % MAPS.size()] if linked else "ph_practice"
-		var result := await _round(map_id, r, difficulty)
+		r += 1
+		if only != "" and linked and map_id != only:
+			continue
+		played += 1
+		var result := await _round(map_id, r - 1, difficulty)
 		results.append(result)
 		print("  round %2d %-11s %d hunters: found %d of %d props, mean last %5.1f s, %s; fit %.2f, spread %4.1f m; moving %4.1f s/prop-min; tests %2d props %2d furniture; decoy %5.1f hp, %d hunters killed by it; board %s; reach %d/%d" % [
-			r + 1, map_id, result["hunters"], result["found"], result["props"], result["mean_last"],
+			r, map_id, result["hunters"], result["found"], result["props"], result["mean_last"],
 			"props win" if result["props_won"] else "hunters win", result["fit"], result["spread"], result["moving"],
 			result["tests_props"], result["tests_furniture"], result["decoy_hp"], result["decoy_deaths"],
 			"ok" if result["board_ok"] else "WRONG", result["reach"], result["places"]])
@@ -124,6 +141,19 @@ func _run() -> void:
 	print("  a prop lasts %.1f s on average; %d of %d props found; props won %d of %d rounds; %d with a find; fit %.2f; spread %.1f m; moving %.1f s per prop-minute; tests %d on props, %d on furniture; %d of %d hunters killed by decoys" % [
 		lasts / maxf(float(props), 1.0), found, props, props_won, results.size(), rounds_with_find, fit / n, spread / n, moving / n,
 		tests_props, tests_furniture, decoy_deaths, hunters])
+	# Each map on its own: a mean over the four once hid the school at 11 rounds in 12 for the
+	# props and the woods at 1 (`ph-bots-map-spread-1`).
+	var by_map := {}
+	for result in results:
+		var row: Array = by_map.get(result["map"], [0, 0, 0, 0])
+		row[0] += 1
+		row[1] += 1 if bool(result["props_won"]) else 0
+		row[2] += int(result["found"])
+		row[3] += int(result["props"])
+		by_map[result["map"]] = row
+	for map_id: String in by_map:
+		var row: Array = by_map[map_id]
+		print("  %-11s props won %2d of %2d rounds (%3.0f%%), %2d of %2d props found" % [map_id, row[1], row[0], 100.0 * row[1] / row[0], row[2], row[3]])
 	_check(disguised == props, "every prop is disguised when the hunters are let go", "%d of %d" % [disguised, props])
 	_check(board_ok, "the board's props left is the props alive after every find")
 	if difficulty == "medium":
@@ -131,6 +161,14 @@ func _run() -> void:
 		_check(moving / n <= 3.0, "a disguised prop keeps still unless shot", "%.1f s moving per prop-minute" % (moving / n))
 		_check(float(props_won) >= PROPS_WIN.x * n and float(props_won) <= PROPS_WIN.y * n,
 			"a close game: the props win %.0f-%.0f%% of rounds" % [PROPS_WIN.x * 100.0, PROPS_WIN.y * 100.0], "props won %d of %d" % [props_won, results.size()])
+		for map_id: String in by_map:
+			var row: Array = by_map[map_id]
+			# A share on fewer than twelve rounds is noise: reported, not held.
+			if row[0] >= MAP_ROUNDS:
+				var share := float(row[1]) / float(row[0])
+				_check(share >= MAP_PROPS_WIN.x and share <= MAP_PROPS_WIN.y,
+					"%s on its own is a close game: the props win %.0f-%.0f%% of its rounds" % [map_id, MAP_PROPS_WIN.x * 100.0, MAP_PROPS_WIN.y * 100.0],
+					"props won %d of %d" % [row[1], row[0]])
 		_check(rounds_with_find * 2 >= results.size(), "the hunters find somebody in at least half the rounds", "%d of %d" % [rounds_with_find, results.size()])
 		_check(tests_furniture <= maxi(tests_props * 3, 4 * results.size()), "the hunters do not shoot the furniture to pieces", "%d furniture tests, %d prop tests" % [tests_furniture, tests_props])
 		_check(decoy_deaths * 5 <= hunters, "the decoy penalty kills at most one hunter in five", "%d of %d" % [decoy_deaths, hunters])
@@ -173,6 +211,11 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	config.keep_progress = false
 	config.map_ids = PackedStringArray([map_id])
 	config.seed_value = 20261012 + index * 7919
+	# For a measurement: the server's ceilings (a map asks for less on its own).
+	if OS.has_environment("PH_ROUND_SECONDS"):
+		config.round_seconds = float(OS.get_environment("PH_ROUND_SECONDS"))
+	if OS.has_environment("PH_HIDE_SECONDS"):
+		config.hide_seconds = float(OS.get_environment("PH_HIDE_SECONDS"))
 
 	var game := PhGame.new()
 	game.name = "Bots_%d" % index

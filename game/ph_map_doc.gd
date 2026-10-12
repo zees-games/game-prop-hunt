@@ -96,6 +96,7 @@ static func validate(source: Dictionary) -> DotResult:
 		"blurb": str(source.get("blurb", "")),
 		"round_seconds": maxf(float(source.get("round_seconds", 0.0)), 0.0),
 		"hide_seconds": maxf(float(source.get("hide_seconds", 0.0)), 0.0),
+		"players_per_hunter": maxf(float(source.get("players_per_hunter", 0.0)), 0.0),
 		"kill_y": float(source.get("kill_y", -30.0)),
 	}
 

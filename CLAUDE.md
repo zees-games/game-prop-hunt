@@ -66,6 +66,7 @@ Short forms; the reasoning is in the linked file.
 **Hunters, decoys and stand-ins**
 
 - A shot landing in a map prop's box and not on a player is a decoy, charged per pellet (`PhGame._charge_for_decoys`, `decoy_penalty`, `decoy_penalty_min`). [design](docs/design.md#decision-3-a-wrong-guess-costs-and-the-furniture-decides-what-is-wrong)
+- A map may set its own share of hunters (`players_per_hunter`, `PhConfig.hunters_for(players, per)`; the server's least and most still hold), as it sets its round and hide; `headless_bots` holds each map to its own band, not only the mean. [bots](docs/bots.md#measured)
 - Stand-ins are `ph_bots.gd` on dot-bot (`DotBotNav`, `DotBotHiding`, `DotBotSearch`, `DotBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing. Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
 - A stand-in prop never hops while disguised (a sink in mid-air), and "hurt" is health lost under the same disguise (a new disguise's maximum is no shot). [bots](docs/bots.md#a-prop-hides-as-what-belongs-there)
 - The drawn gun holds only what the server armed (`PhClient._arm_locally` gives each `player_armed` weapon; never `give_everything`); one hunter weapon per slot (`PhGame.hunter_slot_clash` warns). [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
