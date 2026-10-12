@@ -13,6 +13,10 @@ extends RefCounted
 ##
 ## [b]H is help, in every game of the family[/b] (dot-menu adds the row), so nothing here
 ## may default to it.
+##
+## [b]Chat is two rows[/b] on dot-ui's chat window's own actions (Y to all, U to your side), so
+## the help screen lists them and the Controls page moves them; until 2026-10-12 they were the
+## window's defaults, on no page.
 
 const DISGUISE := &"ph_disguise"
 const REVEAL := &"ph_reveal"
@@ -27,6 +31,9 @@ const STRAIGHTEN := &"ph_straighten"
 const RELOAD := &"ph_reload"
 const VIEW := &"ph_view"
 const SCOREBOARD := &"ph_scoreboard"
+## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
+const CHAT := &"chat_open"
+const CHAT_TEAM := &"chat_open_team"
 ## A hunter's weapon slots, 1 to 5. Rows, read through their actions, so the Controls page can
 ## move them and the help screen lists them; they were keycodes in the client until 2026-10-11.
 const SLOTS: Array[StringName] = [&"ph_slot_1", &"ph_slot_2", &"ph_slot_3", &"ph_slot_4", &"ph_slot_5"]
@@ -48,6 +55,8 @@ static func make() -> DotMenuBindings:
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Hunters")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Weapon slot %d" % (i + 1), str(i + 1), "Hunters")
+	keys.add(CHAT, &"bind_chat", "Chat", "Y", "Communication")
+	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	return keys

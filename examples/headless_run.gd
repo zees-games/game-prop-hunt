@@ -1,5 +1,6 @@
 extends Node
 
+const PhBindings := preload("../game/ph_bindings.gd")
 const PhCatalogue := preload("../game/ph_catalogue.gd")
 const PhConfig := preload("../game/ph_config.gd")
 const PhController := preload("../game/ph_controller.gd")
@@ -24,7 +25,7 @@ const PhSettings := preload("../game/ph_settings.gd")
 
 const SECTIONS := 21
 
-const CHECKS := 96
+const CHECKS := 97
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -710,6 +711,11 @@ func _test_help_and_menu() -> void:
 	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# Chat is two rows, so help lists Y and U and the Controls page moves them.
+	var _t := settings.settings.set_value(&"bind_chat", "J")
+	_check(keys.key_for(PhBindings.CHAT) == "J" and DotInputBinding.describe_action(PhBindings.CHAT) == "J"
+		and keys.key_for(PhBindings.CHAT_TEAM) == "U", "chat (Y) and team chat (U) are rows: rebinding one moves its key",
+		"%s %s" % [keys.key_for(PhBindings.CHAT), keys.key_for(PhBindings.CHAT_TEAM)])
 	var h := InputEventKey.new()
 	h.physical_keycode = KEY_H
 	h.keycode = KEY_H
