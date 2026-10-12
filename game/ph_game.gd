@@ -117,6 +117,13 @@ var rules: DotPropDisguiseRules = null
 ## player id -> PhPlayer.
 var players: Dictionary = {}
 
+## dot-player-controller's `mp_forceview`: whether a player may switch views (0), or is held
+## in first (1) or third person (2); a prop and a hunter start in their side's view either
+## way. Bound by the module (REPLICATED) and followed by a client through its link. (No
+## `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's
+## standing hull would be the wrong one.)
+var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
+
 ## player id -> side.
 var sides: Dictionary = {}
 

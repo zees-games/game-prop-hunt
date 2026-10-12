@@ -105,6 +105,7 @@ Short forms; the reasoning is in the linked file.
 python3 ../mg-prop-hunt-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --ph-map-ids=ph_school
+tools/camera_check.sh --render     # cameras round the house (armed), mp_forceview, both views
 tools/shot.sh --view=room --ph-map-ids=ph_school --at=-38,1.7,3.5 --look=-26,0.8,14
 tools/shot.sh --view=prop --as=furniture_chair_cushion --ph-map-ids=ph_house
 tools/shot.sh --view=blind
