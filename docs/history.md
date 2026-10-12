@@ -11,3 +11,17 @@ Christian's first play test: the hunter's gun was a green sniper, a purple rifle
 - **No count.** A `DotAmmoCounter` bottom right counts the drawn gun, which predicts; `PhClient.correct_drawn` takes the server's count once the gun has been quiet 0.6 s (game-zombie-zone's rule), so a refused shot or a fresh round's refill does not leave the counter on the client's own sum.
 - **No damage from furniture, no impacts** were mostly the offline trigger never reaching the world's gun (fixed the same day, `PhPlayer.command_stamp`), and partly the drawn rig holding a hammer or a pistol the server did not have. The furniture is one static body, so walking into it moves nothing the decoy check reads. The flash and tracers are there: a software renderer draws a few frames a second and a flash lasts a few hundredths, so `tools/shot.sh --fire` slows time while it holds the trigger.
 - **The net suite's chair shot passed only with the shotgun.** At 0.5 m a single SMG ray passes between the chair's seat and back (it is its pieces now, not its box); the pellets caught it. The test aims at the seat.
+
+## Offline, no hunter's shot ever landed (2026-10-12)
+
+`PhClient._drive_offline` stamped fire, alt and reload onto `controller.current_command`, and `PhPlayer.simulate` then applied a fresh `sampler.sample()` over it, so the world's rig never saw a trigger (the play test's "shots that do not register", and part of why decoys never cost him). The buttons go onto the world's own sample through `PhPlayer.command_stamp`, set in `PhClient._adopt`; never stamp `current_command` for the world. `headless_run`'s "offline, the client's trigger" is armed. Found by game-zombie-zone's play test (its docs/history.md).
+
+## The first days (2026-10-09 to 10-11)
+
+Found by running, each with the rule it left (in `CLAUDE.md` where it still bites).
+
+- **Spawns inside sofas**: six, on three maps, because a spawn is written before a room is furnished. Found by `headless_maps`; mg-prop-hunt-maps' builder now moves them itself.
+- **A pool of grass, a dark band round the gym, and washed-out daylight**: all three found by rendering, none by a check. The maps repo's CLAUDE.md has each.
+- **A chair's 98 health was 97.9 on the client**: 12 bits over 0..1000 for `net_max_health`. 14 now.
+- **`var rotation` on PhGame** shadowed `Node3D.rotation` and broke every transform; it is `hunter_history`.
+- **dot-server-deploy had no `addons/dot_menu`** and a stale class cache, so the delivered game's client failed to parse; found by `prophunt_client` there, fixed locally.
