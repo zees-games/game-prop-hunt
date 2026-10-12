@@ -61,6 +61,7 @@ Short forms; the reasoning is in the linked file.
 - A lock or a tilt is the server's, asked for and announced; a tilt is made on a copy and a changed hull goes through `_make_room`. [design](docs/design.md#decision-1-a-disguise-is-a-hull-not-a-look)
 - A leant prop turns about its box's middle and rests on the floor: hull `standing_hull`, model `model_transform`, hitbox `box_transform` (dot-props 4); never `Transform3D(prop_basis(), feet)`. `headless_run` turns every prop six ways. [design](docs/design.md#decision-1-a-disguise-is-a-hull-not-a-look)
 - The blindfold is true on the wire: `PhInterest` sends a hunter no prop during the hide (every snapshot, no linger), and DISGUISE events reach a hunter only when the seek starts (`PhNetBridge._on_disguise_changed`, `_on_phase_changed`). [design](docs/design.md#decision-2-the-blindfold-is-true-on-the-wire)
+- **A READY before the player is seated is kept** (`_ready_unseated` in the bridge) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](docs/history.md)
 - `net_max_health` is 14 bits: 12 made a chair's 98 health 97.9 on the client. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
 **Hunters, decoys and stand-ins**

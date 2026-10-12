@@ -43,3 +43,4 @@ Found by running, each with the rule it left (in `CLAUDE.md` where it still bite
 - **A chair's 98 health was 97.9 on the client**: 12 bits over 0..1000 for `net_max_health`. 14 now.
 - **`var rotation` on PhGame** shadowed `Node3D.rotation` and broke every transform; it is `hunter_history`.
 - **dot-server-deploy had no `addons/dot_menu`** and a stale class cache, so the delivered game's client failed to parse; found by `prophunt_client` there, fixed locally.
+- **A READY that overtook the seat was dropped (2026-10-12).** A client sends READY when its link says PLAYING, which the link decides itself after sending `loaded` on another ENet channel. Through a lossy link the READY can reach the server first; `_admit` found no player for the peer and returned, and nothing asked again, so that client never got a world. Loopback and WebSocket order the two, so no suite could see it until `headless_net` sent the READY before the seat.
