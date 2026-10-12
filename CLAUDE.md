@@ -73,6 +73,8 @@ The clock is a `DotScoreStrip` with the props and hunters still up as its two si
 
 **H is help** (dot-menu's stock key and its top-right "H Help" plate; `PhSettings._fill_help` writes the goal and each side's rules), so nothing in `PhBindings` may default to H, and the Escape menu has dot-menu's stock Help and Leave. `headless_run` checks both.
 
+**M is the map list** (dot-menu's map menu): `PhGame.map_rows()` and `change_map_now()` (the next map plus dot-match's `begin_round_now`) serve both solo and the server, where dot-vote's map menu lets the owner's `sv_map_menu_flag` change it now and gives anybody else a vote. It shares the taunt list's picker; a map choice never reaches `_on_taunt_picked`. Nothing in `PhBindings` may default to M; `headless_run` and `dedicated` check it.
+
 ## Sides, points and stats
 
 `DotTeamRotation` (dot-team) draws the hunters: RANDOM (never the same person twice running when there is anybody else), QUEUE (everybody an equal share over time) or SWAP (last round's props hunt). `!hunter` / `!prop` / `!any` are wishes the draw honours where it can. Points: winning side 10, a find 5, surviving 5, taunts, and a point a second for a prop that shows its face (Q, `reveal_points_per_second`, paid for at most `reveal_paid_seconds`, then a `reveal_cooldown`). `PhProgress` keeps fourteen stats and eight achievements through dot-stats and dot-achievements, keyed by the player's TMC profile, and reports them when `report_progress` is on.

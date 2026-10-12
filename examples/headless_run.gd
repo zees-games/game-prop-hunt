@@ -22,9 +22,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 20
+const SECTIONS := 21
 
-const CHECKS := 91
+const CHECKS := 96
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -72,6 +72,7 @@ func _run() -> void:
 	await _test_bots()
 	await _test_the_client()
 	await _test_help_and_menu()
+	await _test_the_map_menu()
 	await _test_offline_trigger()
 
 	for world in _worlds.duplicate():
@@ -729,6 +730,53 @@ func _test_help_and_menu() -> void:
 
 
 # --- Helpers --------------------------------------------------------------------
+
+## The family's rule since the first play test: M opens the map list, and solo a choice
+## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and dot-vote.
+func _test_the_map_menu() -> void:
+	_section("M opens the map list, and solo a choice changes it")
+	var game := await _world(func(c: PhConfig) -> void: c.map_ids = PackedStringArray())
+	var _a := game.add_player(&"u1", "Ada")
+	var _b := game.add_player(&"u2", "Bo")
+	game.start()
+	await _step(game, 4)
+	var settings := PhSettings.new()
+	add_child(settings)
+	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
+	var keys: DotMenuBindings = settings.bindings
+	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
+		"the map menu is on M, and nothing else in the table defaults to M",
+		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	var rows: Array = game.map_rows()
+	_check(rows.size() > 1 and rows.filter(func(r: Dictionary) -> bool: return bool(r["current"])).size() == 1,
+		"there is more than one to choose, the one playing marked", "%d" % rows.size())
+	var _maps := settings.use_maps(game.map_rows, game.change_map_now)
+	var m := InputEventKey.new()
+	m.physical_keycode = KEY_M
+	m.keycode = KEY_M
+	m.pressed = true
+	_check(settings.menu.handle_event(m) and settings.menu.picker.is_open(), "M opens the picker")
+	var wanted: StringName = &""
+	var key := KEY_NONE
+	for row in range(1, DotMenuPicker.PAGE_SIZE + 1):
+		var it: Variant = settings.menu.picker.at_row(row)
+		if it is Dictionary and not bool((it as Dictionary)["current"]):
+			wanted = StringName(str((it as Dictionary)["id"]))
+			key = KEY_0 + row
+			break
+	var digit := InputEventKey.new()
+	digit.physical_keycode = key
+	digit.keycode = key
+	digit.pressed = true
+	var _k := settings.menu.handle_event(digit)
+	for _i in 4:
+		await get_tree().physics_frame
+	_check(wanted != &"" and StringName(str(game.map_doc.get("id", ""))) == wanted, "choosing one changes to it now", "%s, now %s" % [wanted, StringName(str(game.map_doc.get("id", "")))])
+	_check(not settings.menu.picker.is_open(), "and the picker is closed")
+	settings.queue_free()
+	await get_tree().process_frame
+	_finished()
+
 
 func _section(name: String) -> void:
 	_sections_entered += 1
