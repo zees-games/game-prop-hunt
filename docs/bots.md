@@ -35,13 +35,13 @@ Past 1.0 it tests the thing: fires at it for 1.1 s. A prop that bleeds is found 
 
 | | medium, 20 rounds | easy, 8 | hard, 8 |
 | --- | --- | --- | --- |
-| a prop lasts, mean | 145 s | 200 s | 144 s |
-| props found | 92 of 100 | 35 of 40 | 39 of 40 |
-| rounds the props win | 6 of 20 | 3 of 8 | 1 of 8 |
-| tests on props / on furniture | 58 / 37 | 22 / 12 | 20 / 18 |
-| hunters killed by decoys | 1 of 60 | 0 of 24 | 0 of 24 |
+| a prop lasts, mean | 150 s | 204 s | 162 s |
+| props found | 92 of 100 | 34 of 40 | 39 of 40 |
+| rounds the props win | 3 of 20 | 3 of 8 | 1 of 8 |
+| tests on props / on furniture | 56 / 57 | 30 / 21 | 27 / 30 |
+| hunters killed by decoys | 0 of 60 | 0 of 24 | 1 of 24 |
 
-At medium: every prop disguised when the seek starts, fit 0.88 (others of the kind round it), 14 m apart on average, 0.8 s moving per prop-minute (all of it a move before a forced taunt). Many finds come in the last 30 s, from the beacon. The stand-ins before this, on the same rounds: every prop found inside 70 s, most of them at the first forced taunt, and every prop "fleeing" at the seek's start (the disguise's new maximum read as a shot).
+At medium: every prop disguised when the seek starts, fit 0.84 (others of the kind round it), 15 m apart on average, 1.3 s moving per prop-minute (moves before a forced taunt). Many finds come in the last 30 s, from the beacon. Measured on the maps as dressed 2026-10-12 (lunch on the tables, crates, a camp); before the dressing the same rounds gave 145 s and 6 of 20. The stand-ins before this pass, on the same rounds: every prop found inside 70 s, most of them at the first forced taunt, and every prop "fleeing" at the seek's start (the disguise's new maximum read as a shot).
 
 The suite holds medium to bands: all disguised, fit at least 0.5, at most 3 s moving per prop-minute, the props win between a tenth and nine tenths of rounds, a find in at least half, furniture tests at most three times the prop tests, at most one hunter in five killed by decoys, the board's "props left" equal to the props alive after every death, and at most one hiding place in fifty cut off from the props' start (78 of 319 on the school were, until its north classrooms' boards stopped running across their doors).
 
