@@ -78,6 +78,8 @@ signal death_received(player_id: int, by: int, why: StringName)
 
 ## Somebody was handed, or picked up, a weapon. The HUD names it.
 signal armed_received(player_id: int, weapon_id: StringName)
+## Your shot landed (see [signal PhGame.hit_landed]); only ever to the shooter.
+signal hit_received(point: Vector3, killed: bool, headshot: bool)
 
 signal notice_received(text: String)
 
@@ -259,6 +261,11 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		# Here and not in the module: the net suite has no module, and mg-deathrun found a handout
 		# wired there that reached nobody in it.
 		game.player_armed.connect(announce_armed)
+		# To the shooter alone: a hit marker is that player's business.
+		game.hit_landed.connect(func(id: StringName, point: Vector3, killed: bool, headshot: bool) -> void:
+			var hit_peer := peer_for_player(session_of(id))
+			if hit_peer > 0:
+				_tell(hit_peer, PhEvents.Kind.HIT, PhEvents.write_hit(point, killed, headshot)))
 		# To the one who asked or paid, never broadcast: a refusal is that person's business, and
 		# what a decoy cost a hunter tells everybody else where they are standing.
 		game.refused.connect(func(id: StringName, why: String) -> void:
@@ -1194,6 +1201,11 @@ func _on_event(message: DotNetMessage) -> void:
 				death_received.emit(
 					int(death["player_id"]), int(death["by"]), death["why"]
 				)
+		PhEvents.Kind.HIT:
+			var hit := PhEvents.read_hit(reader)
+
+			if bool(hit["ok"]):
+				hit_received.emit(hit["point"], bool(hit["killed"]), bool(hit["headshot"]))
 		PhEvents.Kind.ARMED:
 			var armed := PhEvents.read_armed(reader)
 

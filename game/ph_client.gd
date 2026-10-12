@@ -149,6 +149,10 @@ func _start_offline() -> void:
 		if player != null and id == player.player_id and chat != null:
 			chat.say_locally("Achievement: %s (+%d)" % [title, points], Color(0.98, 0.84, 0.40))
 	)
+	# Offline the world is the authority, so its own word on a hit is the confirmation.
+	game.hit_landed.connect(func(id: StringName, point: Vector3, killed: bool, headshot: bool) -> void:
+		if id == &"local":
+			_on_hit(point, killed, headshot))
 	game.start()
 	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
@@ -229,6 +233,7 @@ func _build_netcode() -> DotResult:
 	bridge.round_changed.connect(_on_round)
 	bridge.death_received.connect(_on_death)
 	bridge.armed_received.connect(_on_armed)
+	bridge.hit_received.connect(_on_hit)
 	bridge.map_received.connect(_on_map)
 	bridge.disguise_received.connect(_on_disguise)
 	bridge.taunt_received.connect(_on_taunt)
@@ -1151,6 +1156,21 @@ func _server_count() -> Dictionary:
 		"magazine": behaviour.net_magazine, "reserve": behaviour.net_reserve, "slot": behaviour.net_slot,
 		"busy": behaviour.net_reloading or behaviour.net_switching,
 	}
+
+
+## A hit the server confirmed for this player's shot: the marker, and zee's red burst on the body
+## at the server's point (`ZeeShotFx.play_body_hit`, by `has_method` for an older shell's zee;
+## it skips a burst its own presentation ray already drew).
+func _on_hit(point: Vector3, killed: bool, headshot: bool) -> void:
+	if hud != null:
+		hud.confirm_hit(killed, headshot)
+	if weapons == null or not is_instance_valid(weapons) or not weapons.has_method(&"shot_fx"):
+		return
+	var fx: Object = weapons.call(&"shot_fx")
+	if fx == null or not fx.has_method(&"play_body_hit"):
+		return
+	var from: Vector3 = camera.global_position if camera != null else point + Vector3.UP
+	fx.call(&"play_body_hit", point, point - from)
 
 
 func _process(delta: float) -> void:

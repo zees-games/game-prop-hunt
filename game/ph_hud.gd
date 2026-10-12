@@ -98,6 +98,9 @@ var ammo: DotAmmoCounter = null
 ## The rig the counter reads: the gun the client draws (`PhClient.weapons`), which the server's
 ## count corrects (`PhClient._correct_drawn`). Unset, the player's own rig.
 var weapons_fn: Callable = Callable()
+
+## Four ticks round the crosshair for a hit the server confirmed. See [method confirm_hit].
+var hit_marker: DotHitMarker = null
 var _shout: Label = null
 var _hints: Label = null
 var _as: Label = null
@@ -209,6 +212,12 @@ func _build() -> void:
 	ammo.offset_bottom = -24.0
 	ammo.visible = false
 	_root.add_child(ammo)
+
+	hit_marker = DotHitMarker.new()
+	hit_marker.name = "HitMarker"
+	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hit_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(hit_marker)
 
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -495,3 +504,9 @@ func is_blindfolded() -> bool:
 	return player != null and is_instance_valid(player) and game != null \
 		and game.phase == PhGame.Phase.HIDE and game.team_of(player.player_id) == PhGame.HUNTERS \
 		and player.is_alive()
+
+
+## A hit the server confirmed for this hunter's shot: the marker, larger and red on a kill.
+func confirm_hit(killed: bool, headshot: bool) -> void:
+	if hit_marker != null:
+		hit_marker.flash(killed, headshot)

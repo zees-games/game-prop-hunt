@@ -25,7 +25,7 @@ const PhSettings := preload("../game/ph_settings.gd")
 
 const SECTIONS := 24
 
-const CHECKS := 117
+const CHECKS := 118
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -954,6 +954,12 @@ func _test_hunter_weapons() -> void:
 	# furniture is one static body, so nothing a hunter does moves a prop out of the box the
 	# decoy check reads (`PhMap.prop_containing`, from the document).
 	_check(world.map.get("_furniture") is StaticBody3D, "furniture cannot be pushed out of the place a decoy is judged at")
+
+	# A hit the world confirms (offline the world is the server): the marker flashes. Before
+	# this nothing said a hunter's shot had landed at all.
+	var marker: DotHitMarker = hud.get("hit_marker")
+	world.hit_landed.emit(&"local", Vector3(0.0, 1.0, -4.0), false, true)
+	_check(marker != null and marker.alpha() > 0.9 and marker.headshot, "a hit the world confirms flashes the hit marker")
 
 	world._set_side(&"local", PhGame.PROPS)
 	hud.call("_process", 0.0)
