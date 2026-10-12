@@ -7,6 +7,8 @@ const PhGame := preload("../game/ph_game.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
 const PhNetBridge := preload("../game/net/ph_net_bridge.gd")
 const PhPlayer := preload("../game/ph_player.gd")
+const PhEvent := preload("../game/net/ph_event.gd")
+const PhRequest := preload("../game/net/ph_request.gd")
 
 ## The real path minus the socket: two worlds, two managers, two bridges, two links with the
 ## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
@@ -25,7 +27,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 12
-const CHECKS := 49
+const CHECKS := 52
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -159,6 +161,16 @@ func _test_the_codec() -> void:
 	_check(bool(clock["ok"]) and int(clock["phase"]) == PhGame.Phase.SEEK
 		and absf(float(clock["seek_elapsed"]) - 40.25) < 0.1 and int(clock["props"]) == 3
 		and int(clock["hunters"]) == 1, "CLOCK", str(clock))
+
+	# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a
+	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
+	_check(PhEvent.fits(), "every event kind fits the event's kind field",
+		"%d kinds in %d bits" % [PhEvents.Kind.size(), PhEvent.KIND_BITS])
+	_check(PhRequest.fits(), "every request kind fits the request's kind field",
+		"%d kinds in %d bits" % [PhEvents.Ask.size(), PhRequest.KIND_BITS])
+	_check(PhEvents.chat_kinds_fit(), "every chat kind fits the chat line's kind field",
+		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), PhEvents.CHAT_KIND_BITS])
+
 	_finished()
 
 
