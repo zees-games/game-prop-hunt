@@ -100,10 +100,11 @@ bot_quota 4                    // players a round is kept at with bots; each per
 bot_quota_mode fill            // fill (as above), fixed (that many bots), per_player (that many per person) or off
 ph_bots 1                      // 0 = no bots
 ph_bot_suspicion 12            // how often a bot hunter shoots something it suspects
+bot_difficulty medium          // how bot hunters turn, aim and react: easy, medium, hard or nightmare
 ph_vote_after 20               // seconds into a map's last round before the vote opens
 ```
 
-The bot cvars are the family's shared ones (dot-server's `DotBotQuota`). `ph_min_players` still works and sets `bot_quota`; it is deprecated.
+The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they turn, aim and react is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 

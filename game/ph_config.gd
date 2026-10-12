@@ -193,8 +193,8 @@ extends DotConfig
 ## How many players the server keeps in the round by adding stand-ins.
 @export_range(0, 24, 1) var minimum_players: int = 4
 
-## How far a stand-in hunter's aim is off, in degrees.
-@export_range(0.0, 45.0, 0.5) var bot_aim_spread_degrees: float = 4.0
+# How a stand-in hunter turns, aims and how quickly it fires are dot-bot's `bot_*` settings,
+# shared by every game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...).
 
 ## Chance in a hundred, a second, that a stand-in hunter shoots at a prop it walks past.
 @export_range(0.0, 100.0, 1.0) var bot_suspicion: float = 12.0

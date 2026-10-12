@@ -391,6 +391,10 @@ func _add_tunables(world: PhGame) -> void:
 			config.minimum_players = clampi(int(value), 0, 24)
 			if _quota != null and _quota.quota_cvar != null:
 				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
+	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` (easy, medium, hard,
+	# nightmare; medium by default) and every `bot_*` setting it bundles, the names every game in
+	# the family uses. On the game as metadata, where its bots read it; never the registry.
+	var _bot_cvars := DotBotSettings.of(world).bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
 	_tunable("ph_bot_suspicion", config.bot_suspicion,
 		"Chance in a hundred, a second, that a stand-in hunter shoots something it suspects",
 		func(value: float) -> void: config.bot_suspicion = clampf(value, 0.0, 100.0))
@@ -513,7 +517,7 @@ func _keep_the_round_full() -> void:
 		wanted = _quota.wanted(humans, slots)
 
 	for _i in range(maxi(wanted - _bot_ids.size(), 0)):
-		var bot: PhPlayer = bridge.call("add_bot", _bot_name())
+		var bot: PhPlayer = bridge.call("add_bot", _bot_name(world))
 
 		if bot == null:
 			break
@@ -527,12 +531,14 @@ func _keep_the_round_full() -> void:
 		bridge.call("remove_player", PhNetBridge.session_of(leaving))
 
 
-## Names for the stand-ins, so a scoreboard of four of them is readable.
-static func _bot_name() -> String:
-	var names := PackedStringArray([
-		"Lamp", "Ottoman", "Houseplant", "Toaster", "Bookcase", "Teddy", "Fridge", "Stool",
-	])
-	return String(names[randi() % names.size()])
+## Names for the stand-ins, so a scoreboard of four of them is readable: this game's own
+## furniture names through dot-bot's [DotBotNames], never one already in [param world] (drawn
+## at random they could double up).
+static func _bot_name(world: PhGame) -> String:
+	var taken: Array = []
+	for id: StringName in world.players:
+		taken.append((world.players[id] as PhPlayer).display_name)
+	return DotBotNames.pick(taken, world.players.size(), PhGame.BOT_NAMES)
 
 
 ## Joins the bridge's chat seam to the services layer's router.

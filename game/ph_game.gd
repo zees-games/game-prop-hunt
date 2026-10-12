@@ -155,6 +155,12 @@ var _winner_name: String = ""
 ## Bots: player id -> what they are doing. See [method _drive_bots].
 var _bot: Dictionary = {}
 
+## The target id a suspicion shot engages: no player has it.
+const SUSPECT_TARGET := -7
+
+## What the stand-ins are called, solo and on a server; past the end dot-bot numbers them.
+const BOT_NAMES := ["Lamp", "Ottoman", "Houseplant", "Toaster", "Bookcase", "Teddy", "Fridge", "Stool"]
+
 
 func _ready() -> void:
 	if config == null:
@@ -1531,6 +1537,7 @@ func _drive_bots() -> void:
 		var command := DotFpsCommand.new()
 		command.yaw = player.controller.state.yaw
 		command.pitch = player.controller.state.pitch
+		_bot_aim_of(player).view_from(command.yaw, command.pitch)
 
 		if phase == Phase.IDLE:
 			pass
@@ -1544,9 +1551,30 @@ func _drive_bots() -> void:
 
 func _bot_state(player: PhPlayer) -> Dictionary:
 	if not _bot.has(player.player_id):
-		_bot[player.player_id] = {"target": -1, "goal": Vector3.INF, "since": _tick, "stuck": [player.controller.state.position, _tick]}
+		_bot[player.player_id] = {
+			"target": -1, "goal": Vector3.INF, "since": _tick, "stuck": [player.controller.state.position, _tick],
+			# How it turns, aims and when it may fire: dot-bot's, on this game's bot_difficulty.
+			"aim": DotBotAim.new(hash(String(player.player_id)), DotBotSettings.of(self)),
+		}
 
 	return _bot[player.player_id]
+
+
+func _bot_aim_of(player: PhPlayer) -> DotBotAim:
+	return _bot_state(player)["aim"]
+
+
+## The game clock in seconds, for the bots' aim.
+func _bot_now() -> float:
+	return float(_tick) / float(maxi(tick_rate, 1))
+
+
+## Turns a stand-in toward [param at] the way a person turns: at the settings' speed, never in
+## one tick. Writes the view into [param command].
+func _bot_look(player: PhPlayer, command: DotFpsCommand, at: Vector3) -> void:
+	var view := _bot_aim_of(player).look_at_point(player.eye_position(), at, 1.0 / float(maxi(tick_rate, 1)))
+	command.yaw = view.x
+	command.pitch = clampf(view.y, -89.0, 89.0)
 
 
 func _bot_hide(player: PhPlayer, command: DotFpsCommand) -> void:
@@ -1581,8 +1609,8 @@ func _bot_hide(player: PhPlayer, command: DotFpsCommand) -> void:
 	var flat := Vector3(centre.x - eye.x, 0.0, centre.z - eye.z)
 
 	if flat.length() > rules.reach * 0.6:
-		command.yaw = rad_to_deg(atan2(-flat.x, -flat.z))
-		command.move = Vector2(0.0, 1.0)
+		_bot_look(player, command, Vector3(centre.x, eye.y, centre.z))
+		_bot_walk(command, flat)
 		_bot_unstick(player, command)
 		return
 
@@ -1643,8 +1671,8 @@ func _bot_seek(player: PhPlayer, command: DotFpsCommand) -> void:
 	var seen := _bot_seen_prop(player)
 
 	if seen != null:
-		_bot_aim(player, command, seen.controller.state.position + Vector3(0.0, minf(seen.hull_height(), 1.4) * 0.6, 0.0))
-		command.set_button(DotFpsCommand.BUTTON_USER_0, true)
+		var at := seen.controller.state.position + Vector3(0.0, minf(seen.hull_height(), 1.4) * 0.6, 0.0)
+		command.set_button(DotFpsCommand.BUTTON_USER_0, _bot_shoot(player, command, seen.entity_id, at, seen.controller.state.velocity))
 		return
 
 	var goal: Vector3 = state["goal"]
@@ -1655,8 +1683,9 @@ func _bot_seek(player: PhPlayer, command: DotFpsCommand) -> void:
 		state["since"] = _tick
 
 	var flat := Vector3(goal.x, 0.0, goal.z) - Vector3(player.controller.state.position.x, 0.0, player.controller.state.position.z)
-	command.yaw = rad_to_deg(atan2(-flat.x, -flat.z))
-	command.move = Vector2(0.0, 1.0)
+	var eye := player.eye_position()
+	_bot_look(player, command, Vector3(goal.x, eye.y, goal.z))
+	_bot_walk(command, flat)
 	_bot_unstick(player, command)
 
 	# Suspicion: now and then, a shot at the nearest piece of furniture, which is how a person
@@ -1667,9 +1696,20 @@ func _bot_seek(player: PhPlayer, command: DotFpsCommand) -> void:
 		var near := _bot_nearest_hideable(player)
 
 		if near != Vector3.INF:
-			_bot_aim(player, command, near)
+			state["suspect"] = near
+			state["suspect_until"] = _tick + tick_rate
+
+	# A suspicion is followed through for a second: turn onto the piece, then fire once the
+	# view is on it, as a person does, rather than a shot on the tick the thought came.
+	var suspect: Vector3 = state.get("suspect", Vector3.INF)
+
+	if suspect != Vector3.INF and not careful:
+		if _tick > int(state.get("suspect_until", 0)):
+			state["suspect"] = Vector3.INF
+			_bot_aim_of(player).forget()
+		else:
 			command.move = Vector2.ZERO
-			command.set_button(DotFpsCommand.BUTTON_USER_0, true)
+			command.set_button(DotFpsCommand.BUTTON_USER_0, _bot_shoot(player, command, SUSPECT_TARGET, suspect, Vector3.ZERO))
 
 
 func _bot_seen_prop(player: PhPlayer) -> PhPlayer:
@@ -1683,7 +1723,10 @@ func _bot_seen_prop(player: PhPlayer) -> PhPlayer:
 		var at := other.controller.state.position + Vector3(0.0, 0.8, 0.0)
 		var toward := at - eye
 
-		if toward.length() > 25.0 or forward.dot(toward.normalized()) < 0.5:
+		# Inside the bot's view cone and sight (bot_fov, bot_sight), and never beyond 25 m, the
+		# furthest a prop's face reads as a face.
+		var profile := DotBotSettings.of(self).profile
+		if toward.length() > minf(25.0, profile.sight) or rad_to_deg(forward.angle_to(toward)) > profile.fov * 0.5:
 			continue
 
 		# Its own face, or a prop that moved where the bot could see.
@@ -1731,12 +1774,34 @@ func _bot_wander_goal(player: PhPlayer) -> Vector3:
 	return (prop["transform"] as Transform3D).origin
 
 
-func _bot_aim(player: PhPlayer, command: DotFpsCommand, at: Vector3) -> void:
-	var toward := at - player.eye_position()
-	var draw := random.stream_for(&"bot_aim", round_number * 8192 + int(player.entity_id % 8192))
-	var spread := config.bot_aim_spread_degrees
-	command.yaw = rad_to_deg(atan2(-toward.x, -toward.z)) + draw.next_range_f(-spread, spread)
-	command.pitch = clampf(rad_to_deg(asin(clampf(toward.normalized().y, -1.0, 1.0))) + draw.next_range_f(-spread, spread) * 0.4, -89.0, 89.0)
+## Aims a stand-in hunter at [param at] (target [param id]) and says whether it fires this tick:
+## dot-bot's [DotBotAim], so the view turns at `bot_turn_rate`, the first shots miss by
+## `bot_aim_error` and settle, and the trigger waits `bot_reaction` after first sight.
+func _bot_shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
+	var aim := _bot_aim_of(player)
+	var eye := player.eye_position()
+	var now := _bot_now()
+	var _new := aim.engage(id, eye, at, now)
+	var view := aim.track(eye, at, velocity, now, 1.0 / float(maxi(tick_rate, 1)))
+	command.yaw = view.x
+	command.pitch = clampf(view.y, -89.0, 89.0)
+	var fire := aim.trigger(now, eye.distance_to(at))
+	if fire:
+		aim.note_shot(eye, at, now)
+	return fire
+
+
+## Walks along [param world_dir] (flat, world space) whatever way the view is turned.
+func _bot_walk(command: DotFpsCommand, world_dir: Vector3) -> void:
+	var flat := Vector3(world_dir.x, 0.0, world_dir.z)
+	if flat.length() < 0.01:
+		command.move = Vector2.ZERO
+		return
+	flat = flat.normalized()
+	var yaw := deg_to_rad(command.yaw)
+	var forward := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var right := Vector3(cos(yaw), 0.0, -sin(yaw))
+	command.move = Vector2(flat.dot(right), flat.dot(forward)).limit_length(1.0)
 
 
 func _bot_unstick(player: PhPlayer, command: DotFpsCommand) -> void:

@@ -24,7 +24,7 @@ const PhSettings := preload("../game/ph_settings.gd")
 
 const SECTIONS := 19
 
-const CHECKS := 89
+const CHECKS := 90
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -559,6 +559,30 @@ func _test_bots() -> void:
 		"every stand-in prop is hiding as something by the end of the hide (%d of %d)" % [hidden.size(), game.players_on(PhGame.PROPS).size()])
 	await _step(game, TICK_RATE * 6)
 	_check(game.phase == PhGame.Phase.SEEK or game.phase == PhGame.Phase.IDLE, "and the round goes on without anybody at the keyboard")
+
+	# A stand-in hunter's shot is dot-bot's DotBotAim: turned onto the prop at bot_turn_rate,
+	# fired only bot_reaction after it first saw it. Driven through the game's own _bot_shoot.
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0] if not game.players_on(PhGame.HUNTERS).is_empty() else null
+	var profile := DotBotSettings.of(game).profile
+	if hunter != null:
+		var eye := hunter.eye_position()
+		var behind := eye + Vector3(-8.0, -0.4, 6.0)
+		var first := -1.0
+		var fastest := 0.0
+		var command := DotFpsCommand.new()
+		command.yaw = hunter.controller.state.yaw
+		var start: float = game._bot_now()
+		for i in range(TICK_RATE * 2):
+			var before := command.yaw
+			game._bot_aim_of(hunter).view_from(command.yaw, command.pitch)
+			if game._bot_shoot(hunter, command, 424242, behind, Vector3.ZERO) and first < 0.0:
+				first = game._bot_now() - start
+			fastest = maxf(fastest, absf(wrapf(command.yaw - before, -180.0, 180.0)) * TICK_RATE)
+			game._tick += 1
+		_check(first >= profile.reaction * 0.85 and fastest <= profile.turn_rate * 1.02,
+			"a stand-in hunter turns at bot_turn_rate and fires only after bot_reaction (first shot %.2f s, %.0f deg/s)" % [first, fastest])
+	else:
+		_check(false, "a stand-in hunter to aim with")
 
 	_finished()
 
