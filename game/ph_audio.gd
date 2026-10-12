@@ -201,8 +201,9 @@ func setup() -> DotResult:
 	manager.register_as_service = false
 	manager.voices = 24
 	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in round
-	# read -20.1 LUFS integrated with the beds and the steps in.
-	manager.loudness_trim_db = 3.0
+	# read -20.1 LUFS integrated with the beds and the steps in. Once the stand-in turned off
+	# walls (2026-10-12): -19.8 and -20.5 at +3, -18.2 twice at +6, -17.5 and -17.3 at +7.
+	manager.loudness_trim_db = 7.0
 	add_child(manager)
 
 	var ready_now := manager.setup()
