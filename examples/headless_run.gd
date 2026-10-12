@@ -25,7 +25,7 @@ const PhSettings := preload("../game/ph_settings.gd")
 
 const SECTIONS := 22
 
-const CHECKS := 107
+const CHECKS := 109
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -638,6 +638,19 @@ func _test_the_client() -> void:
 		"the clock is DotScoreStrip's, with the props and hunters still up as its plates",
 		str(strip.describe())
 	)
+	# Christian's first play test: a darker HUD by default, restyled live by the menu's theme.
+	var themed: DotMenu = (client.get("settings") as Node).get("menu")
+	var accent: Color = (load("res://game/ph_hud.gd") as GDScript).get("MAP_COLOUR")
+	var plate := strip.colour(&"plate")
+	_check(plate.get_luminance() < 0.1 and plate.a >= 0.7 and strip.colour(&"highlight") == accent,
+		"the HUD is dark by default, in the menu's theme, with this game's colour as its accent", str(plate))
+	var _t: Variant = themed.settings.set_value(&"ui_theme", &"contrast")
+	var hints: Label = hud.get("_hints")
+	_check(vitals.colour(&"plate") == themed.palette().hud_plate and hints.get_theme_color(&"font_color") == themed.palette().hud_text
+		and strip.colour(&"highlight") == accent,
+		"a theme picked in the menu reaches the pieces and the HUD's lines at once, the accent kept")
+	_t = themed.settings.set_value(&"ui_theme", &"midnight")
+
 	me.health.health = me.health.max_health * 0.2
 	hud.call("_process", 0.0)
 	_check(
