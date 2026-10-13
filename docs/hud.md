@@ -16,5 +16,5 @@ Sound follows the map document: each box's `mat` is its collision shape's `surfa
 
 ## A hit
 
-A hit is the server's word: `PhGame.hit_landed` from each weapon shot's damages on a player, sent as HIT to the shooter alone, drawn as dot-ui's `DotHitMarker` and zee's red burst on the body (`ZeeShotFx.play_body_hit`, called by `has_method` so an older pack still runs). It tells a hunter that a disguised prop was hit, which the health the hunter does not lose already says, so it gives nothing away. `headless_run` checks the marker.
+A hit is the server's word: `PhGame.hit_landed` from each weapon shot's damages on a player, sent as HIT to the shooter alone, drawn as dot-ui's `DotHitMarker` and zee's red burst on the body (`ZeeShotFx.play_body_hit`, called by `has_method` so an older pack still runs). It tells a hunter that a disguised prop was hit, which the health the hunter does not lose already says, so it gives nothing away. `headless_run` checks the marker; `headless_net` checks the wire: a hunter's shot into the stand-in is HIT to that hunter's peer, none to a second ready peer and none broadcast, and a hit the hunter takes is no marker (armed: it fails with the bridge's send removed, or broadcast).
 

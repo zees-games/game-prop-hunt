@@ -28,8 +28,8 @@ const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 14
-const CHECKS := 64
+const SECTIONS := 15
+const CHECKS := 68
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -37,6 +37,9 @@ const SERVER_TICK_RATE := 64
 const CLIENT_ENGINE_TICK_RATE := 30
 const SNAPSHOT_RATE := 30
 const INPUT_LEAD := 3
+## A connected player who must hear nothing of somebody else's hit.
+const BYSTANDER_PEER := 8
+const BYSTANDER_SESSION := 43
 
 ## The practice house's kitchen chair, and a spot west of it to stand and look at it from.
 const CHAIR_AT := Vector3(3.6, 0.0, 1.2)
@@ -59,6 +62,9 @@ var _stand_in: PhPlayer = null
 var _to_client: Array = []
 var _to_server: Array = []
 var _tick: int = 0
+## Every event the server sent while a section listens: `[peer_id, kind]`.
+var _sent_events: Array = []
+var _listening := false
 
 ## What the client was told, by kind, so a section can ask whether an event arrived.
 var _heard: Dictionary = {}
@@ -85,6 +91,7 @@ func _run() -> void:
 		await _test_a_joiner_is_told_what_everybody_wears()
 		await _test_a_decoy_is_charged()
 		await _test_the_drawn_gun_takes_the_server_count()
+		await _test_a_hit_is_the_shooters()
 		await _test_the_round_ends()
 		await _test_the_toys_reach_the_client()
 		await _test_leaving()
@@ -557,6 +564,79 @@ func _test_the_drawn_gun_takes_the_server_count() -> void:
 	_finished()
 
 
+## The hit marker's wire half (`PhGame.hit_landed` → HIT → `hit_received`); `headless_run` only
+## proves the offline half, where the world's own signal flashes the marker. A hunter shoots the
+## hiding stand-in point-blank. Armed: with the bridge's HIT send removed the first check fails;
+## sent with `_broadcast` the second does.
+func _test_a_hit_is_the_shooters() -> void:
+	_section("a hunter's shot that lands is told to the hunter alone")
+	var server_me := _server_me()
+	var hits: Array = []
+	var heard := func(point: Vector3, killed: bool, headshot: bool) -> void:
+		hits.append([point, killed, headshot])
+	_client_bridge.hit_received.connect(heard)
+
+	# A second connected player, READY, so a HIT that went to everybody would reach somebody.
+	var _seated := _server_bridge.add_player(BYSTANDER_PEER, BYSTANDER_SESSION, "Bo")
+	_server_bridge._admit(BYSTANDER_PEER)
+
+	# The prop two and a half metres in front of the hunter, in the open, and hit but never
+	# killed: a kill would end the round this suite's next section ends itself.
+	server_me.place_at(LOOK_FROM, 0.0)
+	_stand_in.place_at(LOOK_FROM + Vector3(0.0, 0.0, -2.5), 0.0)
+	var target_health := _server_game.combat.health_of(_stand_in.entity_id)
+	target_health.cannot_die = true
+	var aim := _aim_at(_mine(), _stand_in.global_position + Vector3(0.0, 0.4, 0.0))
+	await _steps(SERVER_TICK_RATE, aim)
+	_sent_events.clear()
+	_listening = true
+
+	var fire := _aim_at(_mine(), _stand_in.global_position + Vector3(0.0, 0.4, 0.0))
+	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
+	await _steps(4, fire)
+	await _steps(INPUT_LEAD + 6, aim)
+
+	var to_shooter := _events_of(PhEvents.Kind.HIT, CLIENT_PEER)
+	_check(not hits.is_empty() and to_shooter > 0, "the hunter's bridge is told the shot landed",
+		"%d heard, %d sent to the hunter, holding %s" % [hits.size(), to_shooter,
+			String(server_me.weapons.current_def().id) if server_me.weapons != null and server_me.weapons.current_def() != null else "nothing"])
+	var elsewhere := _events_of(PhEvents.Kind.HIT, BYSTANDER_PEER) + _events_of(PhEvents.Kind.HIT, 0)
+	_check(elsewhere == 0, "and nobody else is: no HIT to the other player, none broadcast", "%d" % elsewhere)
+	_check(not hits.is_empty() and (hits[0][0] as Vector3).distance_to(_stand_in.global_position) < 2.5,
+		"at the server's point, on the prop that was hit",
+		"%s, body at %s" % [str(hits[0][0]) if not hits.is_empty() else "-", str(_stand_in.global_position)])
+
+	# Hit back: the hunter the victim, and a victim is told nothing.
+	hits.clear()
+	_sent_events.clear()
+	var shot_back := DotShot.new()
+	shot_back.attacker = _stand_in.entity_id
+	var wound := DotDamage.make(_stand_in.entity_id, server_me.entity_id, 1.0, null)
+	wound.health_lost = 1.0
+	wound.point = server_me.global_position + Vector3.UP
+	shot_back.damages.append(wound)
+	_server_game._note_hits(_stand_in, shot_back)
+	await _steps(4, aim)
+	_check(hits.is_empty() and _events_of(PhEvents.Kind.HIT, CLIENT_PEER) == 0,
+		"a hit somebody else landed on this player is not this player's marker", "%d" % hits.size())
+
+	_listening = false
+	target_health.cannot_die = false
+	_client_bridge.hit_received.disconnect(heard)
+	_server_bridge.remove_peer(BYSTANDER_PEER)
+	await _steps(2)
+	_finished()
+
+
+## How many events of [param kind] the server sent to [param peer_id] (0: broadcast).
+func _events_of(kind: int, peer_id: int) -> int:
+	var count := 0
+	for sent: Array in _sent_events:
+		if int(sent[0]) == peer_id and int(sent[1]) == kind:
+			count += 1
+	return count
+
+
 func _test_the_round_ends() -> void:
 	_section("the round ends, and the client is told who won and why")
 	var damage := DotDamage.make(_server_me().entity_id, _stand_in.entity_id, 10000.0, null)
@@ -688,6 +768,12 @@ func _make_manager(server: bool, scope: StringName, peer_id: int, parent: Node, 
 
 
 func _on_server_send(method: StringName, peer_id: int, payload: PackedByteArray) -> void:
+	# Only while a section listens: a decode on the client's registry counts what it skips.
+	if method == &"event" and _listening:
+		var decoded := _client_net.messages.decode(DotNetReader.new(payload), 1, false)
+		if decoded.ok and decoded.value is PhEvent:
+			_sent_events.append([peer_id, (decoded.value as PhEvent).kind])
+
 	if peer_id != 0 and peer_id != CLIENT_PEER:
 		return
 
