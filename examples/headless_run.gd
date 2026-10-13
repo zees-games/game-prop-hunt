@@ -24,9 +24,9 @@ const PhEvents := preload("../game/net/ph_events.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 26
+const SECTIONS := 27
 
-const CHECKS := 133
+const CHECKS := 137
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -68,6 +68,7 @@ func _run() -> void:
 	await _test_room()
 	await _test_taunts()
 	await _test_shots()
+	await _test_toys()
 	await _test_decoys()
 	await _test_breaking()
 	await _test_the_round()
@@ -508,6 +509,49 @@ func _test_shots() -> void:
 			hunter.weapons.arsenal.current_def().id if hunter.weapons.arsenal.current_def() != null else &"-",
 			hunter.weapons.arsenal.magazine_of(hunter.weapons.arsenal.current_def().id) if hunter.weapons.arsenal.has_method("magazine_of") else -1])
 	_check(hunter.points >= points + game.config.find_points, "and the hunter is paid for it")
+	_finished()
+
+
+## dot-props' toys in the practice garden: walked into and sent on, shot and sent off while the
+## combat's trace sees straight through them (no cover, nothing a hunter pays for), and home
+## again at the next round.
+func _test_toys() -> void:
+	_section("the garden's toys")
+	var game := await _seek_round()
+	var box := game.map.toys
+	_check(box != null and box.count() == 3 and box.missing.is_empty(), "the practice garden has its three toys", str(box.describe()) if box != null else "none")
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	var ball := box.toy(0)
+	var b0 := ball.body.global_position
+	hunter.place_at(b0 + Vector3(-0.4, -0.12, 0.0), 0.0)
+	for _i in range(10):
+		hunter.controller.state.velocity = Vector3(5.0, 0.0, 0.0)
+		game._advance_toys(TICK)
+		await _physics_frame()
+	for _i in range(20):
+		await _physics_frame()
+	_check(ball.body.global_position.x > b0.x + 0.4, "a hunter walking into the football sends it on", "%.2f m" % (ball.body.global_position.x - b0.x))
+
+	var beach := box.toy(1)
+	var o0 := beach.body.global_position
+	var health := hunter.health.health
+	var shot := DotShot.make(&"test", hunter.entity_id, game.current_tick(), 0)
+	shot.origin = o0 + Vector3(-5.0, 0.0, 0.0)
+	shot.direction = Vector3(1.0, 0.0, 0.0)
+	shot.damage = 25.0
+	shot.max_range = 40.0
+	var through := game.combat.trace.line_of_sight(shot.origin, o0 + Vector3(2.0, 0.0, 0.0))
+	game._shoot_toys(shot)
+	for _i in range(20):
+		await _physics_frame()
+	_check(beach.body.global_position.distance_to(o0) > 0.4 and through and hunter.health.health == health,
+		"a shot sends the beach ball off, the combat's trace sees through it, and the hunter pays nothing",
+		"%.2f m, clear %s, health %.0f to %.0f" % [beach.body.global_position.distance_to(o0), str(through), health, hunter.health.health])
+
+	game._on_round_started(game.round_number + 1)
+	await _physics_frame()
+	_check(ball.body.global_position.distance_to(ball.rest.origin) < 0.05 and beach.body.global_position.distance_to(beach.rest.origin) < 0.05,
+		"a new round puts every toy home")
 	_finished()
 
 

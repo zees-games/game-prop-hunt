@@ -151,6 +151,10 @@ var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 ## is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
+## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
+## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
+var toy_rules: DotPropToyRules = DotPropToyRules.new()
+
 ## player id -> side.
 var sides: Dictionary = {}
 
@@ -251,12 +255,19 @@ func _exit_tree() -> void:
 ## another player, which is a tell the genre has always had in one form or another, and a far
 ## smaller one than a hunter stuck against an invisible sofa they cannot see is a person.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"prophunt", [&"world", &"player", &"prop"])
+	physics = DotPhysicsLayout.custom(&"prophunt", [&"world", &"player", &"prop", &"toy", &"footprint"])
 
 	for layer in physics.layers:
 		match layer.id:
 			&"player":
 				layer.collides_with = [&"world", &"prop"]
+			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never a
+			# person, who walks through it and pushes it (`_advance_toys`).
+			&"toy":
+				layer.collides_with = [&"world", &"prop", &"toy"]
+			# A toy's footprint, for a walkable mesh's bake only: nothing collides with it.
+			&"footprint":
+				layer.collides_with = []
 			_:
 				layer.collides_with = [&"player"]
 
@@ -301,6 +312,9 @@ func _build_map() -> void:
 	map.physics = physics
 	map.catalogue = props_catalogue
 	map.draw_world = draw_world
+	map.authoritative = authoritative
+	map.toy_rules = toy_rules
+	map.gravity = config.gravity
 	add_child(map)
 
 
@@ -696,6 +710,10 @@ func _on_round_started(number: int) -> void:
 	_prop_damage.clear()
 	if map != null:
 		map.restore_all()
+
+	# And every toy home: a ball rolled into last round's hiding place points at it.
+	if map != null and map.toys != null:
+		map.toys.reset()
 
 	if taunts != null:
 		taunts.reset()
@@ -1531,6 +1549,7 @@ func _advance_weapons() -> void:
 		for shot in outcome.shots:
 			shot.attacker = player.entity_id
 			shot.tick = _tick
+			_shoot_toys(shot)
 			var resolved := combat.resolve_shot(shot)
 			_note_hits(player, resolved)
 			_charge_for_decoys(player, shot)
@@ -1715,6 +1734,10 @@ func _step(delta: float) -> void:
 			player.refit()
 
 	_advance_weapons()
+
+	if authoritative:
+		_advance_toys(delta)
+
 	_watch_world()
 	_advance_reveals(delta)
 	_advance_taunts()
@@ -1752,6 +1775,37 @@ func _watch_world() -> void:
 			fall.tick = _tick
 			fall.context = {"why": DIED_FELL}
 			var _applied := combat.apply_damage(fall)
+
+
+# --- Toys ----------------------------------------------------------------------
+
+## Everybody against the map's toys, after they moved: a walk into a barrel or a ball
+## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
+func _advance_toys(delta: float) -> void:
+	if map == null or map.toys == null or map.toys.count() == 0:
+		return
+	for id: StringName in players:
+		var player: PhPlayer = players[id]
+		if not player.is_alive() or player.watching:
+			continue
+		var state := player.controller.state
+		var tunables := player.controller.tunables
+		var radius := tunables.radius if tunables != null else 0.35
+		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
+		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
+	map.toys.advance(delta)
+
+
+## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed
+## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
+## a ball is never cover, and a hunter pays nothing for hitting one: it is no prop anybody could
+## be. Server side.
+func _shoot_toys(shot: DotShot) -> void:
+	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
+		return
+	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
+	for raw: Variant in directions:
+		var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, physics.layer_mask(&"world") | physics.layer_mask(&"prop"))
 
 
 func delta_for_tick() -> float:

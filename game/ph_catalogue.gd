@@ -250,6 +250,13 @@ static func practice() -> Dictionary:
 		"blurb": "Two rooms and a garden.",
 		"boxes": boxes,
 		"props": props,
+		# dot-props' toys, loose only, in the garden: the suites push the football, shoot the
+		# beach ball, and watch a client see the kick.
+		"toys": [
+			{"toy": "football", "at": [14.0, 0.0, 3.0]},
+			{"toy": "beach_ball", "at": [16.5, 0.0, -2.5]},
+			{"toy": "tyre", "at": [18.5, 0.0, 4.5], "yaw": 30.0},
+		],
 		"lights": [
 			{"at": [-5.0, 2.8, 0.0], "range": 9.0, "energy": 0.9},
 			{"at": [5.0, 2.8, 0.0], "range": 9.0, "energy": 0.9},

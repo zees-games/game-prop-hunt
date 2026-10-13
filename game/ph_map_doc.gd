@@ -39,6 +39,7 @@ const WIRE_LIMIT := 60000
 
 const MAX_BOXES := 6000
 const MAX_PROPS := 2000
+const MAX_TOYS := 96
 const MAX_LIGHTS := 128
 const MAX_SPAWNS := 64
 
@@ -134,6 +135,21 @@ static func validate(source: Dictionary) -> DotResult:
 		return _refuse("%d props; the most is %d" % [props.size(), MAX_PROPS], source)
 
 	doc["props"] = props
+
+	# Toys: dot-props' DotPropToyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
+	# with a toy a newer dot-props has still plays on an older server.
+	var toys: Array = []
+	for raw: Variant in source.get("toys", []):
+		var toy := DotPropToyBox.normal_placement(raw)
+		if toy.is_empty():
+			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
+		toys.append(toy)
+
+	if toys.size() > MAX_TOYS:
+		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
+
+	doc["toys"] = toys
 
 	var lights: Array = []
 	for raw: Variant in source.get("lights", []):

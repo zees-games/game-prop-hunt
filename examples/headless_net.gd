@@ -28,8 +28,8 @@ const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 13
-const CHECKS := 60
+const SECTIONS := 14
+const CHECKS := 64
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -86,6 +86,7 @@ func _run() -> void:
 		await _test_a_decoy_is_charged()
 		await _test_the_drawn_gun_takes_the_server_count()
 		await _test_the_round_ends()
+		await _test_the_toys_reach_the_client()
 		await _test_leaving()
 
 	print("")
@@ -599,6 +600,31 @@ func _aim_at(player: PhPlayer, target: Vector3) -> DotFpsCommand:
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	return command
+
+
+## The garden's toys over the wire: paired by index on both ends, frozen copies; a ball kicked
+## during the hide is not sent to a hunter (a ball rolling off where a prop walked would be that
+## prop), and once the seek starts the hunter sees where it went.
+func _test_the_toys_reach_the_client() -> void:
+	_section("the garden's toys reach the client, and not a hunter during the hide")
+	await _hide_with(PhGame.HUNTERS)
+	var count := _server_game.map.toys.count()
+	_check(count > 0 and _server_bridge.toy_count() == count and _client_bridge.toy_count() == count,
+		"every toy is an entity on both ends, paired by index", "%d toys, %d and %d" % [count, _server_bridge.toy_count(), _client_bridge.toy_count()])
+	var server_ball := _server_game.map.toys.toy(0)
+	var client_ball := _client_game.map.toys.toy(0)
+	_check(client_ball.body.freeze and not client_ball.authoritative, "the client's are frozen copies")
+	var start := client_ball.body.global_position
+	var _kicked := _server_game.map.toys.hit(server_ball.body, server_ball.body.global_position, Vector3(-1, 0.2, 0), 2.0)
+	await _steps(60)
+	_check(client_ball.body.global_position.distance_to(start) < 0.05 and server_ball.body.global_position.distance_to(start) > 1.0,
+		"during the hide a hunter's client is not told the ball moved",
+		"client %.2f m, server %.2f m" % [client_ball.body.global_position.distance_to(start), server_ball.body.global_position.distance_to(start)])
+	_server_game._set_phase(PhGame.Phase.SEEK)
+	await _steps(40)
+	var apart := client_ball.body.global_position.distance_to(server_ball.body.global_position)
+	_check(apart < 0.6, "and in the seek it is where the server's is", "%.2f m apart" % apart)
+	_finished()
 
 
 ## Into a fresh round's hide, with the client on [param side] and the stand-in on the other,

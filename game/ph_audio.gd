@@ -130,6 +130,15 @@ static func sound_catalogue() -> DotAudioCatalogue:
 		fall.gain_db = float(row["gain_db"])
 		fall.cooldown_ms = int(row["cooldown_ms"])
 		c.add(fall)
+
+	# The map's toys: dot-props' stock toy sounds (Kenney, CC0), shipped in the addon.
+	for row: Dictionary in DotPropToySounds.rows():
+		var toy := _placed(row["id"], float(row["distance"]), 6.0, 3, 30, float(row["pitch_min"]), float(row["pitch_max"]))
+		toy.path = row["path"]
+		toy.variants = row["variants"]
+		toy.gain_db = float(row["gain_db"])
+		toy.cooldown_ms = int(row["cooldown_ms"])
+		c.add(toy)
 	return c
 
 
@@ -155,6 +164,20 @@ static func sound_recipes() -> Dictionary:
 		WEAPON_THROW: DotAudioSynth.Voice.CLICK,
 		UI_CLICK: DotAudioSynth.Voice.CLICK,
 		UI_DENY: DotAudioSynth.Voice.DENY,
+		# Stand-ins only for a build without dot-props' toy files.
+		DotPropToySounds.BOUNCE: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.THUMP: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.KNOCK: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.PIN: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.WOOD: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.RUBBER: DotAudioSynth.Voice.IMPACT,
+		DotPropToySounds.PUNCH: DotAudioSynth.Voice.HURT,
+		DotPropToySounds.METAL: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.BELL: DotAudioSynth.Voice.PICKUP,
+		DotPropToySounds.CLICK: DotAudioSynth.Voice.CLICK,
+		DotPropToySounds.WATER: DotAudioSynth.Voice.STEP,
+		DotPropToySounds.BOING: DotAudioSynth.Voice.SPAWN,
+		DotPropToySounds.HORN: DotAudioSynth.Voice.BLIP,
 		# Stand-ins only for a build without dot-player-char's files.
 		DotPlayerDeathReactions.SOUND_THUD: DotAudioSynth.Voice.IMPACT,
 		DotPlayerDeathReactions.SOUND_FACE_PLANT: DotAudioSynth.Voice.IMPACT,
@@ -385,6 +408,11 @@ func deny() -> bool:
 
 
 ## A dead body's sound (dot-player-char's ragdolls), where it landed.
+## A toy's sound (dot-props' toys): a bounce, a knock, where it happened.
+func on_toy(id: StringName, at: Vector3, strength: float) -> bool:
+	return _at(id, at, clampf(strength, 0.25, 1.0))
+
+
 func on_body(id: StringName, at: Vector3, volume: float) -> bool:
 	return _at(id, at, clampf(volume, 0.3, 1.0))
 

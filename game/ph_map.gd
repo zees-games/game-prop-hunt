@@ -60,6 +60,14 @@ var props: Array[Dictionary] = []
 ## node. What [method break_prop] hides and [method restore_all] puts back.
 var _drawn_at: Dictionary = {}
 
+## The map's toys (dot-props' [DotPropToyBox]): loose ones only on this game's maps (barrels,
+## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
+## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
+var toys: DotPropToyBox = null
+var authoritative: bool = true
+var toy_rules: DotPropToyRules = null
+var gravity: float = 20.0
+
 var _solid: StaticBody3D = null
 var _furniture: StaticBody3D = null
 var _drawn: Node3D = null
@@ -95,6 +103,7 @@ func build(p_doc: Dictionary) -> DotResult:
 
 	_build_boxes()
 	_build_props()
+	_build_toys()
 
 	if draw_world:
 		_build_lights()
@@ -112,6 +121,31 @@ func build(p_doc: Dictionary) -> DotResult:
 	return DotResult.success(null)
 
 
+## The toys, on their own layer: a loose one (a barrel, a ball) on `toy`, which the world, the
+## furniture and other toys stop and a survivor or a zombie never does (they walk through it,
+## and a survivor pushes it, `ZzGame._advance_toys`).
+func _build_toys() -> void:
+	toys = DotPropToyBox.new()
+	toys.name = "Toys"
+	toys.authoritative = authoritative
+	toys.draw = draw_world
+	if toy_rules != null:
+		toys.rules = toy_rules
+	toys.gravity = gravity
+	toys.kill_y = kill_height()
+	if physics != null:
+		toys.loose_layer = physics.layer_mask(&"toy")
+		toys.loose_mask = physics.collision_mask(&"toy")
+		toys.solid_layer = physics.layer_mask(&"prop")
+		toys.solid_mask = physics.collision_mask(&"prop")
+		toys.footprint_layer = physics.layer_mask(&"footprint")
+		toys.aim_mask = physics.layer_mask(&"world") | physics.layer_mask(&"prop") | physics.layer_mask(&"toy")
+	add_child(toys)
+	var built := toys.build(doc.get("toys", []))
+	if not built.ok:
+		DotLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
+
+
 func clear() -> void:
 	for child in get_children():
 		remove_child(child)
@@ -121,6 +155,7 @@ func clear() -> void:
 	_drawn_at.clear()
 	_missing.clear()
 	_bounds = AABB()
+	toys = null
 	_solid = null
 	_furniture = null
 	_drawn = null

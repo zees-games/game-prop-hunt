@@ -19,7 +19,7 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 ## Adding a map adds a section and CHECKS_PER_MAP checks.
 
 const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods"]
-const CHECKS_PER_MAP := 8
+const CHECKS_PER_MAP := 10
 
 ## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -167,6 +167,38 @@ func _test_map(id: StringName) -> void:
 
 	_check(buried.is_empty(), "no prop is sunk into a wall or a floor", "; ".join(buried.slice(0, 6)))
 	_check(floating.is_empty(), "every prop stands on something", "%d: %s" % [floating.size(), "; ".join(floating.slice(0, 6))])
+	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
+	# seconds of physics later every one still where the map put it, not through a floor.
+	var box := game.map.toys
+	var placed := (doc.get("toys", []) as Array).size()
+	var stuck: Array = []
+	var own: Array[RID] = []
+	for toy in box.toys:
+		if toy.body != null:
+			own.append(toy.body.get_rid())
+	var space := game.get_world_3d().direct_space_state
+	for toy in box.toys:
+		for child in toy.body.get_children():
+			var shape := child as CollisionShape3D
+			if shape == null or shape.shape == null:
+				continue
+			var query := PhysicsShapeQueryParameters3D.new()
+			query.shape = shape.shape
+			query.transform = shape.global_transform.translated(Vector3(0, 0.05, 0))
+			query.collision_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+			query.exclude = own
+			if not space.intersect_shape(query, 1).is_empty():
+				stuck.append("%s %d at %s" % [toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1)])
+				break
+	_check(box.count() == placed and placed > 0 and box.missing.is_empty() and stuck.is_empty(),
+		"%d toys, every one dot-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
+	for _i in range(120):
+		await get_tree().physics_frame
+	var strayed: Array = []
+	for toy in box.toys:
+		if toy.body.global_position.distance_to(toy.rest.origin) > 0.6:
+			strayed.append("%s %d: %s to %s" % [toy.def["id"], toy.index, toy.rest.origin.snapped(Vector3.ONE * 0.1), toy.body.global_position.snapped(Vector3.ONE * 0.1)])
+	_check(strayed.is_empty(), "two seconds on, every toy is still where the map put it", "; ".join(strayed.slice(0, 6)))
 	await _dispose(game)
 	_finished()
 
