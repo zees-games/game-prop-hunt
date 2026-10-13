@@ -29,7 +29,7 @@ const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
 const SECTIONS := 16
-const CHECKS := 73
+const CHECKS := 74
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -203,6 +203,19 @@ func _test_the_codec() -> void:
 
 	# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a
 	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
+	# The largest MAP a reader accepts survives the event's own body cap. At 4096 a 4100-byte map
+	# went out whole and was read back as no bytes, silently (hs_park with its toys).
+	var biggest := PackedByteArray()
+	biggest.resize(PhEvents.MAP_BYTES)
+	var outgoing := PhEvent.new(PhEvents.Kind.MAP, PhEvents.write_map(biggest))
+	var wire := DotNetWriter.new()
+	outgoing._write(wire)
+	var incoming := PhEvent.new()
+	incoming._read(DotNetReader.new(wire.to_bytes()))
+	var carried := PhEvents.read_map(incoming.reader())
+	_check(bool(carried["ok"]) and (carried["encoded"] as PackedByteArray).size() == PhEvents.MAP_BYTES,
+		"a MAP as large as a reader accepts fits in an event", "%d of %d bytes" % [(carried["encoded"] as PackedByteArray).size(), PhEvents.MAP_BYTES])
+
 	_check(PhEvent.fits(), "every event kind fits the event's kind field",
 		"%d kinds in %d bits" % [PhEvents.Kind.size(), PhEvent.KIND_BITS])
 	_check(PhRequest.fits(), "every request kind fits the request's kind field",
