@@ -10,6 +10,7 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 const PhProgress := preload("../game/ph_progress.gd")
 const PhProps := preload("../game/ph_props.gd")
+const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 const PhSettings := preload("../game/ph_settings.gd")
 const PhEvents := preload("../game/net/ph_events.gd")
 
@@ -26,7 +27,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 28
 
-const CHECKS := 143
+const CHECKS := 145
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1089,6 +1090,20 @@ func _test_hunter_weapons() -> void:
 		and counter.count_text() == expected,
 		"a hunter's HUD has DotAmmoCounter, counting the drawn gun",
 		"%s %s, want %s" % [counter.weapon_name if counter else "-", counter.count_text() if counter else "-", expected])
+
+	# The hints name the keys of what is carried. They said "1-3 Weapons" after grenades went on
+	# slot five (d516aec), so a grenade taken on B was on a key nothing named. Armed: the old line
+	# fails both.
+	var hints: Label = hud.get("_hints")
+	_check(hints.text.contains("1 2 3  Weapons") and not hints.text.contains("Grenade"),
+		"a hunter's hints name keys 1 2 3 for the weapons and no grenade by default", hints.text)
+	drawn.arsenal.give(&"frag")
+	hud.call("_process", 0.0)
+	var with_grenade := hints.text
+	drawn.arsenal.take(ZeeIds.SLOT_THROWN)
+	hud.call("_process", 0.0)
+	_check(with_grenade.contains("1 2 3  Weapons   5  Grenade") and not hints.text.contains("Grenade"),
+		"and key 5 for a grenade while one is carried", with_grenade)
 
 	# Bottom right, clear of the chat box and the health plate bottom left, and of the ballot
 	# top right: the anchors put it in the bottom-right quarter at any frame size.

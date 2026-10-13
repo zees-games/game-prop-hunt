@@ -3,6 +3,7 @@ extends CanvasLayer
 const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhBindings := preload("ph_bindings.gd")
+const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 
 ## What a player needs on screen: the clock and who it is counting for, which side they are on
 ## and how much of them is left, what they are hiding as, and — while the props hide — a
@@ -412,12 +413,7 @@ func _draw_vitals(side: int) -> void:
 ## The counter, from the rig the hunter draws: the magazine and the reserve, low at a quarter of
 ## a magazine (when a reload is worth starting); a melee weapon by its name alone.
 func _draw_ammo(side: int) -> void:
-	var rig: ZeeWeaponRig = null
-	if weapons_fn.is_valid():
-		rig = weapons_fn.call() as ZeeWeaponRig
-	elif player != null and is_instance_valid(player):
-		rig = player.weapons
-
+	var rig := _rig()
 	var def := rig.current_def() if rig != null and is_instance_valid(rig) and rig.arsenal != null else null
 	var shown := def != null and side == PhGame.HUNTERS and player != null and player.is_alive() \
 		and not player.watching and not is_blindfolded()
@@ -463,7 +459,7 @@ func _draw_hints(side: int) -> void:
 			lines.append("show yourself again in %d s" % int(ceilf(player.reveal_wait)))
 	else:
 		lines.append("Shoot the props. Shooting furniture hurts you.")
-		lines.append("%s  Reload   1-3  Weapons" % _key(PhBindings.RELOAD))
+		lines.append(_weapon_hint())
 		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
 		if loadout_offered:
 			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
@@ -484,6 +480,41 @@ func _draw_meter(side: int) -> void:
 	_meter_fill.offset_right = 24.0 + 200.0 * clampf(player.taunt_meter, 0.0, 1.0)
 	var until := (1.0 - player.taunt_meter) * game.config.auto_taunt_seconds
 	_meter_label.text = "Move, or you taunt in %d s" % int(ceilf(until))
+
+
+## The rig the hunter draws (the client's, corrected from the server's), else the player's own.
+func _rig() -> ZeeWeaponRig:
+	if weapons_fn.is_valid():
+		return weapons_fn.call() as ZeeWeaponRig
+	if player != null and is_instance_valid(player):
+		return player.weapons
+	return null
+
+
+## "R  Reload   1 2 3  Weapons   5  Grenade", from the slots the hunter carries and the keys they
+## are bound to. It said "1-3 Weapons" whatever was carried and however the keys were bound, so a
+## grenade taken on B (slot five) was on a key the hints never named.
+func _weapon_hint() -> String:
+	var rig := _rig()
+	var carried: Array[int] = [1, 2, 3]
+	if rig != null and is_instance_valid(rig) and rig.arsenal != null:
+		carried = rig.arsenal.slots()
+	var weapons := PackedStringArray()
+	var grenade := ""
+	for slot in carried:
+		if slot < 1 or slot > PhBindings.SLOTS.size():
+			continue
+		var key := _key(PhBindings.SLOTS[slot - 1])
+		if slot == ZeeIds.SLOT_THROWN:
+			grenade = key
+		else:
+			weapons.append(key)
+	var line := "%s  Reload" % _key(PhBindings.RELOAD)
+	if not weapons.is_empty():
+		line += "   %s  Weapons" % " ".join(weapons)
+	if grenade != "":
+		line += "   %s  Grenade" % grenade
+	return line
 
 
 func _key(action: StringName) -> String:

@@ -35,7 +35,8 @@ There are five maps: a small practice house built into the game, and **Maple Gro
 | **C** | Lock your rotation (props) |
 | **Arrow keys** / **Z** | Tilt and lean / stand upright again (props) |
 | **T** / **F3** | Taunt / pick a taunt (props) |
-| **Mouse 1** / **R** / **1**-**3** | Fire / reload / weapons (hunters) |
+| **Mouse 1** / **R** / **1**-**3** | Fire / reload / weapons: melee, sidearm, primary (hunters) |
+| **5** | Your grenade, if you took one on B (hunters) |
 | **Mouse 2** / **F** | Aim down the sights / quick melee (hunters) |
 | **B** | Loadout: your primary, secondary and a grenade (slot 5, if you want one) as a hunter |
 | **V** | Talk (voice) |
