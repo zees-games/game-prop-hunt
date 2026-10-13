@@ -8,6 +8,10 @@ A map is hundreds of boxes and props. Boxes are batched by material, tint and 12
 
 **Kenney's Nature Kit is teal and coral by design**, and beside realistic rooms it read as a cartoon (the first school render had cyan trees with pink trunks). `props/kits.json` gives a kit a `recolour` table, material name to colour, which `PhProps` applies to a copy of each mesh as it loads. Furniture keeps its own colours except the plant.
 
+## Contact shade
+
+Every visible, opaque box also goes into dot-lighting's `DotContactShade` (API 4), one unshaded mesh of soft bands along each concave crease: a wall's foot and head, a room's corners, a counter on the floor. The client shell draws Compatibility, which has no ambient occlusion, and before it a room's walls met the floor and the ceiling with no shade at all. Glass and water (`PhMaterials.is_transparent`) are left out: they neither cast nor take one. Furniture is left out too, for now: its bounding box would shade the floor round it, and a broken prop would leave the shade behind. `PhMap._add_contact_shade` loads it by path behind `DotAddonApi.build_level("dot_lighting") >= 4`, so a shell older than the helper draws the map without it. School: 449 boxes, 7 122 bands, 77 ms at load.
+
 ## Cameras
 
 A prop starts in third person and a hunter in first, under the server's `mp_forceview` (dot-player-controller's `DotPlayerViewRules`, bound REPLICATED by the module and followed through the link; `_follow_side` and F5 both ask it). The third-person camera is a dot-core `DotCameraBoom` swept from the eye or the prop's middle with `CHASE_UP` as `lift`, as far back as the prop is big, stopping against the building and the furniture; a `DotCameraFade` on the camera is handed the other players and hides one at the lens. dot-spectate is handed the level for its chase and death cameras. No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one. `tools/camera_check.sh [--render]` flies both cameras round the house (armed), checks the rule, and draws both views and the walk-in before and after.

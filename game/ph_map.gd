@@ -30,6 +30,8 @@ const PhProps := preload("ph_props.gd")
 
 const CHANNEL := "ph.map"
 
+const CONTACT_SHADE_SCRIPT := "res://addons/dot_lighting/runtime/dot_contact_shade.gd"
+
 ## Metres of world one batched mesh covers. See the class notes.
 const CHUNK := 12.0
 
@@ -141,6 +143,7 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
+	var shade_boxes: Array = []
 
 	for box: Dictionary in doc["boxes"]:
 		var size := PhMapDoc.v3(box["size"])
@@ -175,6 +178,8 @@ func _build_boxes() -> void:
 			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint}
 
 		_add_box((batches[key] as Dictionary)["tool"], frame, size)
+		if not PhMaterials.is_transparent(str(box["mat"])):
+			shade_boxes.append({"transform": frame, "size": size})
 
 	for key: String in batches:
 		var batch: Dictionary = batches[key]
@@ -186,6 +191,22 @@ func _build_boxes() -> void:
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
 			if PhMaterials.is_transparent(batch["mat"]) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_drawn.add_child(mesh)
+
+	_add_contact_shade(shade_boxes)
+
+
+## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the
+## Compatibility renderer has no ambient occlusion, and a counter or a wall met the floor with
+## no shade at its foot. Glass and water neither cast nor take one. By path, behind the level,
+## so a client shell older than the helper still runs the map without it.
+func _add_contact_shade(boxes: Array) -> void:
+	if boxes.is_empty() or DotAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
+		return
+	var shade: Variant = (load(CONTACT_SHADE_SCRIPT) as GDScript).call(&"node", boxes)
+	if shade is MeshInstance3D and (shade as MeshInstance3D).mesh != null:
+		_drawn.add_child(shade)
+	elif shade is Node:
+		(shade as Node).free()
 
 
 ## Six faces of a box, outward normals, into [param tool]. No UVs: every surface material is

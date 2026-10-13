@@ -97,7 +97,7 @@ Short forms; the reasoning is in the linked file.
 
 **Maps and drawing**
 
-- Boxes are batched by material, tint and 12 m chunk (Compatibility lights a mesh with at most eight omni lights); props are one `MultiMeshInstance3D` per model part. [drawing](docs/drawing.md)
+- Boxes are batched by material, tint and 12 m chunk (Compatibility lights a mesh with at most eight omni lights); props are one `MultiMeshInstance3D` per model part; opaque boxes also get dot-lighting's `DotContactShade` (by path, API 4), furniture not yet. [drawing](docs/drawing.md#contact-shade)
 - Rooms are pastel over Kenney's grid (`PhMaterials.PASTELS`), furniture keeps Kenney's colours except where `props/kits.json` recolours a kit; check both renderers. [drawing](docs/drawing.md)
 - A spawn is written before a room is furnished: `headless_maps` catches one inside furniture, and mg-prop-hunt-maps' builder moves them. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 - Nothing stands in a doorway or out in a hallway: mg-prop-hunt-maps' builder refuses it; `headless_bots` holds every hiding place reachable from the props' start. [history](docs/history.md#the-bots-did-not-know-how-to-play-and-the-school-was-in-the-way-2026-10-12)
