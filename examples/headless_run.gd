@@ -24,9 +24,9 @@ const PhEvents := preload("../game/net/ph_events.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 27
+const SECTIONS := 28
 
-const CHECKS := 137
+const CHECKS := 143
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -71,6 +71,7 @@ func _run() -> void:
 	await _test_toys()
 	await _test_decoys()
 	await _test_breaking()
+	await _test_grenades()
 	await _test_the_round()
 	await _test_the_beacon()
 	_test_interest()
@@ -641,6 +642,98 @@ func _test_breaking() -> void:
 
 
 var _props_catalogue: PhProps = null
+
+
+## The hunters' grenades (`PhProjectiles`): a frag thrown on B's slot five flies, bursts on its
+## fuse and finds the prop beside it, for nothing; one that goes off by the bookcase and finds
+## nobody costs one decoy at its full damage; one in the open garden costs nothing and throws
+## the football. Armed: with `PhGame._advance_weapons` dropping `outcome.spawns` again the first
+## checks fail; with `blast_cost` charging regardless, the third does.
+func _test_grenades() -> void:
+	_section("a hunter's grenade flies, bursts, finds a prop, and costs a decoy on the furniture")
+	var game := await _seek_round()
+	var prop: PhPlayer = game.players_on(PhGame.PROPS)[0]
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	var _worn := game.disguise_as(prop.player_id, &"furniture_chair")
+	prop.place_at(Vector3(-6.0, 0.05, 2.0), 0.0)
+	(game.players_on(PhGame.PROPS)[1] as PhPlayer).place_at(Vector3(7.0, 0.05, -3.0), 0.0)
+	# Clear of the television (-7, -1), which the throw once met a hand's breadth out.
+	_stand_facing(hunter, Vector3(-5.0, 0.05, -1.5), Vector3(-6.0, 0.3, 2.0))
+	var armed := game.arm(hunter, &"frag")
+	hunter.wanted_slot = ZeeWeaponIds.SLOT_THROWN
+	# The SMG put away and the frag drawn (0.25 s and 0.35 s): a press during the switch is a
+	# press already down when it ends, which starts no cook.
+	await _step(game, TICK_RATE)
+
+	var launched: Array = []
+	game.projectiles.launched.connect(func(f: RefCounted) -> void: launched.append(f))
+	var blasts: Array = []
+	game.projectiles.blasted.connect(func(at: Vector3, _spawn: DotWeaponSpawn, shot: DotShot) -> void: blasts.append([at, shot]))
+	var cost: Array = []
+	game.decoy_hit.connect(func(_id: StringName, amount: float) -> void: cost.append(amount))
+	var health := prop.health.health
+	var furthest := 0.0
+
+	# Pin out, a short cook, and let go: zee's grenades throw on release.
+	for i in range(TICK_RATE * 5):
+		_aim(hunter, Vector3(-6.0, 0.3, 2.0))
+		_fire(hunter, i < 6)
+		await _step(game, 1)
+		for f: RefCounted in launched:
+			furthest = maxf(furthest, (f.get(&"position") as Vector3).distance_to((f.get(&"spawn") as DotWeaponSpawn).origin))
+		if not blasts.is_empty():
+			break
+	_fire(hunter, false)
+	_check(armed and launched.size() == 1 and furthest > 1.5, "a frag thrown from slot five leaves the hand and flies",
+		"armed %s, slot %d, %d launched, %.1f m" % [str(armed), hunter.weapons.arsenal.current_slot(), launched.size(), furthest])
+	_check(blasts.size() == 1 and prop.health.health < health and cost.is_empty(),
+		"it bursts on its fuse and hurts the prop beside it, and finding somebody costs nothing",
+		"%d blasts, prop %.0f -> %.0f, charged %s" % [blasts.size(), health, prop.health.health, str(cost)])
+
+	# By the bookcase with nobody near: one decoy, at the frag's full damage.
+	var frag := ZeeWeaponPack.catalogue().get_def(&"frag")
+	var tuning := frag.tuning as DotWeaponBallistics
+	# Everybody in the kitchen, well out of its reach: a prop the first frag only hurt, left
+	# where it was, was 5.3 m from this one and took its splash.
+	for i in range(2):
+		(game.players_on(PhGame.PROPS)[i] as PhPlayer).place_at(Vector3(7.5 + float(i), 0.05, -3.0), 0.0)
+	hunter.place_at(Vector3(6.0, 0.05, -1.0), 0.0)
+	await _step(game, 2)
+	cost.clear()
+	var hunter_before := hunter.health.health
+	var _f := game.projectiles.launch(_still_grenade(BOOKCASE_AT + Vector3(0.0, 0.3, -0.7), hunter, tuning))
+	await _step(game, 4)
+	var expected := maxf(tuning.splash_damage * game.config.decoy_penalty, game.config.decoy_penalty_min)
+	_check(cost.size() == 1 and absf(float(cost[0]) - expected) < 0.01 and hunter.health.health < hunter_before,
+		"one that goes off by the bookcase and finds nobody costs one decoy at its full damage",
+		"charged %s, expected %.1f, health %.0f -> %.0f" % [str(cost), expected, hunter_before, hunter.health.health])
+
+	# In the open garden, beside the football: nothing to pay, and the ball goes.
+	var ball := game.map.toys.toy(0)
+	var b0 := ball.body.global_position
+	cost.clear()
+	var open := _still_grenade(b0 + Vector3(-1.0, 0.3, -1.0), hunter, tuning)
+	open.splash_radius = 2.5
+	var _g := game.projectiles.launch(open)
+	await _step(game, 4)
+	for _i in range(20):
+		await _physics_frame()
+	_check(cost.is_empty() and ball.body.global_position.distance_to(b0) > 0.5,
+		"one in the open garden costs nothing and throws the football",
+		"charged %s, ball moved %.2f m" % [str(cost), ball.body.global_position.distance_to(b0)])
+	_finished()
+
+
+## A grenade lying at [param at], two ticks from going off, thrown by [param thrower].
+func _still_grenade(at: Vector3, thrower: PhPlayer, tuning: DotWeaponBallistics) -> DotWeaponSpawn:
+	var spawn := DotWeaponSpawn.make(&"frag", at, Vector3.ZERO, thrower.entity_id)
+	spawn.fuse_ticks = 2
+	spawn.life_ticks = TICK_RATE * 4
+	spawn.splash_radius = tuning.splash_radius
+	spawn.splash_damage = tuning.splash_damage
+	spawn.damage_type = tuning.damage_type
+	spawn.radius = tuning.radius
+	return spawn
 
 
 func game_catalogue_ids() -> Array:
@@ -1393,16 +1486,23 @@ func _test_hunter_loadout() -> void:
 	for slot: Dictionary in offer.get("slots", []):
 		choices[slot["id"]] = (slot["choices"] as Array).map(func(c: Dictionary) -> String: return str(c["id"]))
 		current[slot["id"]] = str(slot["current"])
-	_check(choices.keys().size() == 2 and (choices.get("primary", []) as Array).has("shotgun")
+	_check(choices.keys().size() == 3 and (choices.get("primary", []) as Array).has("shotgun")
 		and (choices.get("secondary", []) as Array).has("revolver") and not (choices.get("primary", []) as Array).has("hatchet")
 		and current.get("primary") == "smg" and current.get("secondary") == "pistol",
-		"the offer is a primary and a secondary from the hunters' weapons, the SMG and the pistol by default", str(choices))
+		"the offer is a primary, a secondary and a grenade from the hunters' weapons, the SMG and the pistol by default", str(choices))
+	_check((choices.get("thrown", []) as Array).has("frag") and (choices.get("thrown", []) as Array).has("sticky")
+		and current.get("thrown", "") == "" and hunter.weapons != null and not hunter.weapons.arsenal.carries(&"frag"),
+		"the grenade is a frag or a sticky, and nobody carries one they did not choose", "%s, current %s" % [str(choices.get("thrown")), str(current.get("thrown"))])
 
 	var now: Dictionary = await cmd.call(&"choose", null, key, {"primary": "shotgun"})
 	var arsenal := hunter.weapons.arsenal if hunter.weapons != null else null
 	_check(bool(now.get("ok")) and bool(now.get("now")) and arsenal != null and arsenal.carries(&"shotgun")
 		and not arsenal.carries(&"smg") and arsenal.carries(&"pistol") and arsenal.carries(&"hatchet"),
 		"chosen in the hide, the shotgun is in the hunter's hands at once, beside the pistol and the hatchet", str(now))
+	var with_frag: Dictionary = await cmd.call(&"choose", null, key, {"thrown": "frag"})
+	arsenal = hunter.weapons.arsenal if hunter.weapons != null else null
+	_check(bool(with_frag.get("ok")) and arsenal != null and arsenal.carries(&"frag") and arsenal.carries(&"shotgun"),
+		"and a frag chosen in the hide is in slot five beside them", str(with_frag))
 
 	await _wait_for(game, PhGame.Phase.SEEK)
 	var later: Dictionary = await cmd.call(&"choose", null, key, {"primary": "carbine"})

@@ -28,8 +28,8 @@ const PhPlayerNet := preload("../game/net/ph_player_net.gd")
 ##
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 
-const SECTIONS := 15
-const CHECKS := 68
+const SECTIONS := 16
+const CHECKS := 72
 
 const CLIENT_PEER := 7
 const SESSION := 42
@@ -92,6 +92,7 @@ func _run() -> void:
 		await _test_a_decoy_is_charged()
 		await _test_the_drawn_gun_takes_the_server_count()
 		await _test_a_hit_is_the_shooters()
+		await _test_a_grenade_reaches_the_client()
 		await _test_the_round_ends()
 		await _test_the_toys_reach_the_client()
 		await _test_leaving()
@@ -166,6 +167,19 @@ func _test_the_codec() -> void:
 	var broken := PhEvents.read_broken(DotNetReader.new(PhEvents.write_broken(451, Vector3(0.0, 0.0, -1.0), true)))
 	_check(bool(broken["ok"]) and int(broken["index"]) == 451 and (broken["direction"] as Vector3).distance_to(Vector3(0.0, 0.0, -1.0)) < 0.02
 		and bool(broken["quiet"]), "BROKEN", str(broken))
+
+	var thrown := DotWeaponSpawn.make(&"sticky", Vector3(12.25, 1.6, -3.5), Vector3(4.0, 6.5, -17.25), 77)
+	thrown.gravity_scale = 0.8
+	thrown.radius = 0.12
+	thrown.fuse_ticks = 141
+	thrown.life_ticks = 768
+	thrown.tick = 9001
+	var launch := PhEvents.read_launch(DotNetReader.new(PhEvents.write_launch(5, thrown, SESSION)))
+	var again := PhEvents.spawn_from_launch(launch, 77) if bool(launch["ok"]) else null
+	_check(again != null and int(launch["id"]) == 5 and again.id == &"sticky" and int(launch["thrower"]) == SESSION
+		and again.origin == thrown.origin and again.velocity == thrown.velocity and is_equal_approx(again.gravity_scale, 0.8)
+		and again.fuse_ticks == 141 and again.life_ticks == 768 and again.tick == 9001,
+		"LAUNCH carries the grenade exactly, so a client flies the same one", str(launch))
 
 	var turned := PhEvents.read_turn(DotNetReader.new(PhEvents.write_turn(PhGame.Turn.TILT_LEFT)))
 	var asked := PhEvents.read_ask_taunt(DotNetReader.new(PhEvents.write_ask_taunt(&"whistle")))
@@ -624,6 +638,53 @@ func _test_a_hit_is_the_shooters() -> void:
 	target_health.cannot_die = false
 	_client_bridge.hit_received.disconnect(heard)
 	_server_bridge.remove_peer(BYSTANDER_PEER)
+	await _steps(2)
+	_finished()
+
+
+## A grenade over the wire: one LAUNCH to everybody, and the client's copy flies where the
+## server's does and goes off where it does, which is what draws the burst there. Armed: with
+## the bridge's LAUNCH send removed, or the client's copies never ticked, the checks fail.
+func _test_a_grenade_reaches_the_client() -> void:
+	_section("a hunter's grenade is told to everybody once, and flown on the client as on the server")
+	var server_me := _server_me()
+	var drawn: Array = []
+	var heard := func(at: Vector3, _weapon: StringName) -> void: drawn.append(at)
+	_client_game.blast_drawn.connect(heard)
+	var server_blasts: Array = []
+	var went := func(at: Vector3, _spawn: DotWeaponSpawn) -> void: server_blasts.append(at)
+	_server_game.projectiles.detonated.connect(went)
+	_sent_events.clear()
+	_listening = true
+
+	# Lobbed across the open garden, well clear of everybody, a second's fuse and a small blast.
+	var spawn := DotWeaponSpawn.make(&"frag", Vector3(13.0, 1.5, -1.0), Vector3(3.0, 3.0, 0.5), server_me.entity_id)
+	spawn.gravity_scale = 1.0
+	spawn.radius = 0.12
+	spawn.fuse_ticks = SERVER_TICK_RATE
+	spawn.life_ticks = SERVER_TICK_RATE * 4
+	spawn.splash_radius = 1.5
+	spawn.splash_damage = 1.0
+	var flying: RefCounted = _server_game.projectiles.launch(spawn)
+	await _steps(12)
+	var copies: Array = _client_game.projectiles.flying()
+	var copy: RefCounted = copies[0] if not copies.is_empty() else null
+	var owned := copy != null and (copy.get(&"spawn") as DotWeaponSpawn).owner_entity == _mine().entity_id
+	_check(_events_of(PhEvents.Kind.LAUNCH, CLIENT_PEER) == 1 and copy != null and int(copy.get(&"id")) == int(flying.get(&"id")) and owned,
+		"one LAUNCH to every ready player, and the client flies a copy of that grenade, owned by its own number for the thrower",
+		"%d sent, %d copies" % [_events_of(PhEvents.Kind.LAUNCH, CLIENT_PEER), copies.size()])
+	var apart := (copy.get(&"position") as Vector3).distance_to(flying.get(&"position") as Vector3) if copy != null else INF
+	_check(apart < 0.01, "where the server's is, tick for tick", "%.4f m apart" % apart)
+
+	await _steps(SERVER_TICK_RATE)
+	_check(_server_game.projectiles.live_count() == 0 and _client_game.projectiles.live_count() == 0
+		and server_blasts.size() == 1 and drawn.size() == 1 and (drawn[0] as Vector3).distance_to(server_blasts[0] as Vector3) < 0.05,
+		"and it goes off where the server's did, which draws the burst there",
+		"%d server blasts, %d drawn, %s / %s" % [server_blasts.size(), drawn.size(), str(server_blasts), str(drawn)])
+
+	_listening = false
+	_client_game.blast_drawn.disconnect(heard)
+	_server_game.projectiles.detonated.disconnect(went)
 	await _steps(2)
 	_finished()
 

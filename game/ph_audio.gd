@@ -51,6 +51,8 @@ const WEAPON_SWING := &"weapon_swing"
 const WEAPON_LAUNCH := &"weapon_launch"
 const WEAPON_BEAM := &"weapon_beam"
 const WEAPON_THROW := &"weapon_throw"
+## A grenade going off.
+const BLAST := &"blast"
 const UI_CLICK := &"ui_click"
 const UI_DENY := &"ui_deny"
 
@@ -69,7 +71,7 @@ static func ids() -> Array[StringName]:
 	var out: Array[StringName] = [
 		HIDE, SEEK, COUNTDOWN, PROP_FOUND, HUNTER_DOWN, YOU_ARE_OUT, ROUND_WON, ROUND_LOST,
 		DISGUISE, REVEAL, DECOY, WEAPON_SHOT, WEAPON_SWING, WEAPON_LAUNCH, WEAPON_BEAM,
-		WEAPON_THROW, UI_CLICK, UI_DENY,
+		WEAPON_THROW, BLAST, UI_CLICK, UI_DENY,
 	]
 	# A typed array plus a typed array is an untyped one: appended, not added.
 	out.append_array(DotAudioStock.ids())
@@ -114,6 +116,11 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	var throw := _placed(WEAPON_THROW, 40.0, 8.0, 2, 55, 0.95, 1.05)
 	throw.tags = [&"weapon"]
 	c.add(throw)
+	# The heavy shot pitched right down (as game-arena's): the lowest thing the synthesiser makes
+	# is what reads as a blast rather than a gun.
+	var blast := _placed(BLAST, 140.0, 22.0, 3, 85, 0.42, 0.5)
+	blast.tags = [&"weapon"]
+	c.add(blast)
 
 	var click := _flat(UI_CLICK, &"UI", 2, 60)
 	click.cooldown_ms = 60
@@ -162,6 +169,7 @@ static func sound_recipes() -> Dictionary:
 		WEAPON_LAUNCH: DotAudioSynth.Voice.SHOT_HEAVY,
 		WEAPON_BEAM: DotAudioSynth.Voice.SHOT_TIGHT,
 		WEAPON_THROW: DotAudioSynth.Voice.CLICK,
+		BLAST: DotAudioSynth.Voice.SHOT_HEAVY,
 		UI_CLICK: DotAudioSynth.Voice.CLICK,
 		UI_DENY: DotAudioSynth.Voice.DENY,
 		# Stand-ins only for a build without dot-props' toy files.
@@ -397,6 +405,11 @@ func on_decoy() -> bool:
 func on_weapon(at: Vector3, kind: int) -> bool:
 	var id := weapon_sound(kind)
 	return _at(id, at) if id != &"" else false
+
+
+## A grenade went off at [param at].
+func on_blast(at: Vector3) -> bool:
+	return _at(BLAST, at)
 
 
 func click() -> bool:

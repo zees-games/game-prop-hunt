@@ -55,6 +55,9 @@ enum Kind {
 	## The map's toys: the map's id, then their net ids in toy order (both ends build them in
 	## the same order from the map). After MAP, and to a joiner after theirs.
 	TOYS,
+	## A hunter threw a grenade: the server's number for it, the weapon, where from, how fast,
+	## its fuse. A client flies its own copy (`PhProjectiles`), which decides nothing.
+	LAUNCH,
 }
 
 enum Ask {
@@ -671,3 +674,56 @@ static func read_hit(r: DotNetReader) -> Dictionary:
 	var killed := r.read_bool()
 	var headshot := r.read_bool()
 	return {"point": point if point.is_finite() else Vector3.ZERO, "killed": killed, "headshot": headshot, "ok": r.ok()}
+
+
+# --- A grenade thrown -----------------------------------------------------------
+
+## A weapon id is a short name; this is far more than any of the pack's.
+const WEAPON_ID_BYTES := 32
+
+## Everything a client needs to fly the same grenade: one event per throw, nothing per tick,
+## because the flight is a pure function of its start (`PhProjectiles`). Position and velocity
+## as full floats, so the copy starts exactly where the server's did. [param thrower] is the
+## thrower's session id, not the server's entity id: a client numbers its entities itself, and
+## its copy leaves out the thrower's own hitboxes by its own number for them.
+static func write_launch(id: int, spawn: DotWeaponSpawn, thrower: int) -> PackedByteArray:
+	var w := _w()
+	w.write_varint(maxi(0, id))
+	w.write_string(String(spawn.id), WEAPON_ID_BYTES)
+	w.write_varint(maxi(0, thrower))
+	for v: float in [spawn.origin.x, spawn.origin.y, spawn.origin.z, spawn.velocity.x, spawn.velocity.y, spawn.velocity.z]:
+		w.write_float32(v)
+	w.write_float32(spawn.gravity_scale)
+	w.write_float32(spawn.radius)
+	w.write_varint(maxi(0, spawn.fuse_ticks))
+	w.write_varint(maxi(1, spawn.life_ticks))
+	w.write_varint(maxi(0, spawn.tick))
+	return w.to_bytes()
+
+
+static func read_launch(r: DotNetReader) -> Dictionary:
+	var id := r.read_varint()
+	var weapon := StringName(r.read_string(WEAPON_ID_BYTES))
+	var thrower := r.read_varint()
+	var origin := Vector3(r.read_float32(), r.read_float32(), r.read_float32())
+	var velocity := Vector3(r.read_float32(), r.read_float32(), r.read_float32())
+	var gravity := r.read_float32()
+	var radius := r.read_float32()
+	var fuse := r.read_varint()
+	var life := r.read_varint()
+	var tick := r.read_varint()
+	var ok := r.ok() and origin.is_finite() and velocity.is_finite() and is_finite(gravity) and is_finite(radius) and weapon != &""
+	return {"id": id, "weapon": weapon, "thrower": thrower, "origin": origin, "velocity": velocity,
+		"gravity": gravity, "radius": radius, "fuse": fuse, "life": life, "tick": tick, "ok": ok}
+
+
+## The spawn a read LAUNCH describes, for a client's copy, owned by [param owner] (this end's
+## entity id for the thrower). No damage: a copy resolves none.
+static func spawn_from_launch(launch: Dictionary, owner: int) -> DotWeaponSpawn:
+	var spawn := DotWeaponSpawn.make(launch["weapon"], launch["origin"], launch["velocity"], owner)
+	spawn.gravity_scale = float(launch["gravity"])
+	spawn.radius = float(launch["radius"])
+	spawn.fuse_ticks = int(launch["fuse"])
+	spawn.life_ticks = int(launch["life"])
+	spawn.tick = int(launch["tick"])
+	return spawn

@@ -33,6 +33,7 @@ game/
   ph_bots.gd         the stand-ins: hide as what belongs there, search, test what looks wrong
   ph_rules.gd        a DotMatchRules whose outcome is whatever PhGame decided
   ph_loadout.gd      a hunter's loadout as dot-loadout data (B)
+  ph_projectiles.gd  grenades in flight and where they go off; ph_projectile_view.gd draws them
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
   ph_client.gd       one local player, alone or against a server; third person as a prop
@@ -69,19 +70,20 @@ Short forms; the reasoning is in the linked file.
 **Hunters, decoys and stand-ins**
 
 - A shot landing in a map prop's box and not on a player is a decoy, charged per pellet (`PhGame._charge_for_decoys`, `decoy_penalty`, `decoy_penalty_min`). [design](docs/design.md#decision-3-a-wrong-guess-costs-and-the-furniture-decides-what-is-wrong)
-- A map may set its own share of hunters (`players_per_hunter`, `PhConfig.hunters_for(players, per)`; the server's least and most still hold), as it sets its round and hide; `headless_bots` holds each map to its own band, not only the mean. [bots](docs/bots.md#measured)
+- A map may set its own share of hunters (`players_per_hunter`, `PhConfig.hunters_for(players, per)`; the server's least and most still hold), as it sets its round and hide; `headless_bots` holds each map to its own band, not only the mean; a one-round shift is noise (any body in the physics space re-rolls a knife-edge round), so judge a map on its own 48 (`--map`). [history](docs/history.md#the-schools-toys-were-not-the-schools-problem-2026-10-13)
 - Stand-ins are `ph_bots.gd` on dot-bot (`DotBotNav`, `DotBotHiding`, `DotBotSearch`, `DotBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing. Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
 - A stand-in prop never hops while disguised (a sink in mid-air), and "hurt" is health lost under the same disguise (a new disguise's maximum is no shot). [bots](docs/bots.md#a-prop-hides-as-what-belongs-there)
 - The drawn gun holds only what the server armed (`PhClient._arm_locally` gives each `player_armed` weapon; never `give_everything`); one hunter weapon per slot (`PhGame.hunter_slot_clash` warns). [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
-- B is a hunter's loadout (dot-loadout's `DotLoadoutCommand`, `ph_loadout.gd`, owner's `mp_loadout_*`); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round. No grenades yet. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- B is a hunter's loadout (dot-loadout's `DotLoadoutCommand`, `ph_loadout.gd`, owner's `mp_loadout_*`); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round. The grenade slot (5) is optional and empty by default. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- Grenades fly in `ph_projectiles.gd` (the arena's), server and solo; one LAUNCH per throw and a client flies a copy that decides nothing; a blast that hurts no prop by furniture is one decoy (`PhGame.blast_cost`). [design](docs/design.md#grenades)
 - Right mouse aims down the sights (`PhBindings.AIM`; quick melee F), presentation only; the lens zooms from `PhClient.base_fov`, where the menu's field of view binds, never the camera. [design](docs/design.md#a-hunters-loadout-and-aiming)
-- `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s: offline from the world's rig (`headless_run`), online from the owner-only `net_magazine`/`net_reserve` (`headless_net`), both armed. [hud](docs/hud.md)
+- `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s (offline the world's rig, online the owner-only `net_magazine`/`net_reserve`). [hud](docs/hud.md)
 - **A hit is the server's word** (`PhGame.hit_landed`, HIT to the shooter alone): the hit marker and zee's red burst on the body; `headless_run` the marker, `headless_net` the routing (armed). [hud](docs/hud.md#a-hit)
 - Offline, the client's buttons go onto the world's own sample through `PhPlayer.command_stamp` (set in `PhClient._adopt`); never stamp `controller.current_command` for the world. [history](docs/history.md#offline-no-hunters-shot-ever-landed-2026-10-12)
 - The furniture is one static body, so nothing a hunter does moves a prop out of the box the decoy check reads. [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
 - Breakable furniture (`props/kits.json` "breaks") breaks once the shots add up (`PhMap.break_prop`), still charged as a decoy; BROKEN tells every client, a round restores it; debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
 
-- A death's fall is the server's (`PhGame.decide_death` on `player.death`, last and optional on DEATH); the client draws it (`PhClient._fall`): a person (hunter, undisguised prop) as dot-player-char's ragdoll under `sv_ragdoll*` (bound REPLICATED, followed), a disguised prop pops into its own pieces (`prop_death` 0; 1 topples it, 2 hides it), a hunter the furniture finished still breaks (`hunter_break`). [design](docs/design.md#a-death)
+- A death's fall is the server's (`PhGame.decide_death`, last and optional on DEATH); the client draws it (`PhClient._fall`): a person as a ragdoll under `sv_ragdoll*`, a disguised prop pops (`prop_death`), a hunter the furniture finished breaks (`hunter_break`). [design](docs/design.md#a-death)
 
 **Taunts, beacons, sides**
 
@@ -123,12 +125,10 @@ xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --ph-map-ids=ph_school
 tools/camera_check.sh --render     # cameras round the house (armed), mp_forceview, both views
 tools/shot.sh --view=room --ph-map-ids=ph_school --at=-38,1.7,3.5 --look=-26,0.8,14
-tools/shot.sh --view=prop --as=furniture_chair_cushion --ph-map-ids=ph_house
-tools/shot.sh --view=blind
 tools/shot.sh --view=dead --ph-map-ids=ph_woods --seconds=3   # a hunter's ragdoll; --victim=prop --as=<id> a found prop pops
 tools/shot.sh --view=hunter --aim --name=hunter_aimed     # down the sights
-tools/shot.sh --view=loadout                             # B open in the hide
-tools/shot.sh --view=hunter --board --name=board
+tools/shot.sh --view=loadout                             # B open in the hide (every view: tools/shot.sh's header)
+tools/shot.sh --view=grenade --seconds=0.4               # a frag in flight; --seconds=2 its burst
 tools/shot.sh --view=round --seconds=4 --ph-minimum-players=7 --ph-map-ids=ph_school --ph-hide-seconds=14
 godot --headless --path . --script tools/measure_props.gd -- --check   # catalogue matches the models
 ```

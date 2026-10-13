@@ -290,6 +290,14 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			var peer_id := peer_for_player(session_of(id))
 			if peer_id > 0:
 				_tell(peer_id, PhEvents.Kind.DECOY, PhEvents.write_decoy(amount)))
+		# Everybody: a grenade in the air is everybody's business, and the throw is all a client
+		# needs to fly the same one. Hunters throw only in the seek, so nothing here crosses the
+		# blindfold.
+		if game.projectiles != null:
+			game.projectiles.launched.connect(func(f: RefCounted) -> void:
+				var spawn: DotWeaponSpawn = f.get(&"spawn")
+				var thrower := session_of(game.entities.key_for_id(spawn.owner_entity))
+				_broadcast(PhEvents.Kind.LAUNCH, PhEvents.write_launch(int(f.get(&"id")), spawn, thrower)))
 
 		if game.spectate != null:
 			game.spectate.view_changed.connect(_on_spectate_changed)
@@ -798,6 +806,10 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0) -> void:
 			for behaviour in identity.behaviours:
 				behaviour._net_simulate(tick, net.clock.tick_duration())
 
+		# The grenades the server announced, flown here as copies (they decide nothing).
+		if game.projectiles != null:
+			game.projectiles.tick(net.clock.tick_duration())
+
 		# The clock a client shows, advanced between the twice-a-second messages that
 		# correct it. Without this the round timer ticks in half-second steps.
 		game.phase_elapsed += net.clock.tick_duration()
@@ -1231,6 +1243,13 @@ func _on_event(message: DotNetMessage) -> void:
 				death_received.emit(
 					int(death["player_id"]), int(death["by"]), death["why"]
 				)
+		PhEvents.Kind.LAUNCH:
+			var launch := PhEvents.read_launch(reader)
+
+			if bool(launch["ok"]) and game.projectiles != null:
+				var thrower: PhPlayer = game.players.get(player_key(int(launch["thrower"])))
+				var owner := thrower.entity_id if thrower != null else 0
+				var _copy: RefCounted = game.projectiles.launch(PhEvents.spawn_from_launch(launch, owner), int(launch["id"]))
 		PhEvents.Kind.HIT:
 			var hit := PhEvents.read_hit(reader)
 

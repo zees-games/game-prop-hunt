@@ -547,6 +547,33 @@ func prop_containing(point: Vector3) -> int:
 	return -1
 
 
+## The point of prop [param index]'s box nearest [param point], in the world: what a blast at
+## [param point] reaches first. Its box, not its pieces: a blast fills the gap under a table.
+func nearest_on_prop(index: int, point: Vector3) -> Vector3:
+	var prop: Dictionary = props[index]
+	var size: Vector3 = prop["size"]
+	var frame: Transform3D = prop["transform"]
+	var local: Vector3 = frame.affine_inverse() * point
+	var half := size * 0.5
+	local = Vector3(clampf(local.x, -half.x, half.x), clampf(local.y, 0.0, size.y), clampf(local.z, -half.z, half.z))
+	return frame * local
+
+
+## Every unbroken prop whose box comes within [param radius] of [param point], nearest first.
+func props_near(point: Vector3, radius: float) -> Array[int]:
+	var found: Array[int] = []
+	var distances := {}
+	for index in range(props.size()):
+		if bool(props[index]["broken"]):
+			continue
+		var d := nearest_on_prop(index, point).distance_to(point)
+		if d <= radius:
+			found.append(index)
+			distances[index] = d
+	found.sort_custom(func(a: int, b: int) -> bool: return float(distances[a]) < float(distances[b]))
+	return found
+
+
 ## Breaks prop [param index]: nothing collides with it or draws it until [method restore_all].
 ## False when it was already broken or there is no such prop. Whether it MAY break is the
 ## game's (the catalogue's `breaks`).

@@ -72,7 +72,7 @@ func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
 	var local = _client.get("player")
-	var hunter := _view in ["hunter", "blind", "round", "loadout"]
+	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade"]
 
 	# The person at this keyboard on the side the view is about; one stand-in on the other.
 	var other_side_drawn := false
@@ -153,6 +153,39 @@ func _run() -> void:
 				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 		"blind":
 			await _seconds_of(1.0)
+		"grenade":
+			# A frag from the hunter's hand, in slot five: in flight after [member _seconds] of game
+			# time, or just after its burst if the fuse runs out first (the fuse is a second here).
+			# Slowed, because a software renderer draws a few frames a second.
+			game._set_phase(PhGame.Phase.SEEK)
+			if _at != Vector3.INF:
+				local.place_at(_at, 0.0)
+			_face(local, _look)
+			var _armed := game.arm(local, &"frag")
+			local.wanted_slot = ZeeWeaponIds.SLOT_THROWN
+			_client.set("_slot", ZeeWeaponIds.SLOT_THROWN)
+			await _seconds_of(1.0)
+			Engine.time_scale = 0.2
+			var tuning := ZeeWeaponPack.catalogue().get_def(&"frag").tuning as DotWeaponBallistics
+			var forward: Vector3 = local.aim_direction()
+			var spawn := DotWeaponSpawn.make(&"frag", local.eye_position() + forward * 0.6,
+				forward * tuning.speed * 0.55 + Vector3.UP * 2.5, local.entity_id)
+			spawn.gravity_scale = tuning.gravity_scale
+			spawn.radius = tuning.radius
+			spawn.fuse_ticks = game.tick_rate
+			spawn.life_ticks = game.tick_rate * 4
+			spawn.splash_radius = tuning.splash_radius
+			spawn.splash_damage = tuning.splash_damage
+			spawn.damage_type = tuning.damage_type
+			var went: Array = []
+			game.blast_drawn.connect(func(at: Vector3, _weapon: StringName) -> void: went.append(at))
+			var thrown: RefCounted = game.projectiles.launch(spawn)
+			while went.is_empty() and int(thrown.get(&"age_ticks")) < int(_seconds * game.tick_rate):
+				await _frames(1)
+			if not went.is_empty():
+				await _frames(3)
+			print("grenade: %s" % ("went off at %s" % str((went[0] as Vector3).snapped(Vector3.ONE * 0.1)) if not went.is_empty()
+				else "in flight at %s, %d ticks" % [str((thrown.get(&"position") as Vector3).snapped(Vector3.ONE * 0.1)), int(thrown.get(&"age_ticks"))]))
 		"loadout":
 			# B in the hide, blindfolded, when a choice goes straight into the hands.
 			await _seconds_of(0.5)
@@ -188,14 +221,7 @@ func _run() -> void:
 					if far > 2.5 and far < best and String(prop["id"]).begins_with("furniture"):
 						best = far
 						_look = middle
-			if _look != Vector3.INF:
-				var to: Vector3 = _look - (local.eye_position() as Vector3)
-				local.controller.state.yaw = rad_to_deg(atan2(-to.x, -to.z))
-				local.controller.state.pitch = rad_to_deg(atan2(to.y, Vector2(to.x, to.z).length()))
-				# The sampler writes its own look onto every command, so it is turned too.
-				if local.sampler != null:
-					local.sampler.yaw = local.controller.state.yaw
-					local.sampler.pitch = local.controller.state.pitch
+			_face(local, _look)
 			await _seconds_of(_seconds)
 			if _aim:
 				# The pointer is never captured under xvfb; the client aims only while it is.
@@ -226,6 +252,19 @@ func _run() -> void:
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	get_tree().quit(0 if saved == OK else 1)
+
+
+## Turns [param local] to look at [param look] (nothing when it is unset).
+func _face(local: PhPlayer, look: Vector3) -> void:
+	if look == Vector3.INF:
+		return
+	var to: Vector3 = look - local.eye_position()
+	local.controller.state.yaw = rad_to_deg(atan2(-to.x, -to.z))
+	local.controller.state.pitch = rad_to_deg(atan2(to.y, Vector2(to.x, to.z).length()))
+	# The sampler writes its own look onto every command, so it is turned too.
+	if local.sampler != null:
+		local.sampler.yaw = local.controller.state.yaw
+		local.sampler.pitch = local.controller.state.pitch
 
 
 func _until_a_round(game: PhGame) -> void:

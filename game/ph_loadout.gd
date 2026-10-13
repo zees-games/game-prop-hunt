@@ -3,14 +3,15 @@ extends RefCounted
 ## A hunter's loadout, as dot-loadout data: what B offers and what `PhGame._arm_hunters` hands
 ## out. Data only; the manager and the command live on [code]PhGame[/code].
 ##
-## [b]Two slots, primary and secondary, from what the game hands hunters.[/b] The defaults are
-## the config's `hunter_weapons` (the SMG and the pistol, so a hunter who never presses B plays
-## as before); the alternatives are `hunter_choices`. The melee weapon is not a choice: every
-## hunter carries the config's (the hatchet), because a hunter without one has no quiet way to
-## test a suspicious chair.
+## [b]Three slots: primary and secondary from what the game hands hunters, and a grenade.[/b]
+## The defaults are the config's `hunter_weapons` (the SMG and the pistol, so a hunter who never
+## presses B plays as before); the alternatives are `hunter_choices`. The melee weapon is not a
+## choice: every hunter carries the config's (the hatchet), because a hunter without one has no
+## quiet way to test a suspicious chair.
 ##
-## [b]No grenades yet[/b]: this game simulates no projectile, so a thrown weapon's spawn would be
-## dropped and a grenade would cost a slot and do nothing (see docs/design.md).
+## [b]The grenade is optional and empty by default[/b] (`thrown`: a frag or a sticky from
+## `hunter_choices`), so the stand-ins and a hunter who never presses B carry none. A blast that
+## finds nobody next to the furniture costs as a decoy does (`PhGame.blast_cost`, docs/design.md).
 ##
 ## [b]No points budget.[/b] Every primary costs the same and every sidearm the same; the choice
 ## is how a hunter likes to search (spray, a close shotgun, a careful carbine), not a trade.
@@ -21,13 +22,14 @@ const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 const SLOT_FOR := {
 	ZeeIds.SLOT_PRIMARY: &"primary",
 	ZeeIds.SLOT_SIDEARM: &"secondary",
+	ZeeIds.SLOT_THROWN: &"thrown",
 }
 
 const SCHEMA_ID := &"prophunt_hunter"
 
 
 ## The pack's weapons named by [param ids], as items in their loadout slot. An id the pack does
-## not have, or whose slot is not primary or sidearm, is skipped.
+## not have, or whose slot is not primary, sidearm or thrown, is skipped.
 static func catalogue(ids: PackedStringArray) -> DotItemCatalogue:
 	var items: Array[DotItem] = []
 	var seen := {}
@@ -44,8 +46,8 @@ static func catalogue(ids: PackedStringArray) -> DotItemCatalogue:
 
 
 ## The schema: a required primary and a required secondary, defaulting to the first primary and
-## the first sidearm in [param defaults] (the config's `hunter_weapons`), offered from
-## [param defaults] and [param choices] together.
+## the first sidearm in [param defaults] (the config's `hunter_weapons`), and an optional grenade
+## with no default, offered from [param defaults] and [param choices] together.
 static func schema(defaults: PackedStringArray, choices: PackedStringArray) -> DotLoadoutSchema:
 	var pool := PackedStringArray(defaults)
 	for id in choices:
@@ -65,7 +67,24 @@ static func schema(defaults: PackedStringArray, choices: PackedStringArray) -> D
 	secondary.arsenal_slot = ZeeIds.SLOT_SIDEARM
 	secondary.order = 20
 
-	return DotLoadoutSchema.of(SCHEMA_ID, [primary, secondary], items)
+	# Optional, and empty unless [param defaults] names a grenade: nobody carries one they did
+	# not choose.
+	var thrown := DotLoadoutSlot.make(&"thrown", false, _named_in(defaults, items, &"thrown"))
+	thrown.display_name = "Grenade"
+	thrown.kinds = [DotItem.KIND_WEAPON]
+	thrown.arsenal_slot = ZeeIds.SLOT_THROWN
+	thrown.order = 30
+
+	return DotLoadoutSchema.of(SCHEMA_ID, [primary, secondary, thrown], items)
+
+
+## The first of [param ids] that goes in [param slot], or nothing: no fallback to the catalogue.
+static func _named_in(ids: PackedStringArray, items: DotItemCatalogue, slot: StringName) -> StringName:
+	for id in ids:
+		var item := items.find(StringName(id))
+		if item != null and item.slots.has(slot):
+			return item.id
+	return &""
 
 
 ## The first of [param ids] that goes in [param slot], else the first item that does.
@@ -80,8 +99,8 @@ static func _first_in(ids: PackedStringArray, items: DotItemCatalogue, slot: Str
 	return &""
 
 
-## The weapons a hunter carries: the loadout's primary and secondary, then the config's melee (and
-## anything else it names outside the two slots).
+## The weapons a hunter carries: the loadout's primary, secondary and grenade, then the config's
+## melee (and anything else it names outside the slots the loadout filled).
 static func hunter_kit(defaults: PackedStringArray, picked: Array[Dictionary]) -> PackedStringArray:
 	var out := PackedStringArray()
 	var slots_taken := {}
@@ -90,7 +109,7 @@ static func hunter_kit(defaults: PackedStringArray, picked: Array[Dictionary]) -
 		if item != null:
 			slots_taken[int(e.get("arsenal_slot", 0))] = String(item.id)
 	# The primary first: the first weapon armed is the one a client draws (`PhClient._select_locally`).
-	for slot in [ZeeIds.SLOT_PRIMARY, ZeeIds.SLOT_SIDEARM]:
+	for slot in [ZeeIds.SLOT_PRIMARY, ZeeIds.SLOT_SIDEARM, ZeeIds.SLOT_THROWN]:
 		if slots_taken.has(slot):
 			out.append(slots_taken[slot])
 	for id in defaults:

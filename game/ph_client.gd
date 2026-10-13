@@ -15,6 +15,7 @@ const PhHud := preload("ph_hud.gd")
 const PhPaths := preload("ph_paths.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhDebris := preload("ph_debris.gd")
+const PhProjectileView := preload("ph_projectile_view.gd")
 
 ## One local player, a camera and a HUD over a [PhGame] — offline, or against a server.
 ##
@@ -64,6 +65,8 @@ var console: DotConsoleController = null
 ## A hunter's own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
 var view_model: ZeeViewModel = null
+## The grenades in the air, drawn from the world's list (`PhProjectiles`).
+var projectile_view: PhProjectileView = null
 
 var net: DotNetManager = null
 var bridge: PhNetBridge = null
@@ -124,6 +127,7 @@ func _ready() -> void:
 	game.draw_world = true
 	add_child(game)
 	_build_ragdolls()
+	_build_projectile_view()
 
 	_sampler = DotFpsSampler.new(PhPlayer.tunables_for(config))
 	PhPlayer.register_actions(_sampler)
@@ -145,6 +149,23 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	ZeeModelCache.set_asset_root("res://")
+
+
+## The grenades drawn, and a burst and a bang where each goes off: offline from the world's own,
+## online from the copies the server's LAUNCH events start, which go off where the server's did.
+func _build_projectile_view() -> void:
+	projectile_view = PhProjectileView.new()
+	projectile_view.name = "Projectiles"
+	projectile_view.projectiles = game.projectiles
+	add_child(projectile_view)
+	game.blast_drawn.connect(_on_blast)
+
+
+func _on_blast(at: Vector3, _weapon_id: StringName) -> void:
+	if game.effects != null:
+		var _burst := game.effects.spawn(PhGame.BLAST_FX, Transform3D(Basis.IDENTITY, at))
+	if audio != null:
+		var _heard := audio.on_blast(at)
 
 
 # --- Offline ---------------------------------------------------------------

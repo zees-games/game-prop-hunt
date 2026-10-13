@@ -14,6 +14,7 @@ const PhBots := preload("ph_bots.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
+const PhProjectiles := preload("ph_projectiles.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
 ##
@@ -67,6 +68,9 @@ const DIED_SHOT := &"shot"
 const DIED_DECOY := &"decoy"
 const DIED_FELL := &"fell"
 
+## The burst drawn where a grenade went off (dot-fx).
+const BLAST_FX := &"blast"
+
 ## What a turn request asks of a disguise.
 enum Turn { LOCK, TILT_FORWARD, TILT_BACK, TILT_LEFT, TILT_RIGHT, STRAIGHTEN }
 
@@ -103,6 +107,10 @@ signal player_armed(player_id: StringName, weapon_id: StringName)
 ## marker and the hit drawn on the body. The server's word, never a client's prediction.
 signal hit_landed(player_id: StringName, point: Vector3, killed: bool, headshot: bool)
 
+## A hunter's grenade went off at [param at]: everywhere a world is drawn (a client flies its own
+## copies, `PhProjectiles`), for the burst and the sound.
+signal blast_drawn(at: Vector3, weapon_id: StringName)
+
 @export var config: PhConfig = null
 @export var authoritative: bool = true
 @export_range(1, 240, 1) var tick_rate: int = 64
@@ -116,6 +124,9 @@ var map: PhMap = null
 var catalogue: PhCatalogue = null
 var props_catalogue: PhProps = null
 var combat: DotCombatManager = null
+## The hunters' grenades in flight (`ph_projectiles.gd`): flown on the server and solo, and as
+## copies on a client from the LAUNCH events (`PhNetBridge`), which decide nothing.
+var projectiles: PhProjectiles = null
 var match_node: DotMatch = null
 var random: DotRandomManager = null
 var physics: DotPhysicsLayout = null
@@ -349,6 +360,13 @@ func _build_combat() -> void:
 
 	add_child(combat)
 
+	projectiles = PhProjectiles.new()
+	projectiles.setup(combat, config.gravity)
+	projectiles.catalogue = ZeeWeaponPack.catalogue()
+	projectiles.blasted.connect(_on_blast)
+	projectiles.detonated.connect(func(at: Vector3, spawn: DotWeaponSpawn) -> void:
+		blast_drawn.emit(at, spawn.id if spawn != null else &""))
+
 
 func _build_effects() -> void:
 	if authoritative and not draw_world:
@@ -371,6 +389,17 @@ func _build_effects() -> void:
 	hurt.flash_colour = Color(0.9, 0.1, 0.1, 1.0)
 	hurt.flash_decay_ms = 260
 	fx.add(hurt)
+
+	# A grenade going off: a fireball, smoke, sparks and a light (game-arena's scene, copied). At
+	# every quality: where something went off is information, not decoration.
+	var blast := DotFxDef.new()
+	blast.id = BLAST_FX
+	blast.scene_path = PhPaths.rebase("res://scenes/fx/explosion.tscn")
+	blast.lifetime_ms = 1400
+	blast.cost = 10
+	blast.priority = 85
+	blast.max_distance = 140.0
+	fx.add(blast)
 
 	effects = DotFxManager.new()
 	effects.name = "Effects"
@@ -714,6 +743,10 @@ func _on_round_started(number: int) -> void:
 	# And every toy home: a ball rolled into last round's hiding place points at it.
 	if map != null and map.toys != null:
 		map.toys.reset()
+
+	# Nothing thrown last round goes off in this one.
+	if projectiles != null:
+		projectiles.clear()
 
 	if taunts != null:
 		taunts.reset()
@@ -1555,6 +1588,17 @@ func _advance_weapons() -> void:
 			_charge_for_decoys(player, shot)
 			_break_furniture(shot)
 
+		# A thrown grenade: flown from here (`PhProjectiles`), its blast resolved where it goes
+		# off and charged in `_on_blast`. A client's copy comes from LAUNCH, never from here.
+		# Its owner is this player, as a shot's attacker is: the rig's context does not carry this
+		# game's entity id, and a grenade owned by nobody hit its thrower's own head as it left
+		# the hand (the flight leaves the owner's hitboxes out only by that id).
+		if authoritative and projectiles != null:
+			for spawn in outcome.spawns:
+				spawn.owner_entity = player.entity_id
+				spawn.tick = _tick
+			projectiles.accept(outcome)
+
 
 ## What shooting the furniture costs: a share of the damage the shot would have done, off the
 ## hunter's own health.
@@ -1588,7 +1632,11 @@ func _charge_for_decoys(player: PhPlayer, shot: DotShot) -> void:
 	if decoys == 0:
 		return
 
-	var amount := maxf(shot.damage * float(decoys) * config.decoy_penalty, config.decoy_penalty_min)
+	_charge(player, maxf(shot.damage * float(decoys) * config.decoy_penalty, config.decoy_penalty_min))
+
+
+## Takes [param amount] off [param player] as the furniture's answer (a decoy), and tells them.
+func _charge(player: PhPlayer, amount: float) -> void:
 	var cost := DotDamage.make(0, player.entity_id, amount, null)
 	cost.point = player.controller.state.position
 	cost.direction = player.aim_direction()
@@ -1736,6 +1784,8 @@ func _step(delta: float) -> void:
 	_advance_weapons()
 
 	if authoritative:
+		if projectiles != null:
+			projectiles.tick(delta)
 		_advance_toys(delta)
 
 	_watch_world()
@@ -1806,6 +1856,64 @@ func _shoot_toys(shot: DotShot) -> void:
 	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
 	for raw: Variant in directions:
 		var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, physics.layer_mask(&"world") | physics.layer_mask(&"prop"))
+
+
+# --- Grenades ------------------------------------------------------------------
+
+## How fast a blast throws a toy at its centre (nothing at its edge), whatever the toy weighs:
+## game-arena's number, so a ball goes as far from a frag in both games.
+const BLAST_TOY_SPEED := 12.0
+
+
+## A hunter's grenade went off and dot-combat resolved it ([param shot]'s damages are who it
+## hurt). Server side and solo: the hit marker for a prop it found, the toys it throws, and what
+## it costs when it found nobody (docs/design.md, "Grenades").
+func _on_blast(at: Vector3, spawn: DotWeaponSpawn, shot: DotShot) -> void:
+	if not authoritative or spawn == null:
+		return
+
+	var thrower: PhPlayer = players.get(entities.key_for_id(spawn.owner_entity)) if spawn.owner_entity != 0 else null
+
+	if map != null and map.toys != null:
+		var _thrown := map.toys.blast(at, maxf(spawn.splash_radius, 2.0), BLAST_TOY_SPEED)
+
+	if thrower == null or not is_instance_valid(thrower):
+		return
+
+	_note_hits(thrower, shot)
+
+	var cost := blast_cost(at, spawn.splash_radius, spawn.splash_damage, shot)
+
+	if cost > 0.0 and thrower.is_alive():
+		_charge(thrower, cost)
+
+
+## What a blast at [param at] costs its thrower: nothing when it hurt a prop (it found
+## somebody), nothing when no furniture was within [param radius] in clear sight of it (a
+## grenade into an empty yard is a shot into a wall), and otherwise one decoy at the blast's
+## full [param damage]: `decoy_penalty` of it, at least `decoy_penalty_min`. One, however many
+## pieces it reached: a blast is one guess about one place, and a charge per piece would make a
+## grenade in a classroom of thirty chairs a death sentence for testing anything.
+func blast_cost(at: Vector3, radius: float, damage: float, shot: DotShot) -> float:
+	if config.decoy_penalty <= 0.0 or map == null:
+		return 0.0
+
+	if shot != null:
+		for hurt: DotDamage in shot.damages:
+			if hurt != null and not hurt.refused and hurt.health_lost > 0.0 \
+					and team_of(entities.key_for_id(hurt.victim)) == PROPS:
+				return 0.0
+
+	var lifted := at + Vector3(0.0, 0.05, 0.0)
+	for index in map.props_near(at, radius):
+		var nearest := map.nearest_on_prop(index, at)
+		# Up to the piece's own skin: the ray stops short so it does not end inside the wall the
+		# piece stands against.
+		var short := nearest + (lifted - nearest).normalized() * 0.05 if lifted.distance_to(nearest) > 0.06 else lifted
+		if _clear_between(lifted, short):
+			return maxf(damage * config.decoy_penalty, config.decoy_penalty_min)
+
+	return 0.0
 
 
 func delta_for_tick() -> float:
