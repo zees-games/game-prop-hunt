@@ -2,6 +2,10 @@
 
 Bug stories worth keeping, newest first. The rule each one left is in `CLAUDE.md`.
 
+## The school's toys were not the school's problem (2026-10-13)
+
+Any loose toy outdoors on the school (a ball or a tyre on the field or the playground) took `headless_bots` from 7 to 8 props' rounds in 12 there, past the 25-65% band, and nothing the bots ask of the physics space could see a toy (shots, pushes, queries and collisions were each switched off and it held). So the school shipped with one ball, indoors. Played round by round, the toys changed exactly one round of 32 compared: the rotation's first, the school on seed 0, where the hunters found the last prop with 3 s left. A per-tick trace put the first difference at one hunter's height, 0.00015 m, 40 m from any toy; an invisible `StaticBody3D` with no collision layer and no mask, at the field or in the hall, flipped the same round, and one 500 m away changed it without flipping it. A body in the physics space reorders what the engine's motion queries meet, the last float bit of a controller's position moves, and a round already on a knife's edge goes the other way. The real fault was underneath: over 48 seeds the school gave the props 36 rounds (75%) with four hunters for eight, and the twelve the suite plays happened to give 7. With five hunters (`players_per_hunter` 1.6) it is 38% over 24 seeds, and the outdoor toys are back. The rule: a band on a map's twelve rounds is only a band if the map's share over many more seeds sits well inside it; re-measure on `--map <id>` (48 of that map's rounds) before believing a change moved a map, and a one-round difference is noise until a second seed agrees.
+
 ## The props won the school and lost the woods (2026-10-12)
 
 `headless_bots` held the props to 35-55% of rounds over the four maps, and 11 in 24 passed, while the school gave them 11 rounds in 12 and the woods 1. A mean over maps is no band on any of them. The density of hiding places decided it (319 on the school, 68 in the woods), so the maps now set their own share of hunters (`players_per_hunter`) and the suite holds each map to its own band.
