@@ -103,6 +103,10 @@ var beacon_marker: DotFxBeacon = null
 ## What other people see this player as: a person, or a prop. Client side.
 var figure: PhFigure = null
 var prop_model: Node3D = null
+
+## How this player's body falls on their death: the server's pick ([method PhGame.decide_death]),
+## carried on DEATH and set here before anybody hears of it. Null before a first death.
+var death: DotPlayerDeath = null
 var _drawn_prop: StringName = &""
 
 ## Which weapon slot they have asked for, from this game's input message.

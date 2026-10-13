@@ -14,7 +14,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 10
-const CHECKS := 61
+const CHECKS := 62
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -223,6 +223,18 @@ func _test_the_commands() -> void:
 		"mp_teammate_passthrough is replicated: a client is sent the server's level",
 		str(server.console.replicated_values()))
 	var _one := _run_command("mp_teammate_passthrough 1")
+
+	# Dead bodies are the owner's: dot-player-char's sv_ragdoll* set, REPLICATED (a client draws
+	# the bodies) and on the world's own rules, which the server picks each death's fall from.
+	var ragdoll := server.console.find_cvar("sv_ragdoll")
+	var _no_ragdolls := _run_command("sv_ragdoll 0")
+	var _no_limp := _run_command("sv_ragdoll_reactions limp=0")
+	_check(ragdoll != null and ragdoll.has_flag(DotConVar.FLAG_REPLICATED) and not game.ragdoll_rules.enabled
+			and server.console.replicated_values().get("sv_ragdoll", "") == "0"
+			and game.ragdoll_rules.reactions().find(&"limp").weight == 0.0,
+		"sv_ragdoll* are registered, replicated, and reach the world's rules", str(game.ragdoll_rules.describe()))
+	var _ragdolls_back := _run_command("sv_ragdoll 1")
+	server.console.find_cvar("sv_ragdoll_reactions").reset()
 
 	# B's server half: `loadout` and the owner's three cvars, enforced by the world's manager.
 	_check(server.console.find_command("loadout") != null and server.console.find_cvar("mp_loadout_menu") != null

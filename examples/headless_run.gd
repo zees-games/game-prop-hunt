@@ -11,6 +11,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 const PhProgress := preload("../game/ph_progress.gd")
 const PhProps := preload("../game/ph_props.gd")
 const PhSettings := preload("../game/ph_settings.gd")
+const PhEvents := preload("../game/net/ph_events.gd")
 
 ## The simulation, headless: the prop catalogue and the map documents, the draw, the hide, every
 ## part of hiding as a prop, taunts, shots at props and at the furniture, the beacon, and how a
@@ -23,9 +24,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 25
+const SECTIONS := 26
 
-const CHECKS := 125
+const CHECKS := 133
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -79,6 +80,7 @@ func _run() -> void:
 	await _test_offline_trigger()
 	await _test_hunter_weapons()
 	await _test_hunter_loadout()
+	await _test_bodies()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1048,6 +1050,115 @@ func _section(name: String) -> void:
 
 func _finished() -> void:
 	_sections_finished += 1
+
+
+## A death: the server picks the fall and it rides DEATH; a client lays a person down as
+## dot-player-char's ragdoll from the figure it draws, and a disguised prop bursts into its own
+## pieces (or, under `prop_death` 1, topples as the prop).
+func _test_bodies() -> void:
+	_section("the dead: a person falls as a ragdoll, a found prop bursts")
+	var client: Node = (load("res://game/ph_client.gd") as GDScript).new()
+	client.set(&"force_offline", true)
+	client.set(&"remember_loadout", false)
+	client.set(&"config_file", "user://cfg/headless-none.json")
+	add_child(client)
+	for i in 8:
+		await get_tree().process_frame
+	var world: PhGame = client.get("game")
+	var ragdolls: DotPlayerRagdolls = client.get("ragdolls")
+	_check(ragdolls != null and ragdolls.rules == world.ragdoll_rules,
+		"the client keeps the dead under the game's sv_ragdoll* rules")
+	world.wish_side(&"local", PhGame.HUNTERS)
+	world._on_round_started(world.round_number + 1)
+	world._set_phase(PhGame.Phase.SEEK)
+	for i in 20:
+		await get_tree().process_frame
+
+	# A person: a stand-in not in disguise, drawn as a figure.
+	var person: PhPlayer = null
+	var prop: PhPlayer = null
+	for id: StringName in world.players:
+		var p: PhPlayer = world.players[id]
+		if id == &"local" or not p.is_alive():
+			continue
+		if person == null and not p.is_disguised() and p.figure != null and p.figure.visible:
+			person = p
+		elif prop == null and world.team_of(id) == PhGame.PROPS and person != p:
+			prop = p
+	if person != null:
+		var slay := DotDamage.make(0, person.entity_id, person.health.max_health * 10.0, null)
+		slay.tick = world._tick
+		slay.direction = Vector3(1, 0, 0)
+		var _applied: Variant = world.combat.apply_damage(slay)
+		await get_tree().process_frame
+		_check(person.death != null and DotPlayerDeathReactions.stock().has(person.death.reaction),
+			"the world picked how the body falls", str(person.death.describe()) if person.death != null else "none")
+		var bodies := ragdolls.live()
+		_check(bodies.size() == 1 and not person.figure.visible,
+			"and the client laid the body down from the figure, which is hidden", str(bodies.size()))
+		for i in 90:
+			await get_tree().physics_frame
+		var down := bodies.size() == 1 and is_instance_valid(bodies[0])
+		var floor_y := person.controller.state.position.y
+		_check(down and bodies[0].centre().y < floor_y + 0.8 and bodies[0].lowest_point() > floor_y - 0.25,
+			"a second and a half on, the body lies on the floor: not standing, not through it",
+			str(bodies[0].describe()) if down else "gone")
+	else:
+		for k in 3:
+			_check(false, "a stand-in drawn as a person to slay")
+
+	# A prop, disguised and drawn as what it is wearing: found, it bursts and leaves no body.
+	var burst := false
+	var toppled := false
+	if prop != null and world.disguise_as(prop.player_id, &"furniture_bookcase_closed"):
+		for i in 4:
+			await get_tree().process_frame
+		var was := ragdolls.live().size()
+		var shown := prop.prop_model != null and prop.prop_model.visible
+		var slay := DotDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
+		slay.tick = world._tick
+		var _applied: Variant = world.combat.apply_damage(slay)
+		await get_tree().process_frame
+		burst = shown and ragdolls.live().size() == was and world.get_node_or_null("PropDebris_%s" % String(prop.player_id)) != null \
+			and not prop.prop_model.visible
+		# The same under prop_death 1: the prop topples as one piece.
+		world.config.prop_death = 1
+		prop.health.revive(1.0)
+		var _back := world.disguise_as(prop.player_id, &"furniture_bookcase_closed")
+		for i in 4:
+			await get_tree().process_frame
+		var again := DotDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
+		again.tick = world._tick
+		var _hit: Variant = world.combat.apply_damage(again)
+		await get_tree().process_frame
+		var live := ragdolls.live()
+		toppled = live.size() == was + 1 and live[live.size() - 1].style != DotPlayerRagdollRules.Style.RAGDOLL
+		world.config.prop_death = 0
+	_check(burst, "a found prop bursts into its own pieces, and leaves no body")
+	_check(toppled, "and under prop_death 1 it topples as the prop, one stiff piece")
+
+	# The fall rides DEATH last and optional, so a death from an older server still reads.
+	var fall := DotPlayerDeath.new()
+	fall.reaction = &"face_plant"
+	fall.roll_seed = 1234
+	fall.direction = Vector3(1, 0, 0)
+	var died := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, fall)))
+	var carried: DotPlayerDeath = died.get("death")
+	var bare := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT)))
+	_check(bool(died["ok"]) and carried != null and carried.reaction == &"face_plant" and carried.roll_seed == 1234
+		and bool(bare["ok"]) and not bare.has("death"),
+		"a DEATH carries the fall the server picked, and one without a fall still reads")
+
+	var catalogue: DotAudioCatalogue = (load("res://game/ph_audio.gd") as GDScript).call("sound_catalogue")
+	var listed := not DotPlayerDeathSounds.rows().is_empty()
+	for row: Dictionary in DotPlayerDeathSounds.rows():
+		listed = listed and catalogue.find(row["id"]) != null
+	_check(listed, "the death sounds are in the game's catalogue")
+
+	remove_child(client)
+	client.free()
+	await get_tree().process_frame
+	_finished()
 
 
 func _check(ok: bool, what: String, detail: String = "") -> void:

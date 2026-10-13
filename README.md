@@ -106,6 +106,8 @@ bot_difficulty medium          // how bot hunters turn, aim and react: easy, med
 ph_vote_after 20               // seconds into a map's last round before the vote opens
 ```
 
+A hunter who dies drops as a ragdoll ([dot-player-char](https://github.com/modcommunity/dot-player-char)) and a prop that is found bursts into pieces; the server picks how each body goes down and everybody sees the same fall. `sv_ragdoll 0` makes it a quick fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off). On a player's own machine, `--ph-prop-death=1` topples a found prop instead of bursting it (2: it vanishes), and `--ph-hunter-break` says what the furniture does to a hunter it finishes (0 a ragdoll, 1 limbs, 2 bursts).
+
 The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they turn, aim and react is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.

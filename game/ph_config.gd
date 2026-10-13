@@ -160,6 +160,11 @@ extends DotConfig
 ## they burst. See [DotPlayerBreakRules].
 @export_enum("none", "limbs", "explode") var hunter_break: int = 2
 
+## What a disguised prop does when it is found: 0 bursts into its own pieces, as shot furniture
+## does; 1 topples over as the prop (dot-player-char's one-piece body, under `sv_ragdoll*`); 2
+## vanishes. A person's body (a hunter, a prop out of disguise) is a ragdoll either way.
+@export_enum("burst", "topple", "vanish") var prop_death: int = 0
+
 # --- Points ----------------------------------------------------------------
 
 @export_group("Points")

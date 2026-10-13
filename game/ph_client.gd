@@ -14,6 +14,7 @@ const PhGame := preload("ph_game.gd")
 const PhHud := preload("ph_hud.gd")
 const PhPaths := preload("ph_paths.gd")
 const PhPlayer := preload("ph_player.gd")
+const PhDebris := preload("ph_debris.gd")
 
 ## One local player, a camera and a HUD over a [PhGame] — offline, or against a server.
 ##
@@ -122,6 +123,7 @@ func _ready() -> void:
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
 	game.draw_world = true
 	add_child(game)
+	_build_ragdolls()
 
 	_sampler = DotFpsSampler.new(PhPlayer.tunables_for(config))
 	PhPlayer.register_actions(_sampler)
@@ -235,6 +237,8 @@ func _build_netcode() -> DotResult:
 	bridge.open_link(link)
 	# The server's mp_forceview: this end places its own camera.
 	var _view := game.view_rules.follow_cvars(link)
+	# The server's sv_ragdoll* set: this end draws the bodies.
+	var _dead := game.ragdoll_rules.follow_cvars(link)
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -421,6 +425,10 @@ func is_hunter() -> bool:
 
 
 func _on_map(map_id: StringName) -> void:
+	if ragdolls != null:
+		# A body on the old map would hang in the new one's air.
+		ragdolls.clear()
+
 	if audio != null:
 		audio.on_map_doc(map_id, game.map_doc)
 
@@ -457,9 +465,12 @@ func _on_death(session_id: int, by: int, why: StringName) -> void:
 	if audio != null and who != null:
 		var _heard := audio.on_death(who.global_position, mine, was_hunter)
 
-	# The furniture finished a hunter: they come apart, the way the brief asked.
+	# The furniture finished a hunter: they come apart, the way the brief asked. Anybody else
+	# falls (a person) or bursts (a prop): see _fall.
 	if why == PhGame.DIED_DECOY and who != null and _break_rules != null:
 		var _broke := who.break_body(_break_rules, Vector3.UP, session_id * 7919 + game.round_number)
+	else:
+		_fall(who)
 
 	if chat == null:
 		return
@@ -1023,6 +1034,87 @@ func _build_settings() -> void:
 		_wire_board()
 		_wire_maps()
 		_use_loadout_menu()
+
+
+# --- Dead bodies -----------------------------------------------------------
+
+## Where the dead lie: dot-player-char's ragdolls under the game's (the server's) rules.
+var ragdolls: DotPlayerRagdolls = null
+
+
+func _build_ragdolls() -> void:
+	ragdolls = DotPlayerRagdolls.new()
+	ragdolls.name = "Ragdolls"
+	ragdolls.rules = game.ragdoll_rules
+	ragdolls.sound_fn = _ragdoll_sound
+	add_child(ragdolls)
+
+
+func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
+	if audio != null:
+		var _played := audio.on_body(id, at, volume)
+
+
+## [param who]'s body goes down the way the server picked ([member PhPlayer.death]), from what
+## this client draws of them. A person (a hunter, a prop out of disguise) is copied from the
+## figure into a ragdoll. A disguised prop is a prop, not a person, and `PhConfig.prop_death`
+## says what it does: bursts into its own pieces like shot furniture (the default), topples
+## over as the prop, or vanishes. Nothing drawn here (your own first-person body), nothing.
+## Called from [method _on_death], solo and connected alike, before the next frame hides it.
+func _fall(who: PhPlayer) -> void:
+	if who == null or ragdolls == null:
+		return
+	var death: DotPlayerDeath = who.death if who.death != null else DotPlayerDeath.new()
+	if game.physics != null:
+		# The building and the furniture: a body lands on them and on nothing else.
+		game.ragdoll_rules.collision_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
+
+	if who.prop_model != null and who.prop_model.visible and who.prop_model.is_inside_tree():
+		match game.config.prop_death:
+			0:
+				_burst_prop(who, death)
+			1:
+				var _toppled := ragdolls.spawn(who.prop_model, death)
+			_:
+				who.prop_model.visible = false
+		return
+
+	if who.figure == null or not who.figure.visible or not who.figure.is_inside_tree():
+		return
+	var velocity := who.controller.state.velocity if who.controller != null else Vector3.ZERO
+	var _body := ragdolls.spawn(who.figure, death, velocity)
+
+
+## How long a found prop's own pieces take to shrink away as it pops.
+const PROP_POP_SECONDS := 0.35
+
+## A found prop pops: its own meshes thrown the way the shot went and shrinking to nothing in
+## [constant PROP_POP_SECONDS], in a spray of chips of its colour (`ph_debris.gd`, the debris a
+## shot-up piece of furniture throws, which keeps its pieces whole).
+func _burst_prop(who: PhPlayer, death: DotPlayerDeath) -> PhDebris:
+	var parts: Array = []
+	var bounds := AABB()
+	var seeded := false
+	for node: Node in who.prop_model.find_children("*", "MeshInstance3D", true, false):
+		var mesh := node as MeshInstance3D
+		if mesh.mesh == null or not mesh.is_visible_in_tree():
+			continue
+		parts.append([mesh.mesh, mesh.global_transform])
+		var box := mesh.global_transform * mesh.get_aabb()
+		bounds = box if not seeded else bounds.merge(box)
+		seeded = true
+	who.prop_model.visible = false
+	if not seeded:
+		return null
+	var debris := PhDebris.new()
+	debris.name = "PropDebris_%s" % String(who.player_id)
+	debris.pop_seconds = PROP_POP_SECONDS
+	debris.chips = PhDebris.CHIPS * 3
+	game.add_child(debris)
+	var direction := death.direction if death.direction.length_squared() > 0.0001 else Vector3.UP
+	debris.burst(parts, bounds.get_center(), bounds.size, direction,
+		game.physics.layer_mask(&"world") if game.physics != null else 1, death.roll_seed)
+	return debris
 
 
 func _build_break_rules() -> void:

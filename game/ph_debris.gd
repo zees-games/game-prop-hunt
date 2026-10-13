@@ -13,8 +13,18 @@ extends Node3D
 const LIFETIME := 4.0
 const CHIPS := 7
 
+## Seconds over which the thrown pieces shrink to nothing: 0 (furniture) keeps them whole to
+## the end. A found player's prop pops (`PhClient._burst_prop`): most of Kenney's furniture is
+## one mesh, and one whole bookcase thrown is a bookcase knocked over, not a player found.
+var pop_seconds: float = 0.0
+
+## How many chips a burst throws.
+var chips: int = CHIPS
+
 var _left := LIFETIME
 var _bodies: Array[RigidBody3D] = []
+var _pieces: Array[MeshInstance3D] = []
+var _age := 0.0
 
 
 ## Throws [param parts] (`[Mesh, Transform3D]` in the world) away from [param direction], and
@@ -35,6 +45,7 @@ func burst(parts: Array, centre: Vector3, size: Vector3, direction: Vector3, wor
 		var middle := at * mesh.get_aabb().get_center()
 		drawn.transform = Transform3D(at.basis, at.origin - middle)
 		body.add_child(drawn)
+		_pieces.append(drawn)
 		add_child(body)
 		body.global_position = middle
 		body.linear_velocity = (push * 2.5 + Vector3(rng.next_range_f(-1.0, 1.0), rng.next_range_f(1.0, 3.0), rng.next_range_f(-1.0, 1.0)))
@@ -47,7 +58,7 @@ func burst(parts: Array, centre: Vector3, size: Vector3, direction: Vector3, wor
 	chip_material.albedo_color = colour
 	var chip_size := Vector3.ONE * clampf(maxf(size.x, maxf(size.y, size.z)) * 0.12, 0.02, 0.12)
 
-	for i in range(CHIPS):
+	for i in range(chips):
 		var body := _body(world_mask, chip_size)
 		var cube := BoxMesh.new()
 		cube.size = chip_size * rng.next_range_f(0.5, 1.2)
@@ -76,6 +87,14 @@ func _body(world_mask: int, size: Vector3) -> RigidBody3D:
 
 
 func _process(delta: float) -> void:
+	_age += delta
+	if pop_seconds > 0.0:
+		var left := 1.0 - _age / pop_seconds
+		for piece in _pieces:
+			if is_instance_valid(piece):
+				piece.visible = left > 0.0
+				if left > 0.0:
+					piece.scale = Vector3.ONE * maxf(left * left, 0.01)
 	_left -= delta
 	if _left <= 0.0:
 		queue_free()

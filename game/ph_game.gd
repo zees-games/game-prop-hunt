@@ -145,6 +145,12 @@ var players: Dictionary = {}
 ## standing hull would be the wrong one.)
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 
+## What a dead body does, and which death reactions the server allows: dot-player-char's
+## `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a client through its
+## link, because the client draws the bodies. A person's body only: a disguised prop that dies
+## is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
+var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
+
 ## player id -> side.
 var sides: Dictionary = {}
 
@@ -1849,8 +1855,28 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	if match_node != null and DotEntity.is_kind(player.entity_id, DotEntity.KIND_PLAYER):
 		match_node.report_kill(String(by), String(player.player_id), why, _tick)
 
+	# How the body falls, picked once, here, and carried on DEATH to every client.
+	player.death = decide_death(player, damage)
+
 	player_died.emit(player.player_id, by, why)
 	DotLog.debug(CHANNEL, "player died", {"id": String(player.player_id), "by": String(by), "why": String(why)})
+
+
+## The fall a death gets: dot-player-char's reaction rule over the server's weights, seeded from
+## the player and the tick. A hunter's gun is a weapon def (a shotgun may launch); the
+## furniture's cost and a fall carry no direction, and push nothing.
+func decide_death(player: PhPlayer, damage: DotDamage) -> DotPlayerDeath:
+	var weapon: Object = null
+	var shooter: PhPlayer = players.get(entities.key_for_id(damage.attacker)) if damage.attacker != 0 else null
+	if shooter != null and shooter.weapons != null and shooter.weapons.arsenal != null and damage.weapon_id != &"":
+		weapon = shooter.weapons.arsenal.catalogue.get_def(damage.weapon_id)
+	var direction := damage.direction
+	if direction.length_squared() < 0.0001 and shooter != null and shooter != player:
+		direction = (player.controller.state.position - shooter.controller.state.position) * Vector3(1, 0, 1)
+	return DotPlayerDeath.decide(
+		ragdoll_rules.reactions(), damage.is_headshot(), damage.amount, direction,
+		DotPlayerDeath.seed_of(player.entity_id, _tick), weapon
+	)
 
 
 # --- Reporting --------------------------------------------------------------

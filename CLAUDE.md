@@ -80,6 +80,8 @@ Short forms; the reasoning is in the linked file.
 - The furniture is one static body, so nothing a hunter does moves a prop out of the box the decoy check reads. [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
 - Breakable furniture (`props/kits.json` "breaks", measured into the catalogue) breaks once the shots on it add up: `PhMap.break_prop` disables its shapes and hides its drawn instances, the decoy is still charged, BROKEN tells every client (a joiner quietly), and a round restores everything on both ends. Debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
 
+- A death's fall is the server's (`PhGame.decide_death` on `player.death`, last and optional on DEATH); the client draws it (`PhClient._fall`): a person (hunter, undisguised prop) as dot-player-char's ragdoll under `sv_ragdoll*` (bound REPLICATED, followed), a disguised prop pops into its own pieces (`prop_death` 0; 1 topples it, 2 hides it), a hunter the furniture finished still breaks (`hunter_break`). [design](docs/design.md#a-death)
+
 **Taunts, beacons, sides**
 
 - Taunts start with the seek, play from where the prop stands to `taunt_range`; standing still `auto_taunt_seconds` (60, as game-hide-n-seek) taunts for you. The list is `taunts/taunts.json`. [design](docs/design.md#decision-4-taunts-are-a-choice-with-a-price-and-standing-still-is-not-free)
@@ -122,6 +124,7 @@ tools/camera_check.sh --render     # cameras round the house (armed), mp_forcevi
 tools/shot.sh --view=room --ph-map-ids=ph_school --at=-38,1.7,3.5 --look=-26,0.8,14
 tools/shot.sh --view=prop --as=furniture_chair_cushion --ph-map-ids=ph_house
 tools/shot.sh --view=blind
+tools/shot.sh --view=dead --ph-map-ids=ph_woods --seconds=3   # a hunter's ragdoll; --victim=prop --as=<id> a found prop pops
 tools/shot.sh --view=hunter --aim --name=hunter_aimed     # down the sights
 tools/shot.sh --view=loadout                             # B open in the hide
 tools/shot.sh --view=hunter --board --name=board

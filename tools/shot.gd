@@ -16,6 +16,8 @@ var _out := "res://screenshots/shot.png"
 var _at := Vector3.INF
 var _look := Vector3.INF
 var _as := &"furniture_chair"
+## `--view=dead`: who is killed in front of the camera, `hunter` (a person) or `prop` (in `--as`).
+var _victim := "hunter"
 ## `--fire=N`: the hunter holds the trigger for the last N frames before the picture, so a muzzle
 ## flash, tracers and impacts are in it (and the counter has moved).
 var _fire_frames := 0
@@ -48,6 +50,8 @@ func _ready() -> void:
 			_aim = true
 		elif arg.begins_with("--fire="):
 			_fire_frames = arg.trim_prefix("--fire=").to_int()
+		elif arg.begins_with("--victim="):
+			_victim = arg.trim_prefix("--victim=")
 		elif arg.begins_with("--as="):
 			_as = StringName(arg.trim_prefix("--as="))
 
@@ -110,6 +114,43 @@ func _run() -> void:
 			for _i in range(_lean):
 				var _turned := game.turn(local.player_id, PhGame.Turn.TILT_FORWARD)
 			await _seconds_of(_seconds)
+		"dead":
+			# Somebody killed in front of a free camera and [member _seconds] of what follows: a
+			# hunter falls as a ragdoll, a disguised prop (`--victim=prop --as=<id>`) bursts, or
+			# topples under `--ph-prop-death=1`.
+			game._set_phase(PhGame.Phase.SEEK)
+			var victim: PhPlayer = null
+			for id: StringName in game.players:
+				var p: PhPlayer = game.players[id]
+				if p != local and (game.team_of(id) == PhGame.HUNTERS) == (_victim == "hunter"):
+					victim = p
+					break
+			if victim == null:
+				print("nobody on that side to kill")
+				get_tree().quit(1)
+				return
+			var feet: Vector3 = local.controller.state.position + Vector3(0.0, 0.0, -3.0)
+			if _at != Vector3.INF:
+				feet = _at
+			victim.place_at(feet, 180.0)
+			if _victim == "prop":
+				var _worn := game.disguise_as(victim.player_id, _as)
+			# You out of the frame, behind the camera.
+			local.place_at(feet + Vector3(0.0, 0.0, 8.0), 0.0)
+			await _seconds_of(0.4)
+			feet = victim.controller.state.position
+			var camera := _free_camera()
+			camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
+			var slay := DotDamage.make(0, victim.entity_id, victim.health.max_health * 10.0, null)
+			slay.tick = game._tick
+			slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
+			var _applied: Variant = game.combat.apply_damage(slay)
+			print("killed %s (%s) at %s: %s" % [victim.display_name, _victim, feet.snapped(Vector3.ONE * 0.1),
+				victim.death.describe() if victim.death != null else "no fall"])
+			await _seconds_of(_seconds)
+			var yard: DotPlayerRagdolls = _client.get("ragdolls")
+			for body: DotPlayerRagdoll in yard.live():
+				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 		"blind":
 			await _seconds_of(1.0)
 		"loadout":
