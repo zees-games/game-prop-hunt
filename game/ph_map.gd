@@ -71,6 +71,8 @@ var gravity: float = 20.0
 var _solid: StaticBody3D = null
 var _furniture: StaticBody3D = null
 var _drawn: Node3D = null
+## The boxes the contact shade is built from, gathered by the box and furniture builders.
+var _shade_boxes: Array = []
 var _environment: WorldEnvironment = null
 var _sun: DirectionalLight3D = null
 var _bounds: AABB = AABB()
@@ -103,6 +105,8 @@ func build(p_doc: Dictionary) -> DotResult:
 
 	_build_boxes()
 	_build_props()
+	_add_contact_shade(_shade_boxes)
+	_shade_boxes = []
 	_build_toys()
 
 	if draw_world:
@@ -178,8 +182,6 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
-	var shade_boxes: Array = []
-
 	for box: Dictionary in doc["boxes"]:
 		var size := PhMapDoc.v3(box["size"])
 		var at := PhMapDoc.v3(box["at"])
@@ -214,7 +216,7 @@ func _build_boxes() -> void:
 
 		_add_box((batches[key] as Dictionary)["tool"], frame, size)
 		if not PhMaterials.is_transparent(str(box["mat"])):
-			shade_boxes.append({"transform": frame, "size": size})
+			_shade_boxes.append({"transform": frame, "size": size})
 
 	for key: String in batches:
 		var batch: Dictionary = batches[key]
@@ -227,7 +229,19 @@ func _build_boxes() -> void:
 			if PhMaterials.is_transparent(batch["mat"]) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		_drawn.add_child(mesh)
 
-	_add_contact_shade(shade_boxes)
+
+## Whether map furniture [param prop_id] casts a contact shade: only a furniture-kit block (a
+## cabinet, a counter, a fridge, a bookcase, a washer) that collides as its box, never breaks and
+## stands upright. Its box is then its shape, so the shade is where its foot is, and the shade can
+## never outlive it. A piece-built prop (a chair, a table, a tree) is open underneath and its
+## box would shade floor that is lit; a breakable one would leave its shade behind when it broke
+## (the shade is one mesh, built at load). See docs/drawing.md#contact-shade.
+func _shades_floor(prop_id: StringName, raw: Dictionary) -> bool:
+	if catalogue == null or not catalogue.pieces_of(prop_id).is_empty() or catalogue.breaks(prop_id) > 0.0:
+		return false
+	if str(catalogue.entry(prop_id).get("kit", "")) != "furniture":
+		return false
+	return is_zero_approx(float(raw.get("pitch", 0.0))) and is_zero_approx(float(raw.get("roll", 0.0)))
 
 
 ## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the
@@ -304,6 +318,11 @@ func _build_props() -> void:
 			shapes.append(shape)
 
 		props.append({"id": prop_id, "transform": frame, "size": size, "shapes": shapes, "broken": false})
+
+		if draw_world and _shades_floor(prop_id, raw):
+			# Its box casts and takes none: bands on a cabinet's own sides would float off its model.
+			_shade_boxes.append({"transform": frame.translated_local(Vector3(0.0, size.y * 0.5, 0.0)),
+				"size": size, "casts": true, "shaded": false})
 
 		if draw_world:
 			if not by_id.has(prop_id):
