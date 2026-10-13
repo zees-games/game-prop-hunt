@@ -36,6 +36,8 @@ Christian's first play test: the hunter's gun was a green sniper, a purple rifle
 
 ## The first days (2026-10-09 to 10-11)
 
+Built 2026-10-09 from mg-deathrun's skeleton (module, services, wire, client, HUD, spectate, progress, avatars, figure, vote), renamed `dr` → `ph` and rewritten wherever they named a course, a trap or an activator; where a comment says another game found something, the finding is that game's and the line was kept because it is still true here. `headless_run`'s and `headless_net`'s totals were wrong when first written and both fired; `headless_maps` was armed with a spawn put inside the practice kitchen's chair.
+
 Found by running, each with the rule it left (in `CLAUDE.md` where it still bites).
 
 - **Spawns inside sofas**: six, on three maps, because a spawn is written before a room is furnished. Found by `headless_maps`; mg-prop-hunt-maps' builder now moves them itself.

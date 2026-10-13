@@ -9,3 +9,12 @@ The clock is a `DotScoreStrip` with the props and hunters still up as its two si
 **H is help** (dot-menu's stock key and its top-right "H Help" plate; `PhSettings._fill_help` writes the goal and each side's rules), so nothing in `PhBindings` may default to H, and the Escape menu has dot-menu's stock Help and Leave. `headless_run` checks both.
 
 **M is the map list** (dot-menu's map menu): `PhGame.map_rows()` and `change_map_now()` (the next map plus dot-match's `begin_round_now`) serve both solo and the server, where dot-vote's map menu lets the owner's `sv_map_menu_flag` change it now and gives anybody else a vote. It shares the taunt list's picker; a map choice never reaches `_on_taunt_picked`. Nothing in `PhBindings` may default to M; `headless_run` and `dedicated` check it.
+
+## Sound
+
+Sound follows the map document: each box's `mat` is its collision shape's `surface` meta, so footsteps go by surface (dot-audio's `DotAudioFootsteps`); every `ceiling` or `roof` box is an indoor ambience zone; the outdoor bed and ground come from `PhAudio.MAP_SOUND` or the document's `ambience` and `surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` and held in the family's −17 LUFS band by `loudness_trim_db`. A dead person's landing is dot-player-char's stock death sounds, in `PhAudio`'s catalogue.
+
+## A hit
+
+A hit is the server's word: `PhGame.hit_landed` from each weapon shot's damages on a player, sent as HIT to the shooter alone, drawn as dot-ui's `DotHitMarker` and zee's red burst on the body (`ZeeShotFx.play_body_hit`, called by `has_method` so an older pack still runs). It tells a hunter that a disguised prop was hit, which the health the hunter does not lose already says, so it gives nothing away. `headless_run` checks the marker.
+

@@ -4,7 +4,7 @@ Hide as the furniture. Most players are props, who look at something on the map 
 
 Read the family-wide conventions in [`../../CLAUDE.md`](../../CLAUDE.md) first, and each addon's own `CLAUDE.md` before working in it. This file is only about what this game decides. The maps are in `maps/`, a link to [mg-prop-hunt-maps](../mg-prop-hunt-maps), written by its `tools/build_maps.py`; `maps/README.md` is the format.
 
-**Built 2026-10-09 from mg-deathrun's skeleton** (module, services, wire, client, HUD, spectate, progress, avatars, figure, vote, renamed `dr` → `ph` and then rewritten wherever they named a course, a trap or an activator). Where a comment says "mg-wipeout found…" or "mg-smash-copter found…", the finding is that game's and the line was kept because it is still true here.
+Built from mg-deathrun's skeleton; a comment naming another game's finding is that game's, kept because it still holds ([history](docs/history.md#the-first-days-2026-10-09-to-10-11)).
 
 ## Read before
 
@@ -62,7 +62,7 @@ Short forms; the reasoning is in the linked file.
 - A lock or a tilt is the server's, asked for and announced; a tilt is made on a copy and a changed hull goes through `_make_room`. [design](docs/design.md#decision-1-a-disguise-is-a-hull-not-a-look)
 - A leant prop turns about its box's middle and rests on the floor: hull `standing_hull`, model `model_transform`, hitbox `box_transform` (dot-props 4); never `Transform3D(prop_basis(), feet)`. `headless_run` turns every prop six ways. [design](docs/design.md#decision-1-a-disguise-is-a-hull-not-a-look)
 - The blindfold is true on the wire: `PhInterest` sends a hunter no prop during the hide (every snapshot, no linger), and DISGUISE events reach a hunter only when the seek starts (`PhNetBridge._on_disguise_changed`, `_on_phase_changed`). [design](docs/design.md#decision-2-the-blindfold-is-true-on-the-wire)
-- **A READY before the player is seated is kept** (`_ready_unseated` in the bridge) and answered by `add_player`: over ENet with loss it overtakes the link's `loaded`, and a dropped READY left the client waiting for ever. `headless_net` sends it first (armed). [history](docs/history.md)
+- **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - `net_max_health` is 14 bits: 12 made a chair's 98 health 97.9 on the client. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
 **Hunters, decoys and stand-ins**
@@ -72,13 +72,13 @@ Short forms; the reasoning is in the linked file.
 - Stand-ins are `ph_bots.gd` on dot-bot (`DotBotNav`, `DotBotHiding`, `DotBotSearch`, `DotBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing. Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
 - A stand-in prop never hops while disguised (a sink in mid-air), and "hurt" is health lost under the same disguise (a new disguise's maximum is no shot). [bots](docs/bots.md#a-prop-hides-as-what-belongs-there)
 - The drawn gun holds only what the server armed (`PhClient._arm_locally` gives each `player_armed` weapon; never `give_everything`); one hunter weapon per slot (`PhGame.hunter_slot_clash` warns). [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
-- B is a hunter's loadout (dot-menu's over dot-loadout's `DotLoadoutCommand`; primary and secondary from `ph_loadout.gd`, defaults `hunter_weapons`, alternatives `hunter_choices`, owner's `mp_loadout_*` bound by the module); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round; the kit's primary is armed first. No grenades: nothing simulates a thrown weapon yet. [design](docs/design.md#a-hunters-loadout-and-aiming)
-- Right mouse aims down the sights (`PhBindings.AIM`), quick melee is F; the lens zooms from `PhClient.base_fov` (the menu's field of view binds there, never to the camera), the dot fades by `DotCrosshair.opacity_for_aim`. Presentation only. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- B is a hunter's loadout (dot-loadout's `DotLoadoutCommand`, `ph_loadout.gd`, owner's `mp_loadout_*`); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round. No grenades yet. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- Right mouse aims down the sights (`PhBindings.AIM`; quick melee F), presentation only; the lens zooms from `PhClient.base_fov`, where the menu's field of view binds, never the camera. [design](docs/design.md#a-hunters-loadout-and-aiming)
 - `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s: offline from the world's rig (`headless_run`), online from the owner-only `net_magazine`/`net_reserve` (`headless_net`), both armed. [hud](docs/hud.md)
-- **A hit is the server's word** (`PhGame.hit_landed` from each weapon shot's damages on a player, sent as HIT to the shooter alone): dot-ui's `DotHitMarker` and zee's red burst on the body (`ZeeShotFx.play_body_hit`, by `has_method`). It tells a hunter that a disguised prop was hit, as the health it takes already does. `headless_run` checks the marker.
+- **A hit is the server's word** (`PhGame.hit_landed`, HIT to the shooter alone): the hit marker and zee's red burst on the body; `headless_run` checks the marker. [hud](docs/hud.md#a-hit)
 - Offline, the client's buttons go onto the world's own sample through `PhPlayer.command_stamp` (set in `PhClient._adopt`); never stamp `controller.current_command` for the world. [history](docs/history.md#offline-no-hunters-shot-ever-landed-2026-10-12)
 - The furniture is one static body, so nothing a hunter does moves a prop out of the box the decoy check reads. [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
-- Breakable furniture (`props/kits.json` "breaks", measured into the catalogue) breaks once the shots on it add up: `PhMap.break_prop` disables its shapes and hides its drawn instances, the decoy is still charged, BROKEN tells every client (a joiner quietly), and a round restores everything on both ends. Debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
+- Breakable furniture (`props/kits.json` "breaks") breaks once the shots add up (`PhMap.break_prop`), still charged as a decoy; BROKEN tells every client, a round restores it; debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
 
 - A death's fall is the server's (`PhGame.decide_death` on `player.death`, last and optional on DEATH); the client draws it (`PhClient._fall`): a person (hunter, undisguised prop) as dot-player-char's ragdoll under `sv_ragdoll*` (bound REPLICATED, followed), a disguised prop pops into its own pieces (`prop_death` 0; 1 topples it, 2 hides it), a hunter the furniture finished still breaks (`hunter_break`). [design](docs/design.md#a-death)
 
@@ -91,8 +91,8 @@ Short forms; the reasoning is in the linked file.
 
 **HUD and menus**
 
-- The HUD is dot-ui's pieces (`DotScoreStrip`, `DotKeyPrompt`, `DotVitals`, `DotAmmoCounter`) in the menu's theme and HUD size, live (`PhHud.follow_menu`, dot-menu's `follow_hud` by name); `PhHud.piece_theme()` is the accent only (the map blue), never plate, text or ink, and the HUD's Labels set no colour of their own except accent lines; the health plate ends above the chat box's full log. The pack needs dot-ui 4 (`requires.json`). [hud](docs/hud.md)
-- **Sound follows the map document**: each box's `mat` is its collision shape's `surface` meta (footsteps by surface, dot-audio's `DotAudioFootsteps`), every `ceiling`/`roof` box is an indoor ambience zone, and the outdoor bed and ground come from `PhAudio.MAP_SOUND` or the document's `ambience`/`surface`. Levels are measured with `addons/dot_audio/tools/loudness.sh` (−17 LUFS band, `loudness_trim_db`).
+- The HUD is dot-ui's pieces in the menu's theme and HUD size (`PhHud.follow_menu`); `PhHud.piece_theme()` is the accent only, Labels set no colour of their own but accent lines, the health plate ends above a full chat log; needs dot-ui 4. [hud](docs/hud.md)
+- **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `PhAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [hud](docs/hud.md#sound)
 - **H is help and M is the map list** (dot-menu's stock keys): nothing in `PhBindings` may default to either; `headless_run` and `dedicated` check it. A map choice never reaches `_on_taunt_picked`. [hud](docs/hud.md)
 
 **Maps and drawing**
@@ -132,7 +132,7 @@ tools/shot.sh --view=round --seconds=4 --ph-minimum-players=7 --ph-map-ids=ph_sc
 godot --headless --path . --script tools/measure_props.gd -- --check   # catalogue matches the models
 ```
 
-`headless_run`'s and `headless_net`'s totals were wrong when first written and both fired; `headless_maps` was armed with a spawn put inside the practice kitchen's chair. Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice house only, as mg-deathrun's headless_courses does, and says so.
+Without `maps/` linked in (CI clones this repository alone) `headless_maps` checks the practice house only, and says so.
 
 ## Still to do
 
