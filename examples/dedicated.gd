@@ -14,7 +14,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 10
-const CHECKS := 59
+const CHECKS := 61
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -51,7 +51,7 @@ func _run() -> void:
 
 	if server != null and server.state == DotServer.State.RUNNING:
 		await _test_the_module_loads()
-		_test_the_commands()
+		await _test_the_commands()
 		await _test_a_round_runs()
 		await _test_a_reload_keeps_delivered_maps()
 		await _test_the_map_vote()
@@ -223,6 +223,21 @@ func _test_the_commands() -> void:
 		"mp_teammate_passthrough is replicated: a client is sent the server's level",
 		str(server.console.replicated_values()))
 	var _one := _run_command("mp_teammate_passthrough 1")
+
+	# B's server half: `loadout` and the owner's three cvars, enforced by the world's manager.
+	_check(server.console.find_command("loadout") != null and server.console.find_cvar("mp_loadout_menu") != null
+		and server.console.find_cvar("mp_loadout_allow") != null and server.console.find_cvar("mp_loadout_fixed") != null,
+		"the server has the hunters' loadout command and the owner's mp_loadout_* cvars")
+	var _fixed := _run_command("mp_loadout_fixed primary=shotgun")
+	var _off := _run_command("mp_loadout_menu 0")
+	var locked: DotResult = await game.loadouts.active_for(game.storage_key(&"u999"))
+	var typo := _run_command("mp_loadout_allow barrel=smg")
+	_check(locked.ok and (locked.value as DotLoadout).item_in(&"primary") == &"shotgun"
+		and server.console.find_cvar("mp_loadout_allow").get_string() == "",
+		"locked by the owner every hunter carries the fixed shotgun, and a slot that does not exist is refused",
+		str(typo))
+	var _on := _run_command("mp_loadout_menu 1")
+	var _free := _run_command("mp_loadout_fixed \"\"")
 	_finished()
 
 

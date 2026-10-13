@@ -32,6 +32,7 @@ game/
   ph_game.gd         the simulation: the draw, hide/seek, disguises, taunts, decoys, beacons
   ph_bots.gd         the stand-ins: hide as what belongs there, search, test what looks wrong
   ph_rules.gd        a DotMatchRules whose outcome is whatever PhGame decided
+  ph_loadout.gd      a hunter's loadout as dot-loadout data (B)
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
   ph_client.gd       one local player, alone or against a server; third person as a prop
@@ -71,6 +72,8 @@ Short forms; the reasoning is in the linked file.
 - Stand-ins are `ph_bots.gd` on dot-bot (`DotBotNav`, `DotBotHiding`, `DotBotSearch`, `DotBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing. Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
 - A stand-in prop never hops while disguised (a sink in mid-air), and "hurt" is health lost under the same disguise (a new disguise's maximum is no shot). [bots](docs/bots.md#a-prop-hides-as-what-belongs-there)
 - The drawn gun holds only what the server armed (`PhClient._arm_locally` gives each `player_armed` weapon; never `give_everything`); one hunter weapon per slot (`PhGame.hunter_slot_clash` warns). [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
+- B is a hunter's loadout (dot-menu's over dot-loadout's `DotLoadoutCommand`; primary and secondary from `ph_loadout.gd`, defaults `hunter_weapons`, alternatives `hunter_choices`, owner's `mp_loadout_*` bound by the module); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round; the kit's primary is armed first. No grenades: nothing simulates a thrown weapon yet. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- Right mouse aims down the sights (`PhBindings.AIM`), quick melee is F; the lens zooms from `PhClient.base_fov` (the menu's field of view binds there, never to the camera), the dot fades by `DotCrosshair.opacity_for_aim`. Presentation only. [design](docs/design.md#a-hunters-loadout-and-aiming)
 - `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s: offline from the world's rig (`headless_run`), online from the owner-only `net_magazine`/`net_reserve` (`headless_net`), both armed. [hud](docs/hud.md)
 - **A hit is the server's word** (`PhGame.hit_landed` from each weapon shot's damages on a player, sent as HIT to the shooter alone): dot-ui's `DotHitMarker` and zee's red burst on the body (`ZeeShotFx.play_body_hit`, by `has_method`). It tells a hunter that a disguised prop was hit, as the health it takes already does. `headless_run` checks the marker.
 - Offline, the client's buttons go onto the world's own sample through `PhPlayer.command_stamp` (set in `PhClient._adopt`); never stamp `controller.current_command` for the world. [history](docs/history.md#offline-no-hunters-shot-ever-landed-2026-10-12)
@@ -103,7 +106,7 @@ Short forms; the reasoning is in the linked file.
 - No `class_name` anywhere in `game/`: a mounted pack cannot register one. [delivery](docs/delivery.md)
 - `game.yml` does not name the maps pack; the owner names it in dot-server-deploy's `cfg/content.yml`, and `PhModule._add_delivered_maps` mounts it at load and after `ph_reload`. [delivery](docs/delivery.md)
 - Under MANUAL `PhVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after `_add_delivered_maps`; `dedicated` arms both. [delivery](docs/delivery.md)
-- dot-props (4), dot-bot (2), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4) and dot-menu must be tagged and in the client shell before publishing. [delivery](docs/delivery.md)
+- dot-props (4), dot-bot (2), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4), dot-loadout (2, B) and dot-menu (6, B) must be tagged and in the client shell before publishing. [delivery](docs/delivery.md)
 - `project.godot` carries no comments; `PhConfig.gravity` goes onto the world's own space (a project setting does not travel in a pack); the renderer is `gl_compatibility`. [delivery](docs/delivery.md#project-settings)
 - A shell that lacks an addon, or a stale class cache, fails the delivered client's parse: dot-server-deploy's `prophunt_client` finds it. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
@@ -119,6 +122,8 @@ tools/camera_check.sh --render     # cameras round the house (armed), mp_forcevi
 tools/shot.sh --view=room --ph-map-ids=ph_school --at=-38,1.7,3.5 --look=-26,0.8,14
 tools/shot.sh --view=prop --as=furniture_chair_cushion --ph-map-ids=ph_house
 tools/shot.sh --view=blind
+tools/shot.sh --view=hunter --aim --name=hunter_aimed     # down the sights
+tools/shot.sh --view=loadout                             # B open in the hide
 tools/shot.sh --view=hunter --board --name=board
 tools/shot.sh --view=round --seconds=4 --ph-minimum-players=7 --ph-map-ids=ph_school --ph-hide-seconds=14
 godot --headless --path . --script tools/measure_props.gd -- --check   # catalogue matches the models

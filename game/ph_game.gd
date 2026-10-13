@@ -13,6 +13,7 @@ const PhSpectate := preload("ph_spectate.gd")
 const PhBots := preload("ph_bots.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
+const PhLoadout := preload("ph_loadout.gd")
 
 ## The simulation. Headless, authoritative, and the only thing that decides anything.
 ##
@@ -124,6 +125,16 @@ var progress: PhProgress = null
 var taunts: DotPropTaunts = null
 var rules: DotPropDisguiseRules = null
 
+## A hunter's loadout (dot-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed
+## by [method storage_key]. Null on a world that keeps none.
+var loadouts: DotLoadoutManager = null
+
+## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its
+## `loadout_menu` notice and the owner's `mp_loadout_*` cvars, which the module binds. Solo the
+## client asks it directly. Untyped and loaded by path because a host whose dot-loadout predates
+## API 2 has no such class; null there, and B is not offered.
+var loadout_command: Object = null
+
 ## player id -> PhPlayer.
 var players: Dictionary = {}
 
@@ -198,6 +209,7 @@ func _ready() -> void:
 	_build_props()
 	_build_map()
 	_build_combat()
+	_build_loadouts()
 	_build_effects()
 	_build_match()
 	_build_spectate()
@@ -895,16 +907,100 @@ func _arm_hunters() -> void:
 		DotLog.warn(CHANNEL, "two hunter weapons share a slot, so only the last is carried", {"weapons": clash})
 
 	for player in players_on(HUNTERS):
-		for weapon_id in config.hunter_weapons:
-			var _armed := arm(player, StringName(weapon_id))
+		# Not awaited: the round goes on into the hide, when a hunter is blindfolded and fires
+		# nothing, so a store that answers a frame late arms them before anything could tell.
+		# The memory store answers at once.
+		arm_hunter(player)
 
-		var first := StringName(config.hunter_weapons[0]) if not config.hunter_weapons.is_empty() else &""
 
-		if first != &"" and player.weapons != null:
-			var def := player.weapons.arsenal.catalogue.get_def(first)
-			if def != null:
-				var _selected := player.weapons.arsenal.select(def.slot, _tick)
-				player.wanted_slot = def.slot
+## Hands [param player] the config's melee and their loadout's primary and secondary (the
+## config's own when there is no loadout manager or nothing is saved), and draws the primary.
+func arm_hunter(player: PhPlayer) -> void:
+	var kit := config.hunter_weapons
+	if loadouts != null:
+		var res: DotResult = await loadouts.active_for(storage_key(player.player_id))
+		if res.ok:
+			kit = PhLoadout.hunter_kit(config.hunter_weapons, loadouts.resolve(res.value))
+	if not is_instance_valid(player) or team_of(player.player_id) != HUNTERS:
+		return
+
+	for weapon_id in kit:
+		var _armed := arm(player, StringName(weapon_id))
+
+	# The first of the kit in hand: the loadout's primary, or the config's first without one.
+	var first := StringName(kit[0]) if not kit.is_empty() else &""
+
+	if first != &"" and player.weapons != null:
+		var def := player.weapons.arsenal.catalogue.get_def(first)
+		if def != null:
+			var _selected := player.weapons.arsenal.select(def.slot, _tick)
+			player.wanted_slot = def.slot
+
+
+# --- The loadout (B) ----------------------------------------------------------
+
+const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loadout_command.gd"
+
+
+## The hunters' loadouts: dot-loadout's manager on a memory store (a server forgets them on a
+## restart; the client remembers its own choice and sends it again on join), and the B menu's
+## server half where the host's dot-loadout has it (API 2).
+func _build_loadouts() -> void:
+	loadouts = DotLoadoutManager.new()
+	loadouts.name = "Loadouts"
+	loadouts.schema = PhLoadout.schema(config.hunter_weapons, config.hunter_choices)
+	loadouts.register_service = false
+	var lc := DotLoadoutConfig.new()
+	lc.backend = "memory"
+	lc.allow_default_loadout = true
+	lc.conform_on_load = true
+	loadouts.config = lc
+	loadouts.config_file = ""
+	loadouts.load_layered_config = false
+	loadouts.store = DotLoadoutStoreMemory.new()
+	add_child(loadouts)
+
+	if DotAddonApi.build_level("dot_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT):
+		return
+	loadout_command = (load(LOADOUT_COMMAND_SCRIPT) as GDScript).new()
+	loadout_command.set(&"manager", loadouts)
+	# The player a command came from: the session's userid, which names this game's player.
+	loadout_command.set(&"key_fn", func(ctx: Object) -> String:
+		var session: Variant = ctx.get(&"session") if ctx != null else null
+		return storage_key(StringName("u%d" % int((session as Object).get(&"userid")))) if session is Object else "")
+	loadout_command.set(&"applied_fn", func(_ctx: Object, key: String) -> bool:
+		return await rearm_if_allowed(player_id_of_key(key)))
+
+
+## The loadout key of [param player_id]: `ph-hunter-<id>`, with anything a key may not hold made
+## an underscore (dot-loadout keys are letters, digits and `-_.:`, at least eight long).
+static func storage_key(player_id: StringName) -> String:
+	var out := "ph-hunter-"
+	for c in String(player_id):
+		out += c if (c.is_valid_identifier() or c.is_valid_int() or c == "-") else "_"
+	return out
+
+
+## The player id a loadout key names, or &"".
+static func player_id_of_key(key: String) -> StringName:
+	return StringName(key.trim_prefix("ph-hunter-")) if key.begins_with("ph-hunter-") else &""
+
+
+## Whether a new loadout goes into [param id]'s hands now rather than next round: a hunter during
+## the hide, blindfolded, before anything has been fired. Later it would be a free reload in the
+## middle of the seek. A prop's choice waits for the round they hunt.
+func loadout_now_allowed(id: StringName) -> bool:
+	var player: PhPlayer = players.get(id)
+	return player != null and player.is_alive() and team_of(id) == HUNTERS and phase == Phase.HIDE
+
+
+## Arms [param id] with their saved loadout when [method loadout_now_allowed]. True when it did.
+func rearm_if_allowed(id: StringName) -> bool:
+	if not authoritative or not loadout_now_allowed(id):
+		return false
+	await arm_hunter(players[id])
+	DotLog.debug(CHANNEL, "loadout handed over at once", {"player": String(id)})
+	return true
 
 
 ## The hunter weapons in [param ids] that share a slot with an earlier one, as "a/b" pairs, or

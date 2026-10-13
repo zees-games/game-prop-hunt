@@ -33,6 +33,12 @@ cvars:
   ph_players_per_hunter: "3"
   ph_bots: "1"
   bot_quota: "3"
+  # Hunters choose a primary and a secondary on B. An owner restricts them in their
+  # cfg/content.yml (docs/design.md "A hunter's loadout and aiming"), for example shotguns only:
+  #   mp_loadout_allow: "primary=shotgun"
+  # or one kit for every hunter, chosen by nobody:
+  #   mp_loadout_menu: "0"
+  #   mp_loadout_fixed: "primary=smg secondary=pistol"
 
 # This game's maps are small documents the server sends each client, so a host fetches the
 # map packs its server owner names BEFORE the game loads (into the server-only packs)

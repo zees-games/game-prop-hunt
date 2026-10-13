@@ -177,6 +177,12 @@ func _game_load() -> DotResult:
 
 	_build_vote(world)
 
+	# B, a hunter's loadout: `/loadout` and its notice, and the owner's mp_loadout_menu,
+	# mp_loadout_allow and mp_loadout_fixed (dot-loadout's DotLoadoutCommand). Absent on a host
+	# whose dot-loadout predates it, and then B says the server did not answer.
+	if world.loadout_command != null:
+		world.loadout_command.call(&"bind", self)
+
 	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
 	# held. REPLICATED, because each client places its own camera under it.
 	var _views := world.view_rules.bind_cvars(

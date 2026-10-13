@@ -10,6 +10,8 @@
 #   tools/shot.sh --view=round --seconds=5 --ph-minimum-players=7 # a round in progress: stand-ins hid on the clock, a hunter seeking
 #   tools/shot.sh --view=hunter --board                           # with the Tab scoreboard open
 #   tools/shot.sh --view=hunter --fire=12 --aim-prop              # trigger held (slowed) at the nearest furniture: flash, tracers, impacts, the counter, a decoy's cost
+#   tools/shot.sh --view=hunter --aim --name=hunter_aimed        # down the sights (compare --view=hunter)
+#   tools/shot.sh --view=loadout                                  # B open in the hide: a hunter's loadout
 #   tools/shot.sh --view=overview --out=res://screenshots/x.png   # any --ph-* is the game's config
 #
 # xvfb-run because this needs a rendering context: `--headless` gives a null renderer and saves
@@ -30,7 +32,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --ph-*)      config+=("$arg") ;;
-        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop) extra+=("$arg") ;;
+        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop|--aim) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

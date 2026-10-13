@@ -23,9 +23,9 @@ const PhSettings := preload("../game/ph_settings.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 24
+const SECTIONS := 25
 
-const CHECKS := 118
+const CHECKS := 125
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -78,6 +78,7 @@ func _run() -> void:
 	await _test_the_map_menu()
 	await _test_offline_trigger()
 	await _test_hunter_weapons()
+	await _test_hunter_loadout()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -723,6 +724,7 @@ func _test_the_client() -> void:
 	_section("the client boots offline: the keys, the HUD, the taunt list, the board")
 	var client: Node = (load("res://game/ph_client.gd") as GDScript).new()
 	client.set(&"force_offline", true)
+	client.set(&"remember_loadout", false)
 	client.set(&"config_file", "user://cfg/headless-none.json")
 	add_child(client)
 
@@ -758,6 +760,19 @@ func _test_the_client() -> void:
 	var hud: Node = client.get("hud")
 	var me: PhPlayer = client.get("player")
 	hud.call("_process", 0.0)
+	# Down the sights the dot fades with the aim (dot-ui's curve), and a scope hides it.
+	hud.call("set_aim", 0.0, false)
+	var hip: float = (hud.get("_crosshair") as Control).modulate.a
+	hud.call("set_aim", 1.0, false)
+	var aimed: float = (hud.get("_crosshair") as Control).modulate.a
+	hud.call("set_aim", 1.0, true)
+	var scope: Control = hud.get("scope")
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or DotAddonApi.build_level("dot_ui") < 5)
+		and (hud.get("_crosshair") as Control).modulate.a == 0.0 and is_equal_approx(float(scope.get("fraction")), 1.0)
+		and bool(hud.get("loadout_offered")) == (client.get("loadout_menu") != null),
+		"the crosshair is whole at the hip, gone down the sights, a scope replaces it; B is named when offered",
+		"hip %.2f aimed %.2f" % [hip, aimed])
+	hud.call("set_aim", 0.0, false)
 	var strip: DotScoreStrip = hud.get("strip")
 	var vitals: DotVitals = hud.get("vitals")
 	_check(
@@ -853,6 +868,11 @@ func _test_help_and_menu() -> void:
 	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
+	# The right mouse button aims (the family's Aim row); zee's quick melee moved to F.
+	_check(keys.key_for(PhBindings.AIM) == "Mouse 2" and keys.defaults_on("Mouse 2").size() == 1
+		and keys.key_for(PhBindings.BASH) == "F" and keys.defaults_on("F").size() == 1,
+		"aim is the only row on the right mouse button, quick melee the only one on F",
+		"%s %s" % [keys.key_for(PhBindings.AIM), keys.key_for(PhBindings.BASH)])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "J")
 	_check(keys.key_for(PhBindings.CHAT) == "J" and DotInputBinding.describe_action(PhBindings.CHAT) == "J"
@@ -891,6 +911,7 @@ func _test_hunter_weapons() -> void:
 
 	var client: Node = (load("res://game/ph_client.gd") as GDScript).new()
 	client.set(&"force_offline", true)
+	client.set(&"remember_loadout", false)
 	client.set(&"config_file", "user://cfg/headless-none.json")
 	add_child(client)
 	for i in 8:
@@ -1195,3 +1216,48 @@ static func _spread(turns: Dictionary, ids: Array[StringName]) -> Vector2i:
 		lo = mini(lo, int(turns.get(id, 0)))
 		hi = maxi(hi, int(turns.get(id, 0)))
 	return Vector2i(lo, hi)
+
+
+## B, a hunter's loadout (dot-loadout's DotLoadoutCommand on the world's own manager, as the
+## solo client asks it): a primary and a secondary from the hunters' weapons, in the hands at
+## once while the hunters are blindfolded, and only from the next round once the seek is on.
+func _test_hunter_loadout() -> void:
+	_section("B: a hunter's loadout, handed over in the hide and kept for the next round in the seek")
+	var game := await _hide_round()
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	var cmd: Object = game.loadout_command
+	var ready := game.loadouts != null and cmd != null and DotLoadoutKey.is_usable(PhGame.storage_key(hunter.player_id))
+	_check(ready, "the world keeps loadouts, has the B menu's server half, and a usable key per player")
+	if not ready:
+		_finished()
+		return
+	var key := PhGame.storage_key(hunter.player_id)
+	var offer: Dictionary = await cmd.call(&"offer", key)
+	var choices := {}
+	var current := {}
+	for slot: Dictionary in offer.get("slots", []):
+		choices[slot["id"]] = (slot["choices"] as Array).map(func(c: Dictionary) -> String: return str(c["id"]))
+		current[slot["id"]] = str(slot["current"])
+	_check(choices.keys().size() == 2 and (choices.get("primary", []) as Array).has("shotgun")
+		and (choices.get("secondary", []) as Array).has("revolver") and not (choices.get("primary", []) as Array).has("hatchet")
+		and current.get("primary") == "smg" and current.get("secondary") == "pistol",
+		"the offer is a primary and a secondary from the hunters' weapons, the SMG and the pistol by default", str(choices))
+
+	var now: Dictionary = await cmd.call(&"choose", null, key, {"primary": "shotgun"})
+	var arsenal := hunter.weapons.arsenal if hunter.weapons != null else null
+	_check(bool(now.get("ok")) and bool(now.get("now")) and arsenal != null and arsenal.carries(&"shotgun")
+		and not arsenal.carries(&"smg") and arsenal.carries(&"pistol") and arsenal.carries(&"hatchet"),
+		"chosen in the hide, the shotgun is in the hunter's hands at once, beside the pistol and the hatchet", str(now))
+
+	await _wait_for(game, PhGame.Phase.SEEK)
+	var later: Dictionary = await cmd.call(&"choose", null, key, {"primary": "carbine"})
+	_check(bool(later.get("ok")) and not bool(later.get("now")) and arsenal.carries(&"shotgun"),
+		"chosen in the seek it waits: no free reload in the middle of a search", str(later))
+
+	game.wish_side(hunter.player_id, PhGame.HUNTERS)
+	game._on_round_started(game.round_number + 1)
+	await _step(game, 2)
+	arsenal = hunter.weapons.arsenal if hunter.weapons != null else null
+	_check(game.team_of(hunter.player_id) == PhGame.HUNTERS and arsenal != null and arsenal.carries(&"carbine")
+		and not arsenal.carries(&"shotgun"), "and the next round hands it out")
+	_finished()

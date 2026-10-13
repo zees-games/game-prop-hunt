@@ -14,6 +14,9 @@ extends RefCounted
 ## [b]H is help, in every game of the family[/b] (dot-menu adds the row), so nothing here
 ## may default to it.
 ##
+## [b]The right mouse button aims[/b] (zee's `ZeeViewModel.aim`), as in the arena; it was zee's
+## quick melee until 2026-10-12, which moved to F. [b]B is the hunter's loadout[/b] (dot-menu).
+##
 ## [b]Chat is two rows[/b] on dot-ui's chat window's own actions (Y to all, U to your side), so
 ## the help screen lists them and the Controls page moves them; until 2026-10-12 they were the
 ## window's defaults, on no page.
@@ -29,6 +32,11 @@ const TILT_LEFT := &"ph_tilt_left"
 const TILT_RIGHT := &"ph_tilt_right"
 const STRAIGHTEN := &"ph_straighten"
 const RELOAD := &"ph_reload"
+## A hunter's aim down the sights (right mouse, the family's Aim row): the view model comes up
+## and the lens zooms. Presentation only.
+const AIM := &"ph_aim"
+## A hunter's quick melee (zee's alt-fire), on F since the right mouse button aims.
+const BASH := &"ph_bash"
 const VIEW := &"ph_view"
 const SCOREBOARD := &"ph_scoreboard"
 ## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
@@ -53,10 +61,15 @@ static func make() -> DotMenuBindings:
 	keys.add(TILT_RIGHT, &"bind_tilt_right", "Lean right", "Right", "Props")
 	keys.add(STRAIGHTEN, &"bind_straighten", "Stand upright", "Z", "Props")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Hunters")
+	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Hunters")
+	keys.add(BASH, &"bind_bash", "Quick melee", "F", "Hunters")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Weapon slot %d" % (i + 1), str(i + 1), "Hunters")
 	keys.add(CHAT, &"bind_chat", "Chat", "Y", "Communication")
 	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
+	# B is a hunter's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
+	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
+		var _l: Variant = keys.call(&"add_loadout", "Hunters")
 	return keys

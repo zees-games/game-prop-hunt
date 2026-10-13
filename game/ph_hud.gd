@@ -75,6 +75,9 @@ var player: PhPlayer = null
 
 ## `func(action: StringName) -> String`: the key an action is on, from the bindings.
 var key_fn: Callable = Callable()
+## Whether B opens a hunter's loadout here (the client has dot-menu's loadout menu): the
+## blindfold and a hunter's hints then name its key.
+var loadout_offered: bool = false
 
 ## What a player who is out is looking at, and the keys that change it. Empty while playing.
 var watching_label: Label = null
@@ -110,6 +113,12 @@ var _meter_fill: ColorRect = null
 var _meter_label: Label = null
 var _blindfold_label: Label = null
 var _crosshair: ColorRect = null
+## Through a scoped gun at full aim: zee's circle and reticle (the gun is not drawn then).
+var scope: ZeeScopeOverlay = null
+## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
+var aim_fraction: float = 0.0
+## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
 var _shout_for: float = 0.0
 
 
@@ -130,6 +139,11 @@ func _build() -> void:
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_root)
 
+	# Under everything, the blindfold included: the scope is the view, the HUD reads over it.
+	scope = ZeeScopeOverlay.new()
+	scope.name = "Scope"
+	_root.add_child(scope)
+
 	blindfold = _cover("Blindfold", BLINDFOLD_COLOUR)
 	blind_overlay = _cover("Blind", BLIND_COLOUR)
 
@@ -137,8 +151,8 @@ func _build() -> void:
 	_blindfold_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_blindfold_label.offset_left = -520.0
 	_blindfold_label.offset_right = 520.0
-	_blindfold_label.offset_top = -40.0
-	_blindfold_label.offset_bottom = 40.0
+	_blindfold_label.offset_top = -60.0
+	_blindfold_label.offset_bottom = 60.0
 	_blindfold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_blindfold_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.45))
 
@@ -450,6 +464,9 @@ func _draw_hints(side: int) -> void:
 	else:
 		lines.append("Shoot the props. Shooting furniture hurts you.")
 		lines.append("%s  Reload   1-3  Weapons" % _key(PhBindings.RELOAD))
+		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
+		if loadout_offered:
+			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
 
 	_hints.text = "\n".join(lines)
 
@@ -493,6 +510,29 @@ func present_blind(delta: float) -> void:
 			# The strip's own words, so the two clocks on a hunter's screen never disagree by
 			# the second one rounds down and the other up.
 			_blindfold_label.text = "Blindfolded while the props hide\n%s" % DotScoreStrip.clock_text(left)
+			# The hide is when a new loadout goes straight into the hands (PhGame.rearm_if_allowed).
+			if loadout_offered:
+				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"dot_menu_loadout")
+
+
+## The aim this frame, from the client: the dot fades out as the gun comes up (dot-ui's
+## `DotCrosshair.opacity_for_aim`, the arena's curve) and a scope hides it for its own reticle.
+func set_aim(fraction: float, scoped: bool) -> void:
+	aim_fraction = clampf(fraction, 0.0, 1.0) if is_finite(fraction) else 0.0
+	if scope != null:
+		scope.fraction = aim_fraction if scoped else 0.0
+	if _crosshair != null:
+		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
+
+
+## How much of the dot [param fraction] leaves: dot-ui's curve where the host has it, else the
+## dot stays (an older shell had no aim to fade for).
+func crosshair_opacity(fraction: float) -> float:
+	if not _fades:
+		return 1.0
+	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
+	var crosshair: Variant = DotCrosshair
+	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
 
 
 func is_blind() -> bool:

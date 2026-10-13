@@ -41,6 +41,9 @@ const CHASE_UP := 0.8
 
 @export var config_file: String = "user://cfg/prophunt.json"
 @export var force_offline: bool = false
+## Whether B's choice is remembered on this device and sent again on the next join. A suite or a
+## render turns it off: neither may write, or read back, a player's real choice.
+@export var remember_loadout: bool = true
 
 ## How many stand-ins an offline round gets.
 @export_range(0, 12, 1) var offline_bots: int = 5
@@ -82,6 +85,13 @@ var _started_msec: int = Time.get_ticks_msec()
 
 var _firing: bool = false
 var _alt: bool = false
+## The Aim key held (`PhBindings.AIM`, right mouse): a hunter's view model comes up and the
+## lens zooms. Presentation only.
+var _aiming: bool = false
+
+## The lens before an aim zooms it: the menu's field of view lands here, not on the camera, so
+## the zoom always scales the player's own setting and never compounds frame to frame.
+var base_fov: float = 90.0
 var _reloading: bool = false
 var _slot: int = 0
 
@@ -296,12 +306,14 @@ func _adopt(candidate: PhPlayer) -> void:
 		player.command_stamp = _stamp
 
 	if settings != null:
-		settings.bind_camera(camera)
+		settings.bind_camera(self, &"base_fov")
 		if player.sampler != null:
 			settings.bind_look(player.sampler.tunables)
 
 	if hud != null:
 		hud.bind(game, player)
+
+	_restore_loadout.call_deferred()
 
 
 ## Third person for a prop, first for a hunter — unless the player chose with F5 this round.
@@ -750,6 +762,79 @@ func _wire_maps() -> void:
 		func(id: StringName) -> DotResult: return game.change_map_now(id))
 
 
+# --- The loadout menu (B) -----------------------------------------------------
+
+## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
+var loadout_menu: Object = null
+var _loadout_restored := false
+
+const WEAPON_CARDS_SCRIPT := "res://addons/zee_weapons/content/zee_weapon_cards.gd"
+const WEAPON_ICON_DIR := "res://assets/weapon_icons"
+var _weapon_cards: Script = null
+var _weapon_defs: Dictionary = {}
+
+
+## B: a hunter's primary and secondary, as cards with zee's numbers. Solo the world's own
+## loadouts answer; connected the server does (dot-loadout's `/loadout`), under the owner's
+## `mp_loadout_*` rules. A prop may choose too: it is kept for the round they hunt. Guarded on
+## the host's dot-menu and dot-loadout levels, so an older client shell runs the game without it.
+func _use_loadout_menu() -> void:
+	if DotAddonApi.build_level("dot_menu") < 6 or DotAddonApi.build_level("dot_loadout") < 2:
+		return
+	if settings == null or not settings.has_method(&"use_loadout"):
+		return
+	loadout_menu = settings.call(&"use_loadout", loadout_offer, choose_loadout, decorate_loadout_choice)
+	if loadout_menu != null:
+		loadout_menu.set(&"title", "Hunter's loadout")
+		loadout_menu.call(&"remember_as", "prophunt" if remember_loadout else "", "local")
+		if hud != null:
+			hud.loadout_offered = true
+
+
+## Solo: what this player may pick, from the world's own manager.
+func loadout_offer() -> Variant:
+	if game == null or game.loadout_command == null or player == null:
+		return DotResult.fail(DotError.CODE_STATE, "Join the round first.")
+	return await game.loadout_command.call(&"offer", PhGame.storage_key(player.player_id))
+
+
+## Solo: saves [param picks], and hands them over now while the hunters are blindfolded.
+func choose_loadout(picks: Dictionary) -> Variant:
+	if game == null or game.loadout_command == null or player == null:
+		return DotResult.fail(DotError.CODE_STATE, "Join the round first.")
+	return await game.loadout_command.call(&"choose", null, PhGame.storage_key(player.player_id), picks)
+
+
+## A card's picture (the copied weapon silhouettes) and numbers (zee's `ZeeWeaponCards`, zee API 3).
+func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary:
+	var id := StringName(str(choice.get("id", "")))
+	if _weapon_cards == null and DotAddonApi.build_level("zee_weapons") >= 3 and ResourceLoader.exists(WEAPON_CARDS_SCRIPT):
+		_weapon_cards = load(WEAPON_CARDS_SCRIPT) as Script
+	if _weapon_defs.is_empty():
+		for def in ZeeWeaponPack.weapons():
+			_weapon_defs[def.id] = def
+	var out: Dictionary = {}
+	# The weapon's silhouette: game-arena's `tools/build_weapon_icons.sh` renders, copied for the
+	# guns a hunter is offered. A gun an owner adds without one is drawn as its letters.
+	var icon_path := "%s/%s.png" % [WEAPON_ICON_DIR, String(id)]
+	if ResourceLoader.exists(icon_path):
+		out["icon"] = load(icon_path)
+	if _weapon_cards != null and _weapon_defs.has(id):
+		var card: Variant = _weapon_cards.call(&"card", _weapon_defs[id])
+		if card is Dictionary:
+			out.merge(card as Dictionary)
+	return out
+
+
+## Sends the choice this player saved last time, once per join: solo into the world's manager,
+## connected to the server.
+func _restore_loadout() -> void:
+	if loadout_menu == null or _loadout_restored:
+		return
+	_loadout_restored = true
+	var _sent: Variant = await loadout_menu.call(&"restore")
+
+
 func _wire_board() -> void:
 	if settings == null or settings.menu == null:
 		return
@@ -937,6 +1022,7 @@ func _build_settings() -> void:
 		_bind_bot_console()
 		_wire_board()
 		_wire_maps()
+		_use_loadout_menu()
 
 
 func _build_break_rules() -> void:
@@ -970,6 +1056,8 @@ func _capture() -> void:
 func _release() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_captured = false
+	# The button's release goes to the menu, so the aim is let go here or it sticks up.
+	_aiming = false
 
 
 # --- Asking ----------------------------------------------------------------
@@ -1180,6 +1268,8 @@ func _process(delta: float) -> void:
 	if camera == null or player == null:
 		return
 
+	_present_aim()
+
 	if _drive_spectator_camera():
 		_present_effects(delta)
 		return
@@ -1204,6 +1294,21 @@ func _process(delta: float) -> void:
 		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != DotFpsState.Mode.AIR, state.crouch_fraction > 0.5)
 
 	_present_effects(delta)
+
+
+## Down the sights: a hunter's hands come up while the Aim key is held, the lens zooms by what
+## the weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the
+## HUD fades its dot and shows a scope. Nobody aims as a prop, dead, blindfolded, watching, in
+## third person or with the pointer free. Presentation only, as in the arena.
+func _present_aim() -> void:
+	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
+	var blind := hud != null and hud.is_blindfolded()
+	if hands != null:
+		hands.aim(_aiming and _captured and is_hunter() and not third_person and not is_spectating()
+			and player.is_alive() and not blind)
+	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
+	if hud != null:
+		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
 
 
 ## The last seconds of the hide, beeped.
@@ -1390,6 +1495,10 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	if event.is_action_released(PhBindings.RELOAD):
 		_reloading = false
+	if event.is_action_released(PhBindings.AIM):
+		_aiming = false
+	if event.is_action_released(PhBindings.BASH):
+		_alt = false
 
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
@@ -1406,7 +1515,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		if button.button_index == MOUSE_BUTTON_LEFT:
 			_firing = button.pressed and is_hunter()
-		elif button.button_index == MOUSE_BUTTON_RIGHT:
+		elif button.is_action(PhBindings.AIM):
+			_aiming = button.pressed and is_hunter()
+		elif button.is_action(PhBindings.BASH):
 			_alt = button.pressed and is_hunter()
 
 	if player == null:
@@ -1434,6 +1545,14 @@ func _key_pressed(event: InputEvent) -> bool:
 	if is_hunter():
 		if event.is_action_pressed(PhBindings.RELOAD):
 			_reloading = true
+			return true
+
+		if event.is_action_pressed(PhBindings.AIM):
+			_aiming = true
+			return true
+
+		if event.is_action_pressed(PhBindings.BASH):
+			_alt = true
 			return true
 
 		for i in range(PhBindings.SLOTS.size()):

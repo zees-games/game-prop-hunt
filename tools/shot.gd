@@ -22,6 +22,8 @@ var _fire_frames := 0
 ## `--aim-prop`: the hunter faces the nearest piece of furniture (`furniture_*`, a decoy to shoot).
 var _aim_prop := false
 var _client: Node = null
+## --aim: the Aim key held for the frame (down the sights; a scope through a scoped gun).
+var _aim := false
 
 
 func _ready() -> void:
@@ -42,6 +44,8 @@ func _ready() -> void:
 			_look = _v3(arg.trim_prefix("--look="))
 		elif arg == "--aim-prop":
 			_aim_prop = true
+		elif arg == "--aim":
+			_aim = true
 		elif arg.begins_with("--fire="):
 			_fire_frames = arg.trim_prefix("--fire=").to_int()
 		elif arg.begins_with("--as="):
@@ -50,6 +54,7 @@ func _ready() -> void:
 	_client = PhClient.new()
 	_client.name = "Client"
 	_client.set("force_offline", true)
+	_client.set("remember_loadout", false)
 	add_child(_client)
 	_run.call_deferred()
 
@@ -63,7 +68,7 @@ func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
 	var local = _client.get("player")
-	var hunter := _view in ["hunter", "blind", "round"]
+	var hunter := _view in ["hunter", "blind", "round", "loadout"]
 
 	# The person at this keyboard on the side the view is about; one stand-in on the other.
 	var other_side_drawn := false
@@ -107,6 +112,15 @@ func _run() -> void:
 			await _seconds_of(_seconds)
 		"blind":
 			await _seconds_of(1.0)
+		"loadout":
+			# B in the hide, blindfolded, when a choice goes straight into the hands.
+			await _seconds_of(0.5)
+			var menu: Variant = _client.get("loadout_menu")
+			if menu == null:
+				print("no loadout menu on this host")
+			else:
+				await menu.call(&"open")
+				await _seconds_of(_seconds)
 		"round":
 			# A round in progress: the stand-ins hide on the round's own clock, then the seek
 			# runs [code]--seconds[/code]; from the hunter's eyes, or from [code]--at[/code].
@@ -142,6 +156,15 @@ func _run() -> void:
 					local.sampler.yaw = local.controller.state.yaw
 					local.sampler.pitch = local.controller.state.pitch
 			await _seconds_of(_seconds)
+			if _aim:
+				# The pointer is never captured under xvfb; the client aims only while it is.
+				_client.set("_captured", true)
+				_client.set("_aiming", true)
+				await _seconds_of(0.8)
+				var hud: Node = _client.get("hud")
+				var camera: Camera3D = _client.get("camera")
+				print("aimed: crosshair %.2f scope %.2f fov %.1f" % [(hud.get("_crosshair") as Control).modulate.a,
+					float((hud.get("scope") as Control).get("fraction")), camera.fov])
 			# Still held when the picture is taken: a flash lasts a few frames.
 			# Slowed, because a software renderer draws a few frames a second and a flash lasts a
 			# few hundredths of one: at full speed every flash was over before a frame was drawn.

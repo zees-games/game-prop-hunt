@@ -142,6 +142,13 @@ extends DotConfig
 ## a primary, so it replaces the SMG, not joins it. `PhGame._arm_hunters` warns of a clash.
 @export var hunter_weapons: PackedStringArray = PackedStringArray(["smg", "pistol", "hatchet"])
 
+## What else a hunter may pick on B (dot-menu's loadout), by id: primaries and sidearms only
+## (`ph_loadout.gd`); [member hunter_weapons]' primary and sidearm are the defaults and are always
+## offered. An owner narrows or locks it with dot-loadout's `mp_loadout_*` cvars.
+@export var hunter_choices: PackedStringArray = PackedStringArray([
+	"smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol",
+])
+
 ## What shooting the furniture costs a hunter: this fraction of the damage the shot would have
 ## done comes off their own health. 0 turns it off.
 @export_range(0.0, 5.0, 0.05) var decoy_penalty: float = 0.2
