@@ -47,7 +47,7 @@
 /addons/zee_weapons
 
 # The maps are mg-prop-hunt-maps, a repository and a pack of their own.
-# bootstrap-link: mg-prop-hunt-maps/maps
+# bootstrap-link: mg-prop-hunt-maps/maps ci
 /maps
 
 # Exports
