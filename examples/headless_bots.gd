@@ -45,6 +45,11 @@ const BOTS := 8
 
 const SECTIONS := 3
 
+## Seconds into the hide by which every stand-in prop wears a disguise (the delay is 1.5 s, the
+## rest is its hull finding room), and into the seek by which a hunter has hurt some prop.
+const DISGUISE_WITHIN := 6.0
+const SEEKER_DAMAGES_WITHIN := 180.0
+
 ## The share of rounds the props win: a band at medium, a floor at easy, a ceiling at hard.
 const PROPS_WIN := Vector2(0.35, 0.55)
 const EASY_PROPS_WIN := 0.5
@@ -120,7 +125,16 @@ func _run() -> void:
 	var decoy_deaths := 0
 	var hunters := 0
 	var board_ok := true
+	var slowest_disguise := 0.0
+	var still := 0.0
+	var hurt_rounds := 0
+	var hurt_late := 0.0
 	for result in results:
+		slowest_disguise = maxf(slowest_disguise, float(result["latest_disguise"]))
+		still += float(result["still"])
+		if float(result["first_hurt"]) >= 0.0:
+			hurt_rounds += 1
+			hurt_late = maxf(hurt_late, float(result["first_hurt"]))
 		props += int(result["props"])
 		found += int(result["found"])
 		lasts += float(result["sum_last"])
@@ -156,7 +170,12 @@ func _run() -> void:
 		print("  %-11s props won %2d of %2d rounds (%3.0f%%), %2d of %2d props found" % [map_id, row[1], row[0], 100.0 * row[1] / row[0], row[2], row[3]])
 	_check(disguised == props, "every prop is disguised when the hunters are let go", "%d of %d" % [disguised, props])
 	_check(board_ok, "the board's props left is the props alive after every find")
+	print("  every prop wore its disguise within %.1f s of the hide; still %.1f%% of the time; a prop first hurt in %d rounds, the latest at %.0f s of the seek" % [slowest_disguise, still / n * 100.0, hurt_rounds, hurt_late])
+	_check(slowest_disguise <= DISGUISE_WITHIN, "every prop is disguised within %.0f s of the hide starting" % DISGUISE_WITHIN, "%.1f s" % slowest_disguise)
 	if difficulty == "medium":
+		_check(still / n >= 0.9, "a disguised prop is still at least 90% of the time", "%.1f%%" % (still / n * 100.0))
+		_check(hurt_rounds * 10 >= results.size() * 9 and hurt_late <= SEEKER_DAMAGES_WITHIN,
+			"a seeker bot damages a disguised prop within %.0f s of the seek, in nine rounds in ten" % SEEKER_DAMAGES_WITHIN, "%d of %d rounds, the latest at %.0f s" % [hurt_rounds, results.size(), hurt_late])
 		_check(fit / n >= 0.5, "props hide as what belongs where they stand (others of the kind round them)", "fit %.2f" % (fit / n))
 		_check(moving / n <= 3.0, "a disguised prop keeps still unless shot", "%.1f s moving per prop-minute" % (moving / n))
 		_check(float(props_won) >= PROPS_WIN.x * n and float(props_won) <= PROPS_WIN.y * n,
@@ -263,10 +282,19 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	var reach := 0
 	var places := 0
 	var trace := OS.has_environment("PH_BOTS_TRACE")
+	# Seconds into the hide each prop first wore a disguise; seconds into the seek of the first
+	# damage any prop took; ticks a disguised, unhurt prop was still, and all such ticks.
+	var disguised_at := {}
+	var first_hurt := -1.0
+	var still_ticks := 0
 	var limit := int((game.hide_limit() + game.round_limit() + 10.0) * TICK_RATE)
 	for tick in range(limit):
 		game.simulate(TICK)
 		await get_tree().physics_frame
+		if seek_started < 0.0 and game.phase == PhGame.Phase.HIDE:
+			for p in game.players_on(PhGame.PROPS):
+				if p.is_disguised() and not disguised_at.has(p.player_id):
+					disguised_at[p.player_id] = game.phase_elapsed
 		if seek_started < 0.0 and game.phase == PhGame.Phase.SEEK:
 			seek_started = game._now()
 			var hidden: Array[PhPlayer] = []
@@ -293,10 +321,14 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 					continue
 				if p.health != null and p.health.health < p.health.max_health - 0.01:
 					hurt[p.player_id] = true
+					if first_hurt < 0.0:
+						first_hurt = game.seek_elapsed
 				prop_ticks += 1
 				var v := p.controller.state.velocity
 				if p.is_disguised() and Vector2(v.x, v.z).length() > 0.5 and not hurt.has(p.player_id):
 					moving_ticks += 1
+				elif p.is_disguised() and not hurt.has(p.player_id):
+					still_ticks += 1
 		if trace and seek_started >= 0.0 and tick % (TICK_RATE * 4) == 0:
 			var line := "    %5.1f s" % game.seek_elapsed
 			for id: StringName in game.players:
@@ -319,7 +351,8 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	var result := {
 		"map": map_id, "hunters": BOTS - props.size(), "props": props.size(), "found": found, "sum_last": sum_last,
 		"mean_last": sum_last / maxf(float(props.size()), 1.0), "props_won": found < props.size(),
-		"disguised": disguised, "fit": fit, "spread": spread,
+		"disguised": disguised, "fit": fit, "latest_disguise": _latest(disguised_at, props.size()), "first_hurt": first_hurt,
+		"still": float(still_ticks) / maxf(float(still_ticks + moving_ticks), 1.0), "spread": spread,
 		"moving": float(moving_ticks) / maxf(float(prop_ticks), 1.0) * 60.0,
 		"tests_props": bots.tests_on_props, "tests_furniture": bots.tests_on_furniture,
 		"decoy_hp": decoy["hp"], "decoy_deaths": decoy["deaths"], "board_ok": board["ok"],
@@ -329,6 +362,15 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	game.free()
 	await get_tree().process_frame
 	return result
+
+
+static func _latest(at: Dictionary, count: int) -> float:
+	if at.size() < count:
+		return INF
+	var latest := 0.0
+	for id: StringName in at:
+		latest = maxf(latest, float(at[id]))
+	return latest if not at.is_empty() else INF
 
 
 ## How well [param p]'s disguise belongs where it stands: others of its kind within 6 m.

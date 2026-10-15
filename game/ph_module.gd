@@ -420,6 +420,15 @@ func _add_tunables(world: PhGame) -> void:
 	_tunable("ph_bot_suspicion", config.bot_suspicion,
 		"How much a stand-in hunter doubts furniture with no other reason to, in hundredths (0 tests nothing without a reason)",
 		func(value: float) -> void: config.bot_suspicion = clampf(value, 0.0, 100.0))
+	_tunable("ph_bot_disguise_delay", config.bot_disguise_delay,
+		"Seconds into the hide before a stand-in prop puts its disguise on (0 at once)",
+		func(value: float) -> void: config.bot_disguise_delay = clampf(value, 0.0, 60.0))
+	_tunable("ph_bot_relocate_seconds", config.bot_relocate_seconds,
+		"About how many seconds a hidden stand-in prop stays before moving to another place of its kind (0 never)",
+		func(value: float) -> void: config.bot_relocate_seconds = clampf(value, 0.0, 3600.0))
+	_tunable("ph_bot_relocate_range", config.bot_relocate_range,
+		"Metres a stand-in prop's move to another place may reach",
+		func(value: float) -> void: config.bot_relocate_range = clampf(value, 2.0, 60.0))
 
 
 ## A number as an operator would type it: `34`, not `34.000000`.

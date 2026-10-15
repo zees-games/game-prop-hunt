@@ -110,6 +110,10 @@ func settings() -> DotBotSettings:
 	return DotBotSettings.of(game)
 
 
+func config_of() -> Object:
+	return game.get("config")
+
+
 func now() -> float:
 	return float(int(game.get("_tick"))) / float(maxi(int(game.get("tick_rate")), 1))
 
@@ -349,6 +353,14 @@ func _hide(player: PhPlayer, command: DotFpsCommand) -> void:
 
 	var spot: Dictionary = state["spot"]
 
+	# Early: a person in the open is the thing a hunter would be glad of, so put the piece on
+	# once the delay has passed and walk the rest of the way as it. Once only: a refusal (no
+	# room here for the bigger hull) is tried again on arriving.
+	if phase == 1 and not player.is_disguised() and not state.has("early") \
+			and float(game.get("phase_elapsed")) >= float(config_of().get("bot_disguise_delay")):
+		state["early"] = true
+		var _early: bool = _become(player, spot)
+
 	# Late: the hunters are out and it is still a person. Become the thing now and keep going;
 	# a moving chair is a risk, a person is certain death.
 	if phase == 2 and not player.is_disguised():
@@ -518,13 +530,21 @@ func _hidden_tick(player: PhPlayer, state: Dictionary, command: DotFpsCommand) -
 	var watched_now := t - float(state["hunter_seen_at"]) < 3.0
 	var taunts: DotPropTaunts = game.get("taunts")
 	var meter := taunts.meter(player.player_id, t) if taunts != null else 0.0
-	if meter > 0.8 and not watched_now and t - float(state.get("shuffled_at", -INF)) > 4.0:
+	var stream: DotRandomStream = state["stream"]
+	var cfg := config_of()
+	var every := float(cfg.get("bot_relocate_seconds"))
+	# Now and then, with no hunter seen for a good while (one far off), a prop of a kind that
+	# is plentiful here changes its place: a person who never moves is a prop that is found.
+	var restless := every > 0.0 and t - float(state["hunter_seen_at"]) > 8.0 \
+			and stream.next_unit() < dt() / every
+	if (meter > 0.8 or restless) and not watched_now and t - float(state.get("shuffled_at", -INF)) > 4.0:
 		state["shuffled_at"] = t
 		var keep: Dictionary = state["spot"]
+		var reach := float(cfg.get("bot_relocate_range"))
 		state["spot"] = {}
-		_pick_spot(player, state, 12.0, player.disguise.prop_id)
+		_pick_spot(player, state, reach, player.disguise.prop_id)
 		if (state["spot"] as Dictionary).is_empty():
-			_pick_spot(player, state, 12.0)
+			_pick_spot(player, state, reach)
 		if (state["spot"] as Dictionary).is_empty():
 			state["spot"] = keep
 			state["mode"] = &"hidden"
@@ -532,7 +552,6 @@ func _hidden_tick(player: PhPlayer, state: Dictionary, command: DotFpsCommand) -
 
 	# Now and then (about once in four minutes) a taunt of its own, for the points, when no
 	# hunter has been near for half a minute: a taunt is a shout every hunter walks to.
-	var stream: DotRandomStream = state["stream"]
 	if stream.next_unit() < dt() / 240.0 and t - float(state["hunter_seen_at"]) > 30.0:
 		var _taunted: bool = game.call("taunt", player.player_id)
 

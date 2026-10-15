@@ -230,6 +230,18 @@ extends DotConfig
 ## more tests more furniture and pays more decoy penalty. See `ph_bots.gd`.
 @export_range(0.0, 100.0, 1.0) var bot_suspicion: float = 12.0
 
+## Seconds into the hide before a stand-in prop puts its disguise on (the piece it is walking to
+## be beside), so it is never a person in the open for long. 0 is at once; more than the hide is
+## the old way (becomes it on arriving). See `ph_bots.gd`.
+@export_range(0.0, 60.0, 0.1) var bot_disguise_delay: float = 1.5
+
+## About how many seconds a hidden stand-in prop stays before moving to another place of its
+## kind (only with no hunter in sight lately). 0 never moves unless shot or forced to taunt.
+@export_range(0.0, 3600.0, 1.0) var bot_relocate_seconds: float = 150.0
+
+## Metres a stand-in prop's move to another place may reach.
+@export_range(2.0, 60.0, 0.5) var bot_relocate_range: float = 12.0
+
 # --- Watching --------------------------------------------------------------
 
 @export_group("Watching")
