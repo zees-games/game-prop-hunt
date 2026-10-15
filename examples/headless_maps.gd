@@ -19,7 +19,7 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 ## Adding a map adds a section and CHECKS_PER_MAP checks.
 
 const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods"]
-const CHECKS_PER_MAP := 10
+const CHECKS_PER_MAP := 11
 
 ## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not
 ## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
@@ -37,6 +37,9 @@ const MIN_HUNTER_SPAWNS := 3
 
 ## Fewest different props a map must offer to hide as.
 const MIN_WEARABLE := 8
+
+## Furniture covered less than this by its own shapes is listed (see [method _partly_covered]).
+const PARTIAL := 0.8
 
 var _passed := 0
 var _failed := 0
@@ -121,6 +124,8 @@ func _test_map(id: StringName) -> void:
 	var missing: PackedStringArray = game.map.get("_missing")
 	_check(missing.is_empty() and game.map.props.size() == (doc["props"] as Array).size(),
 		"every prop in it is one the catalogue has", ", ".join(missing))
+
+	await _report_colliderless(id, doc)
 
 	var wearable := {}
 
@@ -257,7 +262,7 @@ func _rests_on_something(game: PhGame, frame: Transform3D, size: Vector3) -> boo
 	return false
 
 
-func _world(id: StringName) -> PhGame:
+func _world(id: StringName, drawn := false) -> PhGame:
 	var config := PhConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -269,12 +274,92 @@ func _world(id: StringName) -> PhGame:
 	game.config = config
 	game.tick_rate = 60
 	game.authoritative = true
+	game.draw_world = drawn
 	game.register_service = false
 	add_child(game)
 	game.set_physics_process(false)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	return game
+
+
+## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing in
+## `Drawn` (batched into chunks) and its shapes in `Solid` and `Furniture`, so the audit is the
+## lenient one (a mesh that merely touches a shape passes); [method _partly_covered] is the
+## stricter half for furniture, which a hunter or a disguised prop walks into.
+func _report_colliderless(id: StringName, doc: Dictionary) -> void:
+	var drawn := await _world(id, true)
+	var res := DotCollisionAudit.audit(drawn.map, true)
+	var found: PackedStringArray = (res.value as DotCollisionAudit).paths() if res.ok else PackedStringArray()
+
+	if res.ok:
+		var report: DotCollisionAudit = res.value
+		print("  collision audit: %d findings of %d examined, %d opted out" % [report.count(), report.examined, report.opted_out])
+
+		for line in report.describe_lines().slice(1, 12):
+			print("    %s" % line)
+
+	var partial := _partly_covered(drawn)
+	print("  partly covered furniture (<%d%%): %d" % [int(PARTIAL * 100.0), partial.size()])
+
+	for line in partial.slice(0, 20):
+		print("    %s" % line)
+
+	_check(res.ok and (res.value as DotCollisionAudit).examined > 0 and found.is_empty(),
+		"everything drawn has collision, or says it is decoration (dot_no_collision)",
+		"; ".join(found.slice(0, 6)) if res.ok else res.error.message)
+	await _dispose(drawn)
+	# Both worlds share one physics space: let the drawn one's bodies go before the checks that
+	# follow ask it about the same spot.
+	await get_tree().physics_frame
+
+
+## Furniture whose catalogue box is under [constant PARTIAL] covered by its own shapes, sampled on
+## a grid: the "walk into it" geometry the lenient audit cannot see. Reported, not failed, because
+## a chair is open under its seat and a tree is a trunk under a crown on purpose.
+func _partly_covered(game: PhGame) -> PackedStringArray:
+	var out := PackedStringArray()
+	var worst := {}
+
+	for prop: Dictionary in game.map.props:
+		var size: Vector3 = prop["size"]
+		var frame: Transform3D = prop["transform"]
+		var boxes: Array = []
+
+		for shape: CollisionShape3D in prop["shapes"]:
+			if shape.shape != null:
+				boxes.append([shape.global_transform.affine_inverse(), shape.shape.get_debug_mesh().get_aabb()])
+
+		var hit := 0
+		var total := 0
+
+		for ix in range(6):
+			for iy in range(6):
+				for iz in range(6):
+					var local := Vector3(((ix + 0.5) / 6.0 - 0.5) * size.x, (iy + 0.5) / 6.0 * size.y, ((iz + 0.5) / 6.0 - 0.5) * size.z)
+					var world := frame * local
+					total += 1
+
+					for pair: Array in boxes:
+						if (pair[1] as AABB).has_point((pair[0] as Transform3D) * world):
+							hit += 1
+							break
+
+		var share := float(hit) / float(total)
+
+		if share < PARTIAL:
+			var key := str(prop["id"])
+			var entry: Array = worst.get(key, [0, 1.0, size])
+			entry[0] += 1
+			entry[1] = minf(entry[1], share)
+			worst[key] = entry
+
+	for key: String in worst:
+		var entry: Array = worst[key]
+		out.append("%s x%d, least %d%% of %s" % [key, entry[0], int(entry[1] * 100.0), (entry[2] as Vector3).snapped(Vector3.ONE * 0.01)])
+
+	out.sort()
+	return out
 
 
 func _dispose(game: PhGame) -> void:

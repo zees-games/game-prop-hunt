@@ -207,12 +207,15 @@ func _build_boxes() -> void:
 
 		var tint := PhMapDoc.colour(box.get("tint", [1, 1, 1]))
 		var cell := Vector2i(floori(at.x / CHUNK), floori(at.z / CHUNK))
-		var key := "%s|%s|%d|%d" % [str(box["mat"]), tint.to_html(), cell.x, cell.y]
+		# Seen and not hit (a line on the floor, glass painted on, a lamp) is batched apart from
+		# the solid boxes, so the whole chunk can say it is meant to be walked through.
+		var ghost := not bool(box.get("solid", true))
+		var key := "%s|%s|%d|%d|%s" % [str(box["mat"]), tint.to_html(), cell.x, cell.y, ghost]
 
 		if not batches.has(key):
 			var tool := SurfaceTool.new()
 			tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint}
+			batches[key] = {"tool": tool, "mat": str(box["mat"]), "tint": tint, "ghost": ghost}
 
 		_add_box((batches[key] as Dictionary)["tool"], frame, size)
 		if not PhMaterials.is_transparent(str(box["mat"])):
@@ -223,6 +226,10 @@ func _build_boxes() -> void:
 		var tool: SurfaceTool = batch["tool"]
 		var mesh := MeshInstance3D.new()
 		mesh.name = "Boxes"
+		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# map's own say-so.
+		if bool(batch["ghost"]):
+			mesh.set_meta(&"dot_no_collision", true)
 		mesh.mesh = tool.commit()
 		mesh.material_override = PhMaterials.material(batch["mat"], batch["tint"])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
