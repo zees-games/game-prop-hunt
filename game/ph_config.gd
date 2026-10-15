@@ -242,6 +242,20 @@ extends DotConfig
 ## Metres a stand-in prop's move to another place may reach.
 @export_range(2.0, 60.0, 0.5) var bot_relocate_range: float = 12.0
 
+## Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints):
+## props hide beside furniture of their size where it is tucked in and out of sight, hunters
+## sweep the best spots and the chokepoints. Off is the first way: a place beside each piece of
+## furniture, scored by sight lines alone. See `ph_bots.gd`.
+@export var bot_nav: bool = true
+
+## With `bot_nav`: how much of the annotated map a stand-in hunter knows, 0..1 (at least its own
+## `bot_map_knowledge`). It sweeps the best hiding spots and the chokepoints first, as far as it
+## knows, instead of the nearest place.
+@export_range(0.0, 1.0, 0.05) var bot_sweep: float = 0.1
+
+## Metres from a piece of furniture a spot may be and still be "beside" it, for a stand-in prop.
+@export_range(0.3, 4.0, 0.1) var bot_beside: float = 1.3
+
 # --- Watching --------------------------------------------------------------
 
 @export_group("Watching")

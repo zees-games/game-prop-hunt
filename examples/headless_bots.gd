@@ -43,12 +43,30 @@ const TICK_RATE := 32
 const TICK := 1.0 / float(TICK_RATE)
 const BOTS := 8
 
-const SECTIONS := 3
+const SECTIONS := 4
+
+## Where a prop is looked at again, seconds into the seek (after the moves before a forced taunt
+## and the restless ones), and how long the hunters' coverage of the best places is counted.
+const LATE_LOOK := 100.0
+const COVER_WITHIN := 30.0
+## The best places (by the annotator's score, among those a prop may hide beside) a hunter should
+## pass within this many metres of, and how many of them there are.
+const COVER_NEAR := 8.0
+const COVER_TOP := 16
+## Watchers a prop's exposure is measured from, apart from the bots' own (seeded, fixed).
+const WATCHERS := 64
+## Bands for the annotated map, set from a run with `--nav 0` (the first way) and one without.
+const NEXT_TO_MIN := 0.9
+const AMONG_MIN := 0.7
+const TUCKED_MIN := 0.26
+const SEEN_MAX := 0.2
+const COVER_MIN := 0.91
 
 ## Seconds into the hide by which every stand-in prop wears a disguise (the delay is 1.5 s, the
 ## rest is its hull finding room), and into the seek by which a hunter has hurt some prop.
 const DISGUISE_WITHIN := 6.0
-const SEEKER_DAMAGES_WITHIN := 180.0
+## 180 s before the annotations; a prop that hides well holds out longer, and the latest of 48 first hits is one round (246 s measured).
+const SEEKER_DAMAGES_WITHIN := 260.0
 
 ## The share of rounds the props win: a band at medium, a floor at easy, a ceiling at hard.
 const PROPS_WIN := Vector2(0.35, 0.55)
@@ -60,6 +78,7 @@ const MAP_PROPS_WIN := Vector2(0.25, 0.65)
 const MAP_ROUNDS := 12
 const HARD_PROPS_WIN := 0.4
 
+var nav_on := true
 var _passed := 0
 var _failed := 0
 var _entered := 0
@@ -88,6 +107,8 @@ func _run() -> void:
 	# round played this way is the same round the whole run plays.
 	var only := _arg(args, "--map", "")
 	var difficulty := _arg(args, "--difficulty", "medium")
+	# `--nav 0` plays the first way (no annotations read), to measure what they change.
+	nav_on = _arg(args, "--nav", "1") != "0"
 	var first := maxi(0, int(_arg(args, "--first", "0")))
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
@@ -209,6 +230,37 @@ func _run() -> void:
 	_check(unreachable * 50 <= places, "at most one place in fifty is cut off (a corner behind furniture)", "%d of %d%s" % [unreachable, places, worst])
 	_completed += 1
 
+	_section("the annotated map: where the props stand, what the hunters cover")
+	var samples := 0
+	var next_to := 0
+	var among := 0
+	var tucked := 0.0
+	var seen := 0.0
+	var cover := 0.0
+	var cover_rounds := 0
+	for result in results:
+		var placed: Dictionary = result["placed"]
+		samples += int(placed["n"])
+		next_to += int(placed["next"])
+		among += int(placed["among"])
+		tucked += float(placed["tucked"])
+		seen += float(placed["seen"])
+		if int(result["cover_of"]) > 0:
+			cover += float(result["cover"]) / float(result["cover_of"])
+			cover_rounds += 1
+	var sn := maxf(float(samples), 1.0)
+	print("  nav %s: %d prop samples; next to a same-size piece %.0f%%, among two or more %.0f%%, tucked in %.2f, seen by %.0f%% of watchers; hunters passed %.0f%% of the %d best places in %.0f s" % [
+		"on" if nav_on else "OFF", samples, 100.0 * next_to / sn, 100.0 * among / sn, tucked / sn, 100.0 * seen / sn,
+		100.0 * cover / maxf(float(cover_rounds), 1.0), COVER_TOP, COVER_WITHIN])
+	if difficulty == "medium":
+		# Armed: `-- --nav 0` fails the tucked-in and coverage bands.
+		_check(samples > 0 and float(next_to) / sn >= NEXT_TO_MIN, "props end next to a piece of furniture of their size", "%.0f%% of %d" % [100.0 * next_to / sn, samples])
+		_check(float(among) / sn >= AMONG_MIN, "props end among two or more of their size", "%.0f%%" % (100.0 * among / sn))
+		_check(tucked / sn >= TUCKED_MIN, "props end tucked in (a wall or furniture within 2 m on this share of sides)", "%.2f" % (tucked / sn))
+		_check(seen / sn <= SEEN_MAX, "props end out of most watchers' sight", "%.0f%% seen" % (100.0 * seen / sn))
+		_check(cover_rounds > 0 and cover / float(cover_rounds) >= COVER_MIN, "the hunters pass the best places within %.0f s" % COVER_WITHIN, "%.0f%%" % (100.0 * cover / maxf(float(cover_rounds), 1.0)))
+	_completed += 1
+
 	print("")
 	print("%d sections entered, %d finished" % [_entered, _completed])
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -228,6 +280,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	config.intermission_seconds = 0.0
 	config.minimum_players = 0
 	config.keep_progress = false
+	config.bot_nav = nav_on
 	config.map_ids = PackedStringArray([map_id])
 	config.seed_value = 20261012 + index * 7919
 	# For a measurement: the server's ceilings (a map asks for less on its own).
@@ -287,6 +340,10 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	var disguised_at := {}
 	var first_hurt := -1.0
 	var still_ticks := 0
+	var placed := {"n": 0, "next": 0, "among": 0, "tucked": 0.0, "seen": 0.0}
+	var late_done := false
+	var visited := {}
+	var top := PackedVector3Array()
 	var limit := int((game.hide_limit() + game.round_limit() + 10.0) * TICK_RATE)
 	for tick in range(limit):
 		game.simulate(TICK)
@@ -305,6 +362,8 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 					disguised += 1
 					fit += _fit_of(game, p)
 			fit /= maxf(float(props.size()), 1.0)
+			_sample_placed(game, hidden, placed)
+			top = _top_places(game)
 			spread = _spread(hidden)
 			var counted := _reachable(game)
 			reach = counted[0]
@@ -315,6 +374,23 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 					print("    %s as %s at %s mode %s fit %.2f" % [p.player_id, p.disguise.prop_id, p.controller.state.position.snapped(Vector3.ONE * 0.1), st.get("mode", ""), _fit_of(game, p)])
 		if seek_started >= 0.0 and game.phase != PhGame.Phase.SEEK:
 			break
+		if seek_started >= 0.0 and game.seek_elapsed <= COVER_WITHIN:
+			for h in game.players_on(PhGame.HUNTERS):
+				if not h.is_alive() or h.watching:
+					continue
+				var eye: Vector3 = h.eye_position()
+				for n in range(top.size()):
+					# Seen, not walked to: a hunter marks a place looked at from where it
+					# stands, so a sweep is a walk past, not a visit to each.
+					if not visited.has(n) and eye.distance_to(top[n]) < COVER_NEAR and game._clear_between(eye, top[n] + Vector3(0.0, 0.6, 0.0), true):
+						visited[n] = true
+		if not late_done and seek_started >= 0.0 and game.seek_elapsed >= LATE_LOOK:
+			late_done = true
+			var alive: Array[PhPlayer] = []
+			for p in game.players_on(PhGame.PROPS):
+				if p.is_alive() and not p.watching and p.is_disguised():
+					alive.append(p)
+			_sample_placed(game, alive, placed)
 		if seek_started >= 0.0:
 			for p in game.players_on(PhGame.PROPS):
 				if not p.is_alive() or p.watching:
@@ -357,11 +433,103 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 		"tests_props": bots.tests_on_props, "tests_furniture": bots.tests_on_furniture,
 		"decoy_hp": decoy["hp"], "decoy_deaths": decoy["deaths"], "board_ok": board["ok"],
 		"reach": reach, "places": places,
+		"placed": placed, "cover": float(visited.size()), "cover_of": top.size(),
 	}
 	remove_child(game)
 	game.free()
 	await get_tree().process_frame
 	return result
+
+
+## The best places for a prop to hide on this map, by the annotator's own score: the places a
+## hunter that thinks like the annotator would sweep first. Empty with no mesh.
+static func _top_places(game: PhGame) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var annotations: DotNpcAiNavAnnotations = game.bots.annotations
+	if annotations == null:
+		return out
+	var ranked: Array[Dictionary] = []
+	for spot in annotations.hiding_spots():
+		if int(spot.get("prop", -1)) >= 0:
+			ranked.append(spot)
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	for spot in ranked.slice(0, COVER_TOP):
+		out.append(spot["at"])
+	return out
+
+
+## Where [param hidden] stand, measured the way the bots do not: next to a piece of furniture of
+## the same size as what they wear, among two or more, tucked in (share of sixteen 2 m rays that
+## hit something at a crouched head) and seen (share of fixed watchers with a sight line).
+func _sample_placed(game: PhGame, hidden: Array, into: Dictionary) -> void:
+	var map: Node3D = game.map
+	var props: Array = map.props
+	var watchers := _watchers(game)
+	for p: PhPlayer in hidden:
+		if not p.is_disguised():
+			continue
+		var at: Vector3 = p.controller.state.position
+		var size := Vector3.ZERO
+		for prop: Dictionary in props:
+			if prop["id"] == p.disguise.prop_id:
+				size = prop["size"]
+				break
+		var next := 0
+		var among := 0
+		for prop: Dictionary in props:
+			var other: Vector3 = prop["size"]
+			if absf(other.x - size.x) > size.x * 0.2 or absf(other.y - size.y) > size.y * 0.2 or absf(other.z - size.z) > size.z * 0.2:
+				continue
+			var frame: Transform3D = prop["transform"]
+			if absf(frame.origin.y - at.y) > 0.8:
+				continue
+			var local := frame.affine_inverse() * at
+			var gap := Vector2(maxf(absf(local.x) - other.x * 0.5, 0.0), maxf(absf(local.z) - other.z * 0.5, 0.0)).length()
+			# The prop's own piece is at the spot's side by construction when it copied it; what
+			# counts is another one, so a piece the prop stands IN is not "next to".
+			if gap < 0.05:
+				continue
+			if gap <= 1.5:
+				next += 1
+			if gap <= 3.0:
+				among += 1
+		into["n"] = int(into["n"]) + 1
+		into["next"] = int(into["next"]) + (1 if next >= 1 else 0)
+		into["among"] = int(into["among"]) + (1 if among >= 2 else 0)
+		var head := at + Vector3(0.0, 0.9, 0.0)
+		var blocked := 0
+		for k in range(16):
+			var a := float(k) * TAU / 16.0
+			if not game._clear_between(head, head + Vector3(cos(a), 0.0, sin(a)) * 2.0, true):
+				blocked += 1
+		into["tucked"] = float(into["tucked"]) + float(blocked) / 16.0
+		var seen := 0
+		var near := 0
+		var target := at + Vector3(0.0, 0.5, 0.0)
+		for eye in watchers:
+			if eye.distance_to(target) > 30.0:
+				continue
+			near += 1
+			if game._clear_between(eye, target, true):
+				seen += 1
+		into["seen"] = float(into["seen"]) + (float(seen) / float(near) if near > 0 else 0.5)
+
+
+var _watch_cache := {}
+
+
+func _watchers(game: PhGame) -> PackedVector3Array:
+	var key := str(game.map.get_instance_id())
+	if not _watch_cache.has(key):
+		_watch_cache.clear()
+		var out := PackedVector3Array()
+		var stream := DotRandomStream.new(4242, &"bots_suite")
+		var nav: DotBotNav = game.bots.nav
+		if nav.is_ready():
+			for _i in range(WATCHERS):
+				out.append(nav.random_point(stream) + Vector3(0.0, 1.6, 0.0))
+		_watch_cache[key] = out
+	return _watch_cache[key]
 
 
 static func _latest(at: Dictionary, count: int) -> float:

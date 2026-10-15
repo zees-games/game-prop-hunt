@@ -103,6 +103,22 @@ func _run() -> void:
 			var centre := box.get_center()
 			var reach := maxf(box.size.length() * 0.42, 14.0)
 			_free_camera().look_at_from_position(centre + Vector3(reach * 0.45, reach * 0.6, reach * 0.55), centre)
+		"spots":
+			# The map's annotations the stand-ins and hunters use, drawn over it from above.
+			for _i in range(900):
+				if game.bots.annotations != null:
+					break
+				await _frames(1)
+			if game.bots.annotations == null:
+				print("the bots made no annotations (ph_bot_nav 0, or no stand-in to drive)")
+			else:
+				var debug := DotNpcAiNavDebug.new()
+				game.map.add_child(debug)
+				debug.show_annotations(game.bots.annotations)
+			await _frames(6)
+			var sbox: AABB = game.map.bounds()
+			var sreach := maxf(sbox.size.length() * 0.42, 14.0)
+			_free_camera().look_at_from_position(sbox.get_center() + Vector3(sreach * 0.1, sreach * 0.9, sreach * 0.1), sbox.get_center())
 		"room":
 			await _seconds_of(_seconds)
 			_free_camera().look_at_from_position(_at, _look)

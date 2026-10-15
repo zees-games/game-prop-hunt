@@ -429,6 +429,15 @@ func _add_tunables(world: PhGame) -> void:
 	_tunable("ph_bot_relocate_range", config.bot_relocate_range,
 		"Metres a stand-in prop's move to another place may reach",
 		func(value: float) -> void: config.bot_relocate_range = clampf(value, 2.0, 60.0))
+	_tunable("ph_bot_nav", 1.0 if config.bot_nav else 0.0,
+		"1: stand-ins read the map's nav annotations (props hide beside furniture of their size, tucked in and out of sight; hunters sweep the best spots and chokepoints); 0: the first way",
+		func(value: float) -> void: config.bot_nav = value >= 0.5)
+	_tunable("ph_bot_sweep", config.bot_sweep,
+		"With ph_bot_nav: how much of the annotated map a stand-in hunter knows (0..1); it sweeps the best hiding spots and chokepoints first as far as it knows",
+		func(value: float) -> void: config.bot_sweep = clampf(value, 0.0, 1.0))
+	_tunable("ph_bot_beside", config.bot_beside,
+		"Metres from a piece of furniture a stand-in prop's hiding spot may be and still be beside it",
+		func(value: float) -> void: config.bot_beside = clampf(value, 0.3, 4.0))
 
 
 ## A number as an operator would type it: `34`, not `34.000000`.

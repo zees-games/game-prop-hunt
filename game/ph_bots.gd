@@ -1,6 +1,7 @@
 extends RefCounted
 
 const PhPlayer := preload("ph_player.gd")
+const PhNavAnnotator := preload("ph_nav_annotator.gd")
 
 ## The stand-ins: props that hide as something that belongs where they stand, and hunters that
 ## search the rooms and test what looks wrong, on dot-bot's settings and hiding helpers.
@@ -48,6 +49,11 @@ const HUNTERS := 2
 
 ## Places surveyed (beside the furniture) and the watchers that score them.
 const SURVEY_PLACES := 320
+
+## Most places a map's annotations give the bots, and the score that is the best a spot can have
+## (out of sight 2, tucked in 1.5, among its kind 2), which a hunter's weight is measured from.
+const NAV_PLACES := 260
+const NAV_BEST := 5.5
 const WATCHERS := 80
 
 ## Metres from a piece's side to where a prop stands beside it.
@@ -83,6 +89,16 @@ var _places: Array[Dictionary] = []
 
 var _surveyed: String = ""
 var _baked: String = ""
+var _first_survey: String = ""
+
+## The map's annotations (dot-npc-ai), made after the first survey on every map so a suite can
+## measure against them; the bots use them only with `bot_nav`. Stepped a few slices a tick.
+var annotations: DotNpcAiNavAnnotations = null
+var _job: PhNavAnnotator = null
+## True once the annotations replaced the first survey's places.
+var _nav_places: bool = false
+## Slices of the annotator stepped each tick: a fixed number, so a seeded round replays the same.
+const SLICES_PER_TICK := 48
 var _survey_at: int = 0
 
 ## player id -> the bot's own state.
@@ -154,10 +170,15 @@ func _prepare() -> void:
 	if map == null or key == _surveyed:
 		return
 
+	if _job != null and key == _first_survey:
+		_step_annotator(key)
+		return
+
 	if key != _baked:
 		_baked = key
 		spots.clear()
 		_places.clear()
+		_nav_places = false
 		var still: Array = [map.get("_solid"), map.get("_furniture")]
 		var baked := nav.bake(map, {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}, 0, still)
 		if not baked.ok:
@@ -171,7 +192,7 @@ func _prepare() -> void:
 	if int(game.get("_tick")) < _survey_at or not nav.is_ready():
 		return
 
-	_surveyed = key
+	_first_survey = key
 	var started := Time.get_ticks_usec()
 	var random: DotRandomManager = game.get("random")
 	var stream := random.stream_for(&"bot_survey", hash(str(doc.get("id", ""))) % 65536)
@@ -241,6 +262,109 @@ func _prepare() -> void:
 	DotLog.debug(CHANNEL, "surveyed the map for the bots", {
 		"map": str(doc.get("id", "")), "spots": spots.size(), "nav_ms": snappedf(nav.bake_ms, 0.1), "ms": snappedf(survey_ms, 0.1),
 	})
+	_start_annotator(map, props, usable, catalogue)
+
+
+## Sets the annotator going over the baked mesh, told which pieces of furniture a prop may be.
+func _start_annotator(map: Node3D, props: Array, usable: Array[int], _catalogue: Object) -> void:
+	_job = null
+	annotations = null
+	if not nav.is_ready() or nav.mesh == null:
+		_surveyed = _first_survey
+		return
+	var job := PhNavAnnotator.new(nav.mesh, map.get_world_3d())
+	job.agent_radius = PhPlayer.BODY_RADIUS
+	job.crouch_height = PhPlayer.BODY_CROUCH
+	job.climb = PhPlayer.BODY_STEP
+	job.beside = float(config_of().get("bot_beside"))
+	job.kin_radius = KIN_RADIUS
+	job.kin_full = KIN_FULL
+	job.los_fn = _los
+	var physics: Object = game.get("physics")
+	job.collision_mask = (int(physics.call("layer_mask", &"world")) | int(physics.call("layer_mask", &"prop"))) if physics != null else 1
+	var seeds := PackedVector3Array()
+	for side in ["props", "hunters"]:
+		for i in range(2):
+			var spawn: Array = map.call("spawn", side, i)
+			seeds.append(spawn[0])
+	job.seeds = seeds
+	var piece_list: Array[Dictionary] = []
+	for i in usable:
+		var prop: Dictionary = props[i]
+		var frame: Transform3D = prop["transform"]
+		piece_list.append({
+			"i": i, "frame": frame, "size": prop["size"], "kind": prop["id"],
+			"kin": _kin_count(props, prop["id"], frame.origin, KIN_RADIUS),
+			"yaw": rad_to_deg(frame.basis.get_euler(EULER_ORDER_YXZ).y),
+		})
+	job.pieces = piece_list
+	job.index_pieces()
+	job.random_seed = hash(str((game.get("map_doc") as Dictionary).get("id", ""))) % 65536 + 1
+	_job = job
+	_annotate_ms = 0.0
+
+
+var _annotate_ms: float = 0.0
+
+
+func _step_annotator(key: String) -> void:
+	var started := Time.get_ticks_usec()
+	for _i in range(SLICES_PER_TICK):
+		if not _job.step():
+			break
+	_annotate_ms += (Time.get_ticks_usec() - started) / 1000.0
+	if not _job.is_settled():
+		return
+	var job := _job
+	_job = null
+	_surveyed = key
+	if job.result == null or not job.result.ok:
+		DotLog.warn(CHANNEL, "the map's annotations failed; the bots use the first survey", {"why": job.result.error.message if job.result != null else "no result"})
+		return
+	annotations = job.result.value
+	DotLog.debug(CHANNEL, "annotated the map for the bots", {"ms": snappedf(_annotate_ms, 0.1), "spots": annotations.spots.size(), "hiding": annotations.hiding.size(), "chokepoints": annotations.chokepoints.size()})
+	if bool(config_of().get("bot_nav")):
+		_adopt_annotations(job)
+
+
+## Hiding places for the props and search places for the hunters, from the annotations: the
+## spots beside a piece a prop may be, best first, apart; and those, with the chokepoints.
+func _adopt_annotations(job: PhNavAnnotator) -> void:
+	var ranked: Array[Dictionary] = []
+	for spot in annotations.spots:
+		if int(spot.get("prop", -1)) >= 0:
+			ranked.append(spot)
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	var chosen: Array[Dictionary] = []
+	var apart := job.spot_spacing
+	for spot in ranked:
+		var at: Vector3 = spot["at"]
+		var crowded := false
+		for other in chosen:
+			if (other["at"] as Vector3).distance_to(at) < apart:
+				crowded = true
+				break
+		if crowded:
+			continue
+		chosen.append(spot)
+		if chosen.size() >= NAV_PLACES:
+			break
+	if chosen.size() < 8:
+		# A map with almost no furniture beside its walls: the first survey still stands.
+		DotLog.debug(CHANNEL, "too few annotated places; the bots use the first survey", {"places": chosen.size()})
+		return
+	spots = chosen
+	_nav_places = true
+	if float(config_of().get("bot_sweep")) <= 0.0:
+		# No sweeping: the hunters keep the first survey's places and only the props use the spots.
+		return
+	_places.clear()
+	for spot in chosen:
+		_places.append({"at": spot["at"], "exposure": 1.0 - clampf(float(spot["score"]) / NAV_BEST, 0.0, 1.0), "q": clampf((float(spot["score"]) / NAV_BEST - 0.3) / 0.6, 0.0, 1.0)})
+	for choke in annotations.chokepoints:
+		# Where routes cross: not where a prop hides, but where a hunter sees down the way, so
+		# visited, and after the places that are likelier.
+		_places.append({"at": choke["at"], "exposure": 0.6, "q": 0.35})
 
 
 func _los(a: Vector3, b: Vector3) -> bool:
@@ -449,20 +573,35 @@ func _pick_spot(player: PhPlayer, state: Dictionary, near: float = INF, kind: St
 
 	var bad: Array = state["bad"]
 	var pool: Array = []
-	for spot: Dictionary in spots:
-		if bad.has(int(spot["prop"])):
-			continue
-		if near < INF:
-			var d := (spot["at"] as Vector3).distance_to(at)
-			if d > near or d < 2.0:
+	# Annotated: at first only where the piece has company (three or more of its kind round it)
+	# and the place is tucked in; a move to somewhere near, or a map without such places, takes
+	# what there is.
+	var snug := _nav_places and near == INF
+	for attempt in range(2):
+		for spot: Dictionary in spots:
+			if snug and (int(spot["kin"]) < 3 or float(spot["enclosure"]) < 0.25):
 				continue
-		if kind != &"" and StringName(spot["kind"]) != kind:
-			continue
-		# What dot-bot's choose weighs as exposure: how much the place is seen, and how out of
-		# place its piece would be there, half each.
-		var scored := spot.duplicate()
-		scored["exposure"] = float(spot["exposure"]) * 0.5 + (1.0 - fit(spot)) * 0.5
-		pool.append(scored)
+			if bad.has(int(spot["prop"])):
+				continue
+			if near < INF:
+				var d := (spot["at"] as Vector3).distance_to(at)
+				if d > near or d < 2.0:
+					continue
+			if kind != &"" and StringName(spot["kind"]) != kind:
+				continue
+			# What dot-bot's choose weighs as exposure: how much the place is seen, and how out
+			# of place its piece would be there; an annotated place is also judged by how tucked
+			# in it is (a chair in a corner, not mid-floor).
+			var scored := spot.duplicate()
+			if spot.has("enclosure"):
+				scored["exposure"] = float(spot["exposure"]) * 0.3 + (1.0 - fit(spot)) * 0.3 + (1.0 - float(spot["enclosure"])) * 0.4
+			else:
+				scored["exposure"] = float(spot["exposure"]) * 0.5 + (1.0 - fit(spot)) * 0.5
+			pool.append(scored)
+		if pool.size() >= 6 or not snug:
+			break
+		snug = false
+		pool.clear()
 
 	if pool.is_empty():
 		state["retry_at"] = now() + 1.0
@@ -477,8 +616,11 @@ func _pick_spot(player: PhPlayer, state: Dictionary, near: float = INF, kind: St
 		return length < maxf(left - 3.0, 6.0) * speed * 0.85
 
 	var stream: DotRandomStream = state["stream"]
+	# With annotations it looks hard at the best of them: the pool is already scored for being
+	# tucked in, out of sight and among its kind, so a bot that knows the map takes the top few.
+	var skill := settings().profile.map_knowledge
 	var chosen := DotBotHiding.choose(pool, at, threats if near == INF else PackedVector3Array(), taken, stream,
-		settings().profile.map_knowledge, reachable)
+		skill, reachable)
 	if chosen.is_empty() and int(state.get("retries", 0)) >= 3:
 		chosen = DotBotHiding.choose(pool, at, threats, taken, stream, settings().profile.map_knowledge)
 	state["retries"] = int(state.get("retries", 0)) + 1
@@ -585,7 +727,14 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 
 	if state["search"] == null:
 		var search := DotBotSearch.new()
-		search.setup(_places, profile.map_knowledge)
+		var sweep := float(config_of().get("bot_sweep")) if _nav_places else 0.0
+		search.setup(_places, maxf(profile.map_knowledge, sweep))
+		if _nav_places:
+			# Weight the places the annotations call good (a snug spot, a chokepoint), so a hunter
+			# looks at the best hiding places before the near ones: sweeping, not wandering.
+			for n in range(mini(search.places.size(), _places.size())):
+				var q: float = float(_places[n].get("q", 0.0))
+				search.places[n]["weight"] = lerpf(1.0, 0.1 + 3.5 * q * q, sweep)
 		state["search"] = search
 	var search: DotBotSearch = state["search"]
 
