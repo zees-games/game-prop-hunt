@@ -7,6 +7,7 @@
 #   tools/shot.sh --view=prop --as=furniture_chair                # a prop in third person, hidden
 #   tools/shot.sh --view=prop --as=survival_bottle --lean=6       # leant: 6 steps is on its side, 12 on its nose
 #   tools/shot.sh --view=dead --seconds=1.5                      # a hunter killed: their ragdoll (--victim=prop --as=<id>: a found prop bursts)
+#   tools/shot.sh --view=person --seconds=1                      # somebody else, with their hull (green) and hitboxes (red)
 #   tools/shot.sh --view=blind                                    # a hunter while the props hide
 #   tools/shot.sh --view=round --seconds=5 --ph-minimum-players=7 # a round in progress: stand-ins hid on the clock, a hunter seeking
 #   tools/shot.sh --view=hunter --board                           # with the Tab scoreboard open

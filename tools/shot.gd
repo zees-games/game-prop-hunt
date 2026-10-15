@@ -7,6 +7,7 @@ const PhClient := preload("../game/ph_client.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
 const PhPlayer := preload("../game/ph_player.gd")
+const ShotOutline := preload("shot_outline.gd")
 
 var _view := "hunter"
 var _seconds := 3.0
@@ -151,6 +152,40 @@ func _run() -> void:
 			var yard: DotPlayerRagdolls = _client.get("ragdolls")
 			for body: DotPlayerRagdoll in yard.live():
 				print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
+		"person":
+			# Somebody else as everybody else sees them: a hunter stand-in three metres in front
+			# of a free camera, with the movement capsule (green) and the hitboxes (red) drawn
+			# over the body, to compare the hull against what is drawn.
+			game._set_phase(PhGame.Phase.SEEK)
+			var other: PhPlayer = null
+			for id: StringName in game.players:
+				if game.players[id] != local:
+					other = game.players[id]
+					game._set_side(id, PhGame.HUNTERS)
+					break
+			var feet: Vector3 = local.controller.state.position + Vector3(0.0, 0.0, -3.0)
+			if _at != Vector3.INF:
+				feet = _at
+			other.place_at(feet, 150.0)
+			local.place_at(feet + Vector3(0.0, 0.0, 8.0), 0.0)
+			await _seconds_of(maxf(_seconds, 0.6))
+			feet = other.controller.state.position
+			_free_camera().look_at_from_position(feet + Vector3(1.6, 1.2, 2.4), feet + Vector3(0.0, 0.9, 0.0))
+			# A stand-in keeps playing, so the shapes follow it every frame up to the picture.
+			var drawn: Array[Node] = []
+			var follow := func() -> void:
+				for shape in drawn:
+					shape.queue_free()
+				drawn.clear()
+				drawn.append(ShotOutline.hull(self, other.controller.state.position,
+					other.controller.tunables.radius, other.hull_height()))
+				for box: DotHitbox in other.hitboxes.get_children():
+					if box.enabled:
+						drawn.append(ShotOutline.hitbox(self, box))
+			follow.call()
+			get_tree().process_frame.connect(follow)
+			print("person: %s; hull r=%.2f h=%.2f" % [other.figure.describe() if other.figure != null else "no figure",
+				other.controller.tunables.radius, other.hull_height()])
 		"blind":
 			await _seconds_of(1.0)
 		"grenade":
