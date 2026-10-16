@@ -27,7 +27,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 28
 
-const CHECKS := 145
+const CHECKS := 146
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -128,6 +128,8 @@ func _test_config() -> void:
 	var rules := config.disguise_rules()
 	_check(is_equal_approx(rules.reach, config.disguise_reach) and is_equal_approx(rules.reveal_cooldown, config.reveal_cooldown),
 		"the disguise rules are the configuration's")
+	var models := ZeeWeaponArtTable.validate_models()
+	_check(models.ok, "every weapon model the art table names is vendored", "" if models.ok else models.error.message)
 
 	config.hunter_pick = 9
 	_check(not config.validate().ok, "a way of picking hunters that is none of the three is refused")
