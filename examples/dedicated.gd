@@ -14,7 +14,7 @@ const PhPlayer := preload("../game/ph_player.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 10
-const CHECKS := 62
+const CHECKS := 63
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -417,9 +417,15 @@ func _test_the_map_vote() -> void:
 		"the new map starts the vote over", "%s / %s" % [director.current_id(), laid])
 	vote.set("voters_fn", func() -> Array: return [&"console"])
 	director.advance(director.rules.vote_cooldown_sec + 0.1)
+	var opened_count := [0]
+	var counter := func(_options: Array, _seconds: float) -> void: opened_count[0] += 1
+	director.vote_opened.connect(counter)
 	var rocked := _run_command("rtv")
 	vote.call("advance", 0.05)
 	_check(director.is_voting(), "and a passing rock-the-vote opens a ballot", str(rocked))
+	# The director opens it under MANUAL; this game used to open it from clock.expired too.
+	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", str(opened_count[0]))
+	director.vote_opened.disconnect(counter)
 	_finished()
 
 
