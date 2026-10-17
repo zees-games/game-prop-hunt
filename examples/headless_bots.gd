@@ -29,7 +29,7 @@ const PhBots := preload("../game/ph_bots.gd")
 ## - every place a prop may hide is reachable from where the props start (the school's
 ##   bathrooms once had a toilet in each doorway).
 ##
-## Forty-eight rounds by default, twelve a map, about eight minutes: a band on eight rounds was a
+## Sixty rounds by default (it was forty-eight over four maps), twelve a map, about ten minutes: a band on eight rounds was a
 ## band on noise, and each map is held to its own band once it has twelve. `-- --rounds N` plays
 ## another number, `-- --first N` starts at the Nth round's map and seed, `-- --map ph_house`
 ## plays that map's rounds of the rotation only, `-- --difficulty hard` plays another preset, and
@@ -37,7 +37,7 @@ const PhBots := preload("../game/ph_bots.gd")
 ## `PH_HIDE_SECONDS` set the server's ceilings for a measurement. Without `maps/` linked it plays
 ## the practice house.
 
-const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods"]
+const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221"]
 
 const TICK_RATE := 32
 const TICK := 1.0 / float(TICK_RATE)
@@ -65,8 +65,8 @@ const COVER_MIN := 0.91
 ## Seconds into the hide by which every stand-in prop wears a disguise (the delay is 1.5 s, the
 ## rest is its hull finding room), and into the seek by which a hunter has hurt some prop.
 const DISGUISE_WITHIN := 6.0
-## 180 s before the annotations; a prop that hides well holds out longer, and the latest of 48 first hits is one round (246 s measured).
-const SEEKER_DAMAGES_WITHIN := 260.0
+## 180 s before the annotations; a prop that hides well holds out longer, and the latest of 60 first hits is one round (264 s measured, on the biggest map, ph_office221).
+const SEEKER_DAMAGES_WITHIN := 280.0
 
 ## The share of rounds the props win: a band at medium, a floor at easy, a ceiling at hard.
 const PROPS_WIN := Vector2(0.35, 0.55)
@@ -102,7 +102,7 @@ func _run() -> void:
 	print("prophunt bots")
 	print("")
 	var args := OS.get_cmdline_user_args()
-	var rounds := maxi(1, int(_arg(args, "--rounds", "48")))
+	var rounds := maxi(1, int(_arg(args, "--rounds", "60")))
 	# One map only: its own rounds of the rotation (the 2nd, 6th, 10th... for the house), so a
 	# round played this way is the same round the whole run plays.
 	var only := _arg(args, "--map", "")
