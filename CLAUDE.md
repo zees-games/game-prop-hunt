@@ -108,6 +108,7 @@ Short forms; the reasoning is in the linked file.
 
 **Delivery**
 
+- **Workshop maps** (`provides.json` `accepts`: kinds `["map"]`, `map_kinds` `["prophunt"]`; no props, because a disguise is a measured hull, see [not-yet](docs/not-yet.md)): a pack `map` entry's `scene` is a prop-hunt map DOCUMENT whose `id` equals the entry's. `PhCatalogue.follow_content` reads `DotContentIndex.shared()` on every `playable()`, so solo (M, vote, change-map) lists it as "Name [Pack]" and an online session sees none; the game's own ids win and a bad document is refused cleanly. `PhVote` follows the index through dot-vote's `follow_content`, so `maps_fn` returns only the game's own maps. `headless_workshop` holds it; `tools/shot.sh --view=maps` renders it. [delivery](docs/delivery.md#the-workshop-solo-only)
 - No `class_name` anywhere in `game/`: a mounted pack cannot register one. [delivery](docs/delivery.md)
 - `game.yml` does not name the maps pack; the owner names it in dot-server-deploy's `cfg/content.yml`, and `PhModule._add_delivered_maps` mounts it at load and after `ph_reload`. [delivery](docs/delivery.md)
 - Under MANUAL `PhVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after `_add_delivered_maps`; `dedicated` arms both. [delivery](docs/delivery.md)
