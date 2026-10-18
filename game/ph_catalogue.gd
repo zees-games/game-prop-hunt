@@ -23,8 +23,17 @@ var maps: Dictionary = {}
 ## Files that were refused, with why. What `ph_maps` prints, so a mapper can see it.
 var refused: Dictionary = {}
 
+## id -> pack title, for the maps in [member maps] that a subscribed pack provided (solo only).
+## The game's own maps are never in it, and an id of theirs is never taken by a pack.
+var workshop: Dictionary = {}
+
+## The Workshop's index and the `map_kind`s taken from it; see [method follow_content].
+var content_index: DotContentIndex = null
+var content_kinds: PackedStringArray = PackedStringArray()
+
 var _order: Array[StringName] = []
 var _next: int = 0
+var _workshop_docs: Dictionary = {}
 
 
 ## Reads every document under [param directory] (relative to this game's root), and adds the
@@ -32,6 +41,7 @@ var _next: int = 0
 func load_from(directory: String) -> int:
 	maps.clear()
 	refused.clear()
+	workshop.clear()
 
 	_add(practice(), "built-in")
 
@@ -111,9 +121,121 @@ func _rebuild_order() -> void:
 	_next = 0
 
 
+## Takes the maps subscribed packs provide, for the index's current session only. Opt-in. A
+## pack's map is a prop-hunt map document (the same JSON as `maps/`) named by the entry's
+## `scene` path, with `map_kind` one of [param accepted_kinds] ("*" is every kind, empty none).
+##
+## [b]Synced on every read rather than copied once[/b]: the index filters by its current
+## session, so a game that goes online loses them with no signal to miss. [method playable]
+## is the read everything goes through.
+func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
+	content_index = index
+	content_kinds = accepted_kinds
+	sync_content()
+
+
+## Brings [member maps] in line with the index's current session: a pack map in, one that left
+## out. The game's own ids win, and a pack map that is not a valid document is listed in
+## [member refused] and left out.
+func sync_content() -> void:
+	var wanted := {}
+
+	if content_index != null:
+		for entry in content_index.entries(&"map"):
+			var kind := str(entry.raw.get("map_kind", ""))
+
+			if kind == "" or not (content_kinds.has("*") or content_kinds.has(kind)):
+				continue
+
+			var id := StringName(entry.id)
+
+			if wanted.has(id) or (maps.has(id) and not workshop.has(id)):
+				continue
+
+			var doc := _workshop_doc(entry)
+
+			if not doc.is_empty():
+				wanted[id] = [doc, entry.pack_title]
+
+	var changed := false
+
+	for id: StringName in workshop.keys():
+		if not wanted.has(id):
+			maps.erase(id)
+			workshop.erase(id)
+			changed = true
+
+	for id: StringName in wanted:
+		if not maps.has(id):
+			maps[id] = wanted[id][0]
+			workshop[id] = wanted[id][1]
+			changed = true
+
+	if changed:
+		_rebuild_order()
+
+
+func _workshop_doc(entry: DotContentEntry) -> Dictionary:
+	if _workshop_docs.has(entry.key):
+		return _workshop_docs[entry.key]
+
+	var path := entry.path("scene")
+	var text := FileAccess.get_file_as_string(path) if path != "" else ""
+	var parsed := PhMapDoc.parse_json(text, path) if text != "" \
+		else DotResult.fail(DotError.CODE_IO, "empty or unreadable", path)
+	var doc: Dictionary = {}
+
+	if parsed.ok:
+		doc = parsed.value
+		doc["id"] = entry.id
+	else:
+		refused[entry.key] = parsed.error.message
+		DotLog.warn(CHANNEL, "a Workshop map was refused", {
+			"entry": entry.key, "why": parsed.error.message,
+		})
+
+	_workshop_docs[entry.key] = doc
+	return doc
+
+
+## The file a game pack states what it takes from subscriptions in (dot-cloud's
+## docs/workshop.md, "What a game accepts"). Read from there so the site and this list cannot drift.
+const PROVIDES_PATH := "res://provides.json"
+const ACCEPTED_MAP_KINDS_FALLBACK := ["prophunt"]
+
+
+## The `map_kind`s of subscribed maps this game takes: `accepts.map_kinds` in `provides.json`.
+static func accepted_map_kinds() -> PackedStringArray:
+	var out := PackedStringArray()
+	var path := PhPaths.rebase(PROVIDES_PATH)
+	var parsed: Variant = null
+	if FileAccess.file_exists(path):
+		parsed = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var accepts: Variant = (parsed as Dictionary).get("accepts") if parsed is Dictionary else null
+	var kinds: Variant = (accepts as Dictionary).get("map_kinds") if accepts is Dictionary else null
+	if not (kinds is Array):
+		kinds = ACCEPTED_MAP_KINDS_FALLBACK
+	for kind: Variant in (kinds as Array):
+		out.append(str(kind))
+	return out
+
+
+## Whether [param id] came from a subscribed pack.
+func is_workshop(id: StringName) -> bool:
+	return workshop.has(id)
+
+
+## The name a menu shows: "Name [Pack]" for a pack's map, the plain name otherwise.
+func label_of(id: StringName) -> String:
+	var name := str((maps.get(id, {}) as Dictionary).get("name", id))
+	var pack := str(workshop.get(id, ""))
+	return "%s [%s]" % [name, pack] if pack != "" else name
+
+
 ## The ids a server may draw from, after [param allowed] (empty is all). The built-in practice
 ## map drops out once there is anything else.
 func playable(allowed: PackedStringArray) -> Array[StringName]:
+	sync_content()
 	var out: Array[StringName] = []
 
 	for id in _order:
@@ -153,12 +275,13 @@ func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream
 
 
 func describe_lines() -> PackedStringArray:
+	sync_content()
 	var lines := PackedStringArray(["maps (%d)" % maps.size()])
 
 	for id in _order:
 		var doc: Dictionary = maps[id]
 		lines.append("  %-22s %-28s %4d props  %s" % [
-			id, str(doc["name"]), (doc["props"] as Array).size(), str(doc["author"]),
+			id, label_of(id), (doc["props"] as Array).size(), str(doc["author"]),
 		])
 
 	if not refused.is_empty():

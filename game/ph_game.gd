@@ -250,6 +250,8 @@ func _ready() -> void:
 		# would have named. See [method solo_map_dirs].
 		for root in solo_map_dirs("maps"):
 			var _added := catalogue.add_directory(root)
+		# The Workshop's maps, solo only by the index's own session (an online session lists none).
+		catalogue.follow_content(DotContentIndex.shared(), PhCatalogue.accepted_map_kinds())
 		# Laid out now, not on the first round: a warmup on an empty world is
 		# indistinguishable from a map that failed to load.
 		_lay_out_map()
@@ -878,7 +880,7 @@ func map_rows() -> Array:
 	var now := StringName(str(map_doc.get("id", "")))
 	for id in catalogue.playable(config.map_ids):
 		var doc: Dictionary = catalogue.maps.get(id, {})
-		var row := {"id": String(id), "name": str(doc.get("name", id)), "current": id == now,
+		var row := {"id": String(id), "name": catalogue.label_of(id), "current": id == now,
 			"detail": str(doc.get("blurb", ""))}
 		if doc.has("thumbnail"):
 			row["thumbnail"] = str(doc["thumbnail"])

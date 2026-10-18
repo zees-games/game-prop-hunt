@@ -612,8 +612,11 @@ func _build_vote(world: PhGame) -> void:
 	vote.maps_fn = func() -> Array:
 		var out: Array = []
 
+		# The game's own maps only: the Workshop's come from the source's own follow, which
+		# reads the index on every ballot and so shows none of them online.
 		for id in world.catalogue.playable(world.config.map_ids):
-			out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
+			if not world.catalogue.is_workshop(id):
+				out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
 
 		return out
 	vote.apply_fn = func(id: StringName) -> DotResult:

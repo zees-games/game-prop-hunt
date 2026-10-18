@@ -14,6 +14,7 @@
 #   tools/shot.sh --view=hunter --fire=12 --aim-prop              # trigger held (slowed) at the nearest furniture: flash, tracers, impacts, the counter, a decoy's cost
 #   tools/shot.sh --view=hunter --aim --name=hunter_aimed        # down the sights (compare --view=hunter)
 #   tools/shot.sh --view=loadout                                  # B open in the hide: a hunter's loadout
+#   tools/shot.sh --view=maps --seconds=0.5                       # M: the solo map list with a Workshop fixture map (Name [Pack])
 #   tools/shot.sh --view=grenade --seconds=0.4                    # a frag thrown from slot five, in flight (--seconds=2: its burst)
 #   tools/shot.sh --view=overview --out=res://screenshots/x.png   # any --ph-* is the game's config
 #

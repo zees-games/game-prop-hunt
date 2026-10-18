@@ -3,6 +3,7 @@ extends Node
 ## Renders the game and saves a frame. The check no assertion in this repository makes.
 ## See `tools/shot.sh` for the views. Any `--ph-*` is the game's own configuration.
 
+const PhCatalogue := preload("../game/ph_catalogue.gd")
 const PhClient := preload("../game/ph_client.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
@@ -56,12 +57,40 @@ func _ready() -> void:
 		elif arg.begins_with("--as="):
 			_as = StringName(arg.trim_prefix("--as="))
 
+	if _view == "maps":
+		_subscribe_fixture()
+
 	_client = PhClient.new()
 	_client.name = "Client"
 	_client.set("force_offline", true)
 	_client.set("remember_loadout", false)
 	add_child(_client)
 	_run.call_deferred()
+
+
+## --view=maps: a fixture map pack in the shared [DotContentIndex], as the solo shell leaves
+## one after a subscribed pack mounts, so the M menu shows what a player would see. The pack's
+## map is the practice house under another name, written to user://.
+func _subscribe_fixture() -> void:
+	var dir := "user://ws_shot_ph/"
+	DirAccess.make_dir_recursive_absolute(dir)
+	var doc := PhCatalogue.practice().duplicate(true)
+	doc["id"] = "fixture_barn"
+	doc["name"] = "Fixture Barn"
+	doc["blurb"] = "From the Workshop."
+	var file := FileAccess.open(dir + "barn.json", FileAccess.WRITE)
+	file.store_string(JSON.stringify(doc))
+	file.close()
+	var index := DotContentIndex.shared()
+	index.set_session(DotContentIndex.SESSION_SOLO)
+	var _added := index.add_pack({
+		"content_id": "fixture/barns", "version": "1.0.0", "prefix": dir,
+		"session": DotContentIndex.SESSION_SOLO, "source": &"subscription",
+		"provides": {"schema": 1, "title": "Hilltop Pack", "kinds": ["map"], "entries": [
+			{"kind": "map", "id": "fixture_barn", "name": "Fixture Barn", "scene": "barn.json", "map_kind": "prophunt"},
+			{"kind": "map", "id": "fixture_run", "name": "Fixture Run", "scene": "barn.json", "map_kind": "surf"},
+		]},
+	})
 
 
 static func _v3(text: String) -> Vector3:
@@ -237,6 +266,21 @@ func _run() -> void:
 				await _frames(3)
 			print("grenade: %s" % ("went off at %s" % str((went[0] as Vector3).snapped(Vector3.ONE * 0.1)) if not went.is_empty()
 				else "in flight at %s, %d ticks" % [str((thrown.get(&"position") as Vector3).snapped(Vector3.ONE * 0.1)), int(thrown.get(&"age_ticks"))]))
+		"maps":
+			# M: the solo map list, with the Workshop's map among the game's own.
+			await _seconds_of(0.5)
+			var settings: Object = _client.get("settings")
+			var menu: Variant = settings.get("menu")
+			menu.call(&"open_maps")
+			var picker: Variant = menu.get("picker")
+			if picker != null:
+				# Past the last row and back one: the fixture sorts after the shipped maps' ids.
+				var rows := game.map_rows()
+				for i in range(rows.size()):
+					if str(rows[i]["id"]) == "fixture_barn":
+						picker.call(&"turn", 99)
+						picker.call(&"turn", i - rows.size() + 1)
+			await _seconds_of(_seconds)
 		"loadout":
 			# B in the hide, blindfolded, when a choice goes straight into the hands.
 			await _seconds_of(0.5)

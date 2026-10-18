@@ -9,3 +9,7 @@ The maps are their own repository and pack, [mg-prop-hunt-maps](../mg-prop-hunt-
 ## Project settings
 
 `project.godot` carries no comments: the editor drops them, and any key left at its default, the first time it saves the file, so the reasons for its settings live here. Gravity stays the engine default and nothing reads it: `PhConfig.gravity` is written onto the world's own physics space, because a project setting does not travel inside a delivered pack. The renderer is `gl_compatibility`, what the delivered client runs, and lighting is tuned under it. The canvas texture filter is Nearest so the prototype grid reads as discrete squares at distance. Texture imports keep `detect_3d/compress_to=0` (`[importer_defaults]` starts new ones that way) so the editor never re-imports one VRAM-compressed on a first open.
+
+## The Workshop (solo only)
+
+`provides.json` states what the game takes from subscribed packs: kind `map`, `map_kind` `prophunt`. A pack's map entry names a map document (the JSON `maps/` holds) in `scene`. `PhCatalogue.follow_content` re-reads the shared `DotContentIndex` on every `playable()`, so a solo game lists and plays the map (M menu, `ph_maps`, the next-map draw) as "Name [Pack]" and an online session lists none; the game's own ids win. `PhVote` follows the same index for the ballot, and its `maps_fn` returns only the game's own maps. `headless_workshop` covers solo, online and a kind the game does not accept; `tools/shot.sh --view=maps` renders the M menu with a fixture pack. Props are not accepted, see [not-yet.md](not-yet.md).
