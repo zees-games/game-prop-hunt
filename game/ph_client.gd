@@ -1619,6 +1619,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_released(PhBindings.BASH):
 		_alt = false
 
+	if _wheel_pressed(event):
+		get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 
@@ -1642,11 +1646,55 @@ func _unhandled_input(event: InputEvent) -> void:
 	if player == null:
 		return
 
-	if event is InputEventMouseMotion and _captured:
+	# Every event, not only motion: the sampler latches a press that a wheel tick sends with its
+	# release in the same frame, and reads its own actions off the events it is shown.
+	if _captured:
 		if _offline and player.sampler != null:
 			player.sampler.handle_event(event)
 		elif _sampler != null:
 			_sampler.handle_event(event)
+
+
+## The wheel (or whatever the Controls page moved it to) walks a hunter's carried slots. Props
+## carry nothing and have no item switching, so for them it does nothing.
+func _wheel_pressed(event: InputEvent) -> bool:
+	var step := 0
+
+	if event.is_action_pressed(&"dot_menu_weapon_next"):
+		step = 1
+	elif event.is_action_pressed(&"dot_menu_weapon_previous"):
+		step = -1
+	else:
+		return false
+
+	if not _captured or player == null or not player.is_alive() or is_spectating() or not is_hunter():
+		return false
+
+	var to := _cycled_slot(step)
+
+	if to > 0:
+		_slot = to
+
+	return true
+
+
+## The carried slot [param step] places along from the one chosen, wrapping, skipping empty
+## slots. 0 when there is nothing else to go to.
+func _cycled_slot(step: int) -> int:
+	if weapons == null or weapons.arsenal == null:
+		return 0
+
+	var carried := weapons.arsenal.slots()
+
+	if carried.size() < 2:
+		return 0
+
+	var at := carried.find(_slot if _slot != 0 else weapons.arsenal.current_slot())
+
+	if at < 0:
+		return carried[0]
+
+	return carried[posmod(at + step, carried.size())]
 
 
 ## The game's own keys, from the bindings. True when one was used.

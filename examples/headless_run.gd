@@ -27,7 +27,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 28
 
-const CHECKS := 146
+const CHECKS := 147
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1015,6 +1015,11 @@ func _test_help_and_menu() -> void:
 		and keys.key_for(PhBindings.BASH) == "F" and keys.defaults_on("F").size() == 1,
 		"aim is the only row on the right mouse button, quick melee the only one on F",
 		"%s %s" % [keys.key_for(PhBindings.AIM), keys.key_for(PhBindings.BASH)])
+	# The wheel cycles a hunter's weapons, one row per direction, and no longer jumps.
+	_check(keys.key_for(&"dot_menu_weapon_previous") == "Wheel up" and keys.key_for(&"dot_menu_weapon_next") == "Wheel down"
+		and keys.defaults_on("Wheel up").size() == 1 and keys.defaults_on("Wheel down").size() == 1,
+		"the wheel is two rows, one per direction, with nothing else on it",
+		"%s %s" % [keys.key_for(&"dot_menu_weapon_previous"), keys.key_for(&"dot_menu_weapon_next")])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "J")
 	_check(keys.key_for(PhBindings.CHAT) == "J" and DotInputBinding.describe_action(PhBindings.CHAT) == "J"

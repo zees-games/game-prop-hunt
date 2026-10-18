@@ -50,6 +50,7 @@ const SLOTS: Array[StringName] = [&"ph_slot_1", &"ph_slot_2", &"ph_slot_3", &"ph
 static func make() -> DotMenuBindings:
 	var keys := DotMenuBindings.new()
 	keys.add_movement()
+	var _wheel := keys.add_wheel_weapons(&"dot_menu_weapon_previous", &"dot_menu_weapon_next", "Hunters")
 	keys.add(DISGUISE, &"bind_disguise", "Become what you look at", "E", "Props")
 	keys.add(REVEAL, &"bind_reveal", "Show yourself / hide again", "Q", "Props")
 	keys.add(LOCK, &"bind_lock", "Lock rotation", "C", "Props")
