@@ -36,7 +36,7 @@ game/
   ph_projectiles.gd  grenades in flight and where they go off; ph_projectile_view.gd draws them
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
-  ph_client.gd       one local player, alone or against a server; third person as a prop
+  ph_client.gd       one local player, alone or against a server; third person as a prop; its platform wiring (loading cover, settings, console, Tab, M, pointer, input block) is dot-game's `DotGameClient` (`platform`)
   ph_bindings.gd     every key, as dot-menu bindings; ph_settings.gd the Escape menu
   ph_module.gd       the DotGameModule: cvars, ph_status / ph_maps / ph_taunts / ph_map, stand-ins
   ph_services.gd     chat, voice and moderation over dot-game's base
@@ -111,7 +111,7 @@ Short forms; the reasoning is in the linked file.
 - No `class_name` anywhere in `game/`: a mounted pack cannot register one. [delivery](docs/delivery.md)
 - `game.yml` does not name the maps pack; the owner names it in dot-server-deploy's `cfg/content.yml`, and `PhModule._add_delivered_maps` mounts it at load and after `ph_reload`. [delivery](docs/delivery.md)
 - Under MANUAL `PhVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after `_add_delivered_maps`; `dedicated` arms both. [delivery](docs/delivery.md)
-- dot-props (4), dot-bot (2), dot-npc-ai (2, with dot-npc), dot-team (2), dot-fx (2), dot-game (3), dot-ui (4), dot-loadout (2, B) and dot-menu (6, B) must be tagged and in the client shell before publishing. [delivery](docs/delivery.md)
+- dot-props (4), dot-bot (2), dot-npc-ai (2, with dot-npc), dot-team (2), dot-fx (2), dot-game (8), dot-ui (4), dot-loadout (2, B) and dot-menu (6, B) must be tagged and in the client shell before publishing. [delivery](docs/delivery.md)
 - `project.godot` carries no comments; `PhConfig.gravity` goes onto the world's own space (a project setting does not travel in a pack); the renderer is `gl_compatibility`. [delivery](docs/delivery.md#project-settings)
 - A shell that lacks an addon, or a stale class cache, fails the delivered client's parse: dot-server-deploy's `prophunt_client` finds it. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 

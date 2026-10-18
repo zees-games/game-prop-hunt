@@ -35,8 +35,6 @@ const PhProjectileView := preload("ph_projectile_view.gd")
 
 const CHANNEL := "ph.client"
 
-const LINK_SERVICE := &"dot_client_link"
-
 ## How far behind a prop the camera hangs: this plus its size.
 const CHASE_BACK := 2.4
 const CHASE_UP := 0.8
@@ -59,7 +57,7 @@ var chat: DotGameChatClient = null
 var audio: PhAudio = null
 var settings: PhSettings = null
 
-## The player's console. See [method DotConsoleKit.build].
+## The player's console (the platform's).
 var console: DotConsoleController = null
 
 ## A hunter's own gun, drawn. Never decides anything: every shot is the server's.
@@ -81,7 +79,6 @@ var _view_chosen: bool = false
 var _offline: bool = true
 var _sampler: DotFpsSampler = null
 var _watch_id: int = -1
-var _captured: bool = false
 var _arm: DotCameraBoom = null
 var _fade: DotCameraFade = null
 var _rig_height: float = 0.0
@@ -106,12 +103,24 @@ var _beeped: int = -1
 var _break_rules: DotPlayerBreakRules = null
 
 ## Covers the screen, and keeps the local body and the input still, until the level is built,
-## the local player exists and its camera is current. See [method _build_gate].
+## the local player exists and its camera is current. It is [member DotGameClient.gate].
 var gate: DotLoadGate = null
+
+## dot-game's client platform: the cover, settings and menu, console, HUD theme, Tab, M, the
+## pointer and the input block. See [DotGameClient].
+var platform: DotGameClient = null
 
 
 func _ready() -> void:
-	_build_gate()
+	# First, before anything can be drawn: the platform puts the loading cover up, held until the
+	# player exists and the camera is current, and finds the link.
+	platform = DotGameClient.new()
+	platform.name = "Platform"
+	platform.force_offline = force_offline
+	platform.spawned_fn = func() -> bool: return player != null
+	platform.scoreboard_action = PhBindings.SCOREBOARD
+	add_child(platform)
+	gate = platform.gate
 	ZeeModelCache.set_asset_root(PhPaths.root())
 
 	var config := PhConfig.new()
@@ -120,8 +129,8 @@ func _ready() -> void:
 	if not loaded.ok:
 		DotLog.warn(CHANNEL, "falling back to defaults", {"why": loaded.error.message})
 
-	link = DotRegistry.get_node_service(LINK_SERVICE)
-	_offline = force_offline or link == null or OS.get_cmdline_user_args().has("--offline")
+	link = platform.link as Node
+	_offline = platform.offline
 
 	game = PhGame.new()
 	game.name = "World"
@@ -150,29 +159,14 @@ func _ready() -> void:
 	else:
 		DotLog.result(CHANNEL, "the netcode", _build_netcode())
 
-	if not DotPlatform.is_web():
-		_capture()
 
-
-## The load gate.
+## The load gate is [member DotGameClient.gate].
 ##
 ## [b]Without it the first frames showed a half-built world.[/b] Solo, the body spawned and fell
 ## in the tick the first map landed with shaders compiling in front of the player, a connected
 ## client drew a HUD with no player and no camera until JOIN, and a map change tore the level
 ## down in front of a body that kept falling. A frozen player is also skipped by
 ## [method PhPlayer.simulate], which the world calls by name and `process_mode` does not stop.
-func _build_gate() -> void:
-	gate = DotLoadGate.new()
-	gate.name = "LoadGate"
-	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
-	# out its timeout, and every suite that drives a client would wait with it.
-	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
-	add_child(gate)
-	gate.hold(&"map", "Loading the map")
-	gate.require(&"spawned", func() -> bool:
-		return player != null and camera != null and camera.is_inside_tree(), "Joining")
-
-
 ## A map is built: held from the moment the old one starts to go, released once the new one
 ## stands. [signal PhGame.world_clearing] and [signal PhGame.world_rebuilt] fire for the first
 ## map, a map change, and a map a server sent.
@@ -828,21 +822,6 @@ func _key(action: StringName) -> String:
 	return str(row.get("default", action))
 
 
-# --- The Tab board ---------------------------------------------------------
-
-## M: the map list (dot-menu's map menu). Solo a choice changes the map here at once;
-## connected the server decides, by the owner's `sv_map_menu_flag`, and anybody without it
-## gets a vote instead (dot-vote's map menu, wired in [PhModule]). Its choice goes to the map
-## menu, never to the taunt list's `picked` handler. By name, so a client shell older than
-## the map menu still runs the game without it.
-func _wire_maps() -> void:
-	if not settings.has_method(&"use_maps"):
-		return
-	var _maps: Variant = settings.call(&"use_maps",
-		func() -> Array: return game.map_rows() if game != null else [],
-		func(id: StringName) -> DotResult: return game.change_map_now(id))
-
-
 # --- The loadout menu (B) -----------------------------------------------------
 
 ## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
@@ -916,11 +895,10 @@ func _restore_loadout() -> void:
 	var _sent: Variant = await loadout_menu.call(&"restore")
 
 
-func _wire_board() -> void:
-	if settings == null or settings.menu == null:
+func _dress_board() -> void:
+	if board == null:
 		return
 
-	board = settings.menu.scoreboard
 	board.title_text = "Prop Hunt"
 	board.columns = [
 		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
@@ -932,20 +910,6 @@ func _wire_board() -> void:
 	board.sort_by = &"points"
 	board.decorate = _decorate_row
 	board.prepare = _prepare_board
-
-	if not _offline and link != null:
-		board.feed_from(link)
-	else:
-		board.source = board_snapshot
-
-
-func _show_board(on: bool) -> void:
-	if board == null:
-		return
-	if on:
-		board.open()
-	else:
-		board.close()
 
 
 func _decorate_row(row: Dictionary) -> void:
@@ -1044,10 +1008,6 @@ func _build_chat() -> void:
 	chat.voice_config = PhServices.voice_format()
 	add_child(chat)
 
-	# Typing is not moving: the sampler polls the keyboard.
-	chat.typing_changed.connect(func(typing: bool) -> void:
-		_suspend_input(typing or (settings != null and settings.is_open())))
-
 
 func _build_audio() -> void:
 	audio = PhAudio.new()
@@ -1065,15 +1025,28 @@ func _build_audio() -> void:
 
 func _build_settings() -> void:
 	settings = PhSettings.new()
+	settings.name = "Settings"
 	add_child(settings)
+	platform.settings = settings
+	# Not handed over: PhHud is a CanvasLayer and the platform's hud is a Control, so it follows
+	# the menu's theme itself, below.
+	platform.chat = chat
+	platform.board_snapshot_fn = board_snapshot
+	# M: the map list. Solo a choice changes the map here at once; connected the server decides,
+	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (dot-vote's
+	# map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt
+	# list's `picked` handler.
+	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
+	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
+	DotLog.result(CHANNEL, "the platform", platform.setup())
+	# Walking is off while the cover is up, a menu is open or a line is typed: the sampler polls
+	# the keyboard.
+	platform.input_blocked_changed.connect(_suspend_input)
+	_suspend_input(platform.is_input_blocked())
 
-	var built: DotResult = settings.setup()
-
-	if not built.ok:
-		DotLog.warn(CHANNEL, "no settings; everything is at its default", {"why": built.error.message})
-		remove_child(settings)
-		settings.free()
-		settings = null
+	settings = platform.settings as PhSettings
+	console = platform.console as DotConsoleController
+	if settings == null:
 		return
 
 	if _sampler != null:
@@ -1084,25 +1057,13 @@ func _build_settings() -> void:
 
 	if settings.menu != null:
 		settings.menu.picker_action = PhBindings.TAUNT_MENU
-		settings.menu.scoreboard_action = PhBindings.SCOREBOARD
 		settings.menu.picked.connect(_on_taunt_picked)
-		settings.menu_state_changed.connect(func(any_open: bool) -> void:
-			_suspend_input(any_open or (chat != null and chat.is_typing()))
-			if any_open:
-				_release()
-			elif not DotPlatform.is_web():
-				_capture())
-		settings.menu.busy = func() -> bool: return chat != null and chat.is_typing()
-		# The console (the key under Escape): net_stat and every other setting by name, and
-		# the server's console when one runs in this process. One of the menu's overlays, so
-		# opening it stops the player and frees the pointer exactly as the menu does.
-		console = DotConsoleKit.build(self, settings.settings, settings.menu)
 		# The HUD in the menu's theme and at the player's HUD size, live.
 		if hud != null:
 			hud.follow_menu(settings.menu)
 		_bind_bot_console()
-		_wire_board()
-		_wire_maps()
+		board = platform.board as DotMenuScoreboard
+		_dress_board()
 		_use_loadout_menu()
 
 
@@ -1203,6 +1164,10 @@ func _build_break_rules() -> void:
 
 
 func _suspend_input(suspended: bool) -> void:
+	if suspended:
+		# The button's release goes to the menu, so the aim is let go here or it sticks up.
+		_aiming = false
+
 	if _sampler != null:
 		_sampler.suspended = suspended
 
@@ -1210,16 +1175,9 @@ func _suspend_input(suspended: bool) -> void:
 		player.sampler.suspended = suspended
 
 
-func _capture() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	_captured = true
-
-
-func _release() -> void:
-	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
-	_captured = false
-	# The button's release goes to the menu, so the aim is let go here or it sticks up.
-	_aiming = false
+## Whether the pointer is the game's: captured. A menu frees it and the platform takes it back.
+func _pointer_ours() -> bool:
+	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 # --- Asking ----------------------------------------------------------------
@@ -1468,7 +1426,7 @@ func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	var blind := hud != null and hud.is_blindfolded()
 	if hands != null:
-		hands.aim(_aiming and _captured and is_hunter() and not third_person and not is_spectating()
+		hands.aim(_aiming and _pointer_ours() and is_hunter() and not third_person and not is_spectating()
 			and player.is_alive() and not blind)
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
@@ -1641,18 +1599,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _covered():
 		return
 
-	if event is InputEventMouseButton and event.pressed and not _captured:
-		_capture()
-		return
-
+	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
 	if event.is_action_pressed("ui_cancel"):
-		_release()
+		# The button's release goes to the menu, so the aim is let go here or it sticks up.
+		_aiming = false
 		if settings != null:
 			settings.open()
-		return
-
-	if event.is_action(PhBindings.SCOREBOARD) and not event.is_echo():
-		_show_board(event.is_pressed())
 		return
 
 	if event is InputEventKey and (event as InputEventKey).pressed and not event.is_echo():
@@ -1696,7 +1648,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Every event, not only motion: the sampler latches a press that a wheel tick sends with its
 	# release in the same frame, and reads its own actions off the events it is shown.
-	if _captured:
+	if _pointer_ours():
 		if _offline and player.sampler != null:
 			player.sampler.handle_event(event)
 		elif _sampler != null:
@@ -1715,7 +1667,7 @@ func _wheel_pressed(event: InputEvent) -> bool:
 	else:
 		return false
 
-	if not _captured or player == null or not player.is_alive() or is_spectating() or not is_hunter():
+	if not _pointer_ours() or player == null or not player.is_alive() or is_spectating() or not is_hunter():
 		return false
 
 	var to := _cycled_slot(step)
