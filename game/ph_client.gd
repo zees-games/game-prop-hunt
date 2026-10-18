@@ -105,8 +105,13 @@ var _beeped: int = -1
 ## The rules a hunter's body comes apart by when the furniture finishes them.
 var _break_rules: DotPlayerBreakRules = null
 
+## Covers the screen, and keeps the local body and the input still, until the level is built,
+## the local player exists and its camera is current. See [method _build_gate].
+var gate: DotLoadGate = null
+
 
 func _ready() -> void:
+	_build_gate()
 	ZeeModelCache.set_asset_root(PhPaths.root())
 
 	var config := PhConfig.new()
@@ -125,6 +130,8 @@ func _ready() -> void:
 	game.register_service = _offline
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
 	game.draw_world = true
+	# Before the world is added, in case a world lays its first map out in its own _ready.
+	_hold_for_maps()
 	add_child(game)
 	_build_ragdolls()
 	_build_projectile_view()
@@ -145,6 +152,38 @@ func _ready() -> void:
 
 	if not DotPlatform.is_web():
 		_capture()
+
+
+## The load gate.
+##
+## [b]Without it the first frames showed a half-built world.[/b] Solo, the body spawned and fell
+## in the tick the first map landed with shaders compiling in front of the player, a connected
+## client drew a HUD with no player and no camera until JOIN, and a map change tore the level
+## down in front of a body that kept falling. A frozen player is also skipped by
+## [method PhPlayer.simulate], which the world calls by name and `process_mode` does not stop.
+func _build_gate() -> void:
+	gate = DotLoadGate.new()
+	gate.name = "LoadGate"
+	# A headless run draws nothing, so there is nothing to compile; its warm-up would only wait
+	# out its timeout, and every suite that drives a client would wait with it.
+	gate.warm_up_on_open = DisplayServer.get_name() != "headless"
+	add_child(gate)
+	gate.hold(&"map", "Loading the map")
+	gate.require(&"spawned", func() -> bool:
+		return player != null and camera != null and camera.is_inside_tree(), "Joining")
+
+
+## A map is built: held from the moment the old one starts to go, released once the new one
+## stands. [signal PhGame.world_clearing] and [signal PhGame.world_rebuilt] fire for the first
+## map, a map change, and a map a server sent.
+func _hold_for_maps() -> void:
+	game.world_clearing.connect(func() -> void: gate.hold(&"map", "Loading the map"))
+	game.world_rebuilt.connect(func() -> void: gate.release(&"map"))
+
+
+## True while the load gate covers the screen: no input, no prediction sampling.
+func _covered() -> bool:
+	return gate != null and not gate.is_open()
 
 
 func _exit_tree() -> void:
@@ -324,6 +363,10 @@ func _adopt(candidate: PhPlayer) -> void:
 		return
 
 	player = candidate
+	# A client built without its _ready (a suite adopting a body) has no gate.
+	if gate != null:
+		gate.freeze(player)
+
 	_follow_side()
 	_build_camera()
 
@@ -1237,7 +1280,9 @@ func _physics_process(delta: float) -> void:
 	if net == null or not net.is_running() or bridge == null:
 		return
 
-	var move := _sampler.sample(delta) if _sampler != null else DotFpsCommand.new()
+	# The clock still advances; only the sampling waits, so the mouse does not pile up a turn
+	# behind the cover and the server sees an idle body until it lifts.
+	var move := _sampler.sample(delta) if _sampler != null and not _covered() else DotFpsCommand.new()
 	_stamp(move)
 
 	var ticks := net.clock.advance(delta)
@@ -1593,6 +1638,9 @@ static func drawn_position(body: PhPlayer, remote: bool) -> Vector3:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _covered():
+		return
+
 	if event is InputEventMouseButton and event.pressed and not _captured:
 		_capture()
 		return
