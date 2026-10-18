@@ -29,7 +29,7 @@ const PhBots := preload("../game/ph_bots.gd")
 ## - every place a prop may hide is reachable from where the props start (the school's
 ##   bathrooms once had a toilet in each doorway).
 ##
-## Seventy-two rounds by default (it was forty-eight over four maps), twelve a map, about ten minutes: a band on eight rounds was a
+## Ninety-six rounds by default (it was forty-eight over four maps), twelve a map, about ten minutes: a band on eight rounds was a
 ## band on noise, and each map is held to its own band once it has twelve. `-- --rounds N` plays
 ## another number, `-- --first N` starts at the Nth round's map and seed, `-- --map ph_house`
 ## plays that map's rounds of the rotation only, `-- --difficulty hard` plays another preset, and
@@ -37,7 +37,7 @@ const PhBots := preload("../game/ph_bots.gd")
 ## `PH_HIDE_SECONDS` set the server's ceilings for a measurement. Without `maps/` linked it plays
 ## the practice house.
 
-const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221", "ph_apartment"]
+const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church"]
 
 const TICK_RATE := 32
 const TICK := 1.0 / float(TICK_RATE)
@@ -102,7 +102,7 @@ func _run() -> void:
 	print("prophunt bots")
 	print("")
 	var args := OS.get_cmdline_user_args()
-	var rounds := maxi(1, int(_arg(args, "--rounds", "72")))
+	var rounds := maxi(1, int(_arg(args, "--rounds", "96")))
 	# One map only: its own rounds of the rotation (the 2nd, 6th, 10th... for the house), so a
 	# round played this way is the same round the whole run plays.
 	var only := _arg(args, "--map", "")
