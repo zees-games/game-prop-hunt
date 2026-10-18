@@ -128,6 +128,11 @@ var map: PhMap = null
 var catalogue: PhCatalogue = null
 var props_catalogue: PhProps = null
 var combat: DotCombatManager = null
+## Whether a player may be hurt or eliminated now: `func(player_id: StringName) -> bool`, assigned
+## by the module (dot-game's "still loading": a seat behind its client's cover cannot see and is
+## frozen by its own client, so a shot, a decoy charge or a fall must not end it). Unset offline,
+## and bots are never loading, so offline rounds are unchanged.
+var harm_gate: Callable = Callable()
 ## The hunters' grenades in flight (`ph_projectiles.gd`): flown on the server and solo, and as
 ## copies on a client from the LAUNCH events (`PhNetBridge`), which decide nothing.
 var projectiles: PhProjectiles = null
@@ -380,6 +385,12 @@ func _build_combat() -> void:
 	combat.resolver.hit_groups = DotHitGroup.defaults()
 	combat.resolver.team_of = func(entity_id: int) -> int:
 		return team_of(entities.key_for_id(entity_id))
+	# The one place every hurt passes (a hunter's shot, a blast, a decoy's charge on the hunter,
+	# the fall): a round counts the living from health, so refusing here keeps a covered seat
+	# alive in the count as well.
+	combat.resolver.adjust = func(damage: DotDamage) -> void:
+		if not can_be_harmed(entities.key_for_id(damage.victim)):
+			damage.refuse("still loading")
 
 	add_child(combat)
 
@@ -697,6 +708,12 @@ func players_on(side: int) -> Array[PhPlayer]:
 			out.append(players[id])
 
 	return out
+
+
+## Whether [param player_id] may be damaged or eliminated now: false while their client is
+## behind its loading cover. True for anybody the gate does not know.
+func can_be_harmed(player_id: StringName) -> bool:
+	return not harm_gate.is_valid() or bool(harm_gate.call(player_id))
 
 
 ## How many of a side are up and in the round.

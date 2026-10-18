@@ -3,6 +3,7 @@ extends Node
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
+const PhNetBridge := preload("../game/net/ph_net_bridge.gd")
 
 ## The game as a deployed server runs it: a real [DotServer], booted from a config file, with
 ## the module loaded BY PATH the way an operator names it — so the netcode, the services, the
@@ -13,8 +14,8 @@ const PhPlayer := preload("../game/ph_player.gd")
 ## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
 ## nothing but the stand-ins the module seats itself.
 
-const SECTIONS := 10
-const CHECKS := 63
+const SECTIONS := 11
+const CHECKS := 67
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -311,6 +312,7 @@ func _test_a_round_runs() -> void:
 		var bots_after: int = (quota_module.get("_bot_ids") as Array).size()
 		_check(bots_after == bots_before, "and a stand-in comes back when they leave",
 			"%d -> %d" % [bots_with, bots_after])
+		_covered_seat_cannot_be_harmed(quota_module, quota_bridge)
 	else:
 		_check(false, "a person joining takes a stand-in's place", "no module")
 		_check(false, "and a stand-in comes back when they leave", "no module")
@@ -318,6 +320,40 @@ func _test_a_round_runs() -> void:
 	var _restored := _run_command("ph_min_players 3")
 
 	_check(_said(_run_command("ph_status"), "round"), "and ph_status still answers")
+	_finished()
+
+
+## [b]A seat behind its client's loading cover cannot be hurt or eliminated[/b] (dot-game's "still
+## loading"): a person with a real peer, marked loading on the module's roster the way a join
+## does, takes a lethal hit that must be refused; once their cover lifts the same hit lands.
+## Rounds of stand-ins never reach this, because a bot is never loading.
+func _covered_seat_cannot_be_harmed(module: Object, bridge: Object) -> void:
+	_section("a covered seat cannot be harmed")
+	var roster: Object = module.get("roster")
+	var joined: DotResult = bridge.call("add_player", 7, 9002, "Covered")
+	var who: PhPlayer = game.players.get(PhNetBridge.player_key(9002))
+	_check(joined.ok and who != null and roster != null, "a person with a peer is seated")
+	if not (joined.ok and who != null and roster != null):
+		return
+	# What the roster's spawn hook does for a person, by hand: the peer's seat, then loading.
+	(roster.get("_peer_seat") as Dictionary)[7] = 9002
+	roster.call("_start_loading", 9002, true)
+	_check(bool(module.call("is_peer_loading", 7)) and not game.can_be_harmed(PhNetBridge.player_key(9002)),
+		"the seat is loading and the world will not harm it")
+	var before := who.health.health
+	var hit := DotDamage.make(0, who.entity_id, who.health.max_health * 10.0, null)
+	hit.context = {"why": &"test"}
+	var _applied: Variant = game.combat.apply_damage(hit)
+	_check(who.is_alive() and is_equal_approx(who.health.health, before),
+		"a lethal hit on a loading seat is refused and the seat stays up",
+		"%s -> %s" % [before, who.health.health])
+	roster.call("_finish_loading", 9002, "test")
+	var hit2 := DotDamage.make(0, who.entity_id, 1.0, null)
+	hit2.context = {"why": &"test"}
+	var _applied2: Variant = game.combat.apply_damage(hit2)
+	_check(who.health.health < before, "and once the cover lifts the same kind of hit lands",
+		"%s -> %s" % [before, who.health.health])
+	bridge.call("remove_player", 9002)
 	_finished()
 
 

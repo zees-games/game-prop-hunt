@@ -160,6 +160,14 @@ func _game_load() -> DotResult:
 	add_command("any", _cmd_wish.bind(0), "Either side in the next draw", "")
 	add_command("ph_say", _cmd_say, "Say something to everybody, as the server")
 
+	# dot-game's "still loading": the server refuses to hurt or eliminate a seat whose client is
+	# behind its cover (see PhGame.harm_gate). Asked by peer, resolved through the bridge.
+	world.harm_gate = func(player_id: StringName) -> bool:
+		if bridge == null:
+			return true
+		var peer := int((bridge as PhNetBridge).peer_for_player(PhNetBridge.session_of(player_id)))
+		return peer <= 0 or can_peer_be_harmed(peer)
+
 	_wire_chat()
 	_wire_identity()
 	_wire_map(world)
