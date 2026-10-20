@@ -18,7 +18,7 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 ## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
 ## Adding a map adds a section and CHECKS_PER_MAP checks.
 
-const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church"]
+const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church", "ph_abandoned_hotel"]
 const CHECKS_PER_MAP := 11
 
 ## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not
@@ -96,6 +96,11 @@ func _test_the_catalogue() -> void:
 	ids.sort()
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	_maps = MAPS.duplicate() if linked else ["ph_practice"]
+	# `-- --map ph_x` audits one map: for a converted map while it is being tuned.
+	var user_args := OS.get_cmdline_user_args()
+	var only := user_args.find("--map")
+	if linked and only >= 0 and only + 1 < user_args.size():
+		_maps = [user_args[only + 1]]
 
 	if not linked:
 		print("(no map directory: the built-in practice house only)")

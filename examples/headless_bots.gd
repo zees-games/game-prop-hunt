@@ -129,6 +129,10 @@ func _run() -> void:
 	var r := first
 	while played < rounds:
 		var map_id: String = MAPS[r % MAPS.size()] if linked else "ph_practice"
+		# A converted map outside the suite's rotation (`-- --map ph_x`) plays its own rounds, seeded
+		# by their number, so it is measured on its own without changing what the suite's maps draw.
+		if only != "" and linked and not MAPS.has(only):
+			map_id = only
 		r += 1
 		if only != "" and linked and map_id != only:
 			continue
