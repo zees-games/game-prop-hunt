@@ -88,6 +88,13 @@ const MAP_BANDS := {
 	"ph_abandoned_church": Vector2(0.1, 0.65),
 }
 const HARD_PROPS_WIN := 0.4
+## CI mode (the `CI` environment variable is "true", which GitHub Actions sets): two rounds a map
+## instead of twelve, because the full run takes longer than a runner's 900 s suite cap. Every
+## section and every check still runs; the sample is small, so the close-game share is held to the
+## per-map band instead of the mean's, and the per-map bands (which need twelve rounds) are only
+## reported. `--rounds N` overrides it, and a local run keeps the full default.
+const CI_ROUNDS := 16
+const CI_PROPS_WIN := Vector2(0.2, 0.7)
 
 var nav_on := true
 var _passed := 0
@@ -113,7 +120,9 @@ func _run() -> void:
 	print("prophunt bots")
 	print("")
 	var args := OS.get_cmdline_user_args()
-	var rounds := maxi(1, int(_arg(args, "--rounds", "96")))
+	var ci := OS.get_environment("CI") == "true"
+	var rounds := maxi(1, int(_arg(args, "--rounds", str(CI_ROUNDS if ci else 96))))
+	var close_band := CI_PROPS_WIN if ci and args.find("--rounds") < 0 else PROPS_WIN
 	# One map only: its own rounds of the rotation (the 2nd, 6th, 10th... for the house), so a
 	# round played this way is the same round the whole run plays.
 	var only := _arg(args, "--map", "")
@@ -124,7 +133,7 @@ func _run() -> void:
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
 
-	_section("%d rounds of stand-ins at %s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)"])
+	_section("%d rounds of stand-ins at %s%s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)", " (CI length)" if close_band == CI_PROPS_WIN else ""])
 	var played := 0
 	var r := first
 	while played < rounds:
@@ -214,8 +223,8 @@ func _run() -> void:
 			"a seeker bot damages a disguised prop within %.0f s of the seek, in nine rounds in ten" % SEEKER_DAMAGES_WITHIN, "%d of %d rounds, the latest at %.0f s" % [hurt_rounds, results.size(), hurt_late])
 		_check(fit / n >= 0.5, "props hide as what belongs where they stand (others of the kind round them)", "fit %.2f" % (fit / n))
 		_check(moving / n <= 3.0, "a disguised prop keeps still unless shot", "%.1f s moving per prop-minute" % (moving / n))
-		_check(float(props_won) >= PROPS_WIN.x * n and float(props_won) <= PROPS_WIN.y * n,
-			"a close game: the props win %.0f-%.0f%% of rounds" % [PROPS_WIN.x * 100.0, PROPS_WIN.y * 100.0], "props won %d of %d" % [props_won, results.size()])
+		_check(float(props_won) >= close_band.x * n and float(props_won) <= close_band.y * n,
+			"a close game: the props win %.0f-%.0f%% of rounds" % [close_band.x * 100.0, close_band.y * 100.0], "props won %d of %d" % [props_won, results.size()])
 		for map_id: String in by_map:
 			var row: Array = by_map[map_id]
 			# A share on fewer than twelve rounds is noise: reported, not held.
