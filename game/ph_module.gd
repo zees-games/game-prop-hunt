@@ -150,10 +150,24 @@ func _game_load() -> DotResult:
 
 	add_command("ph_status", _cmd_status, "Show the round, the map and who is hiding as what")
 	add_command("ph_net", _cmd_net, "Show what the netcode is doing")
-	add_command("ph_maps", _cmd_maps, "List the maps, and any refused file")
+	# maps.yml, before the commands: its `commands: names:` block renames ph_maps / ph_map (roles
+	# of those names) as it does dot-vote's, and the ballot reads the marks it sets.
+	var _rotation := world.load_rotation()
+	add_cvar(
+		"sv_map_rotation_file", world.config.map_rotation_file,
+		"maps.yml: the maps that rotate, in named rotations. Unlisted maps stay installed."
+	).changed.connect(
+		func(_old: String, new_value: String) -> void:
+			world.config.map_rotation_file = new_value.strip_edges()
+			var _read := world.load_rotation()
+			if vote != null:
+				vote.refresh_maps()
+	)
+
+	add_command(world.command_name("ph_maps", "ph_maps"), _cmd_maps, "List the maps, and any refused file")
 	add_command("ph_reload", _cmd_reload, "Read the map directory again (from the next map)")
 	add_command("ph_taunts", _cmd_taunts, "List the taunts")
-	add_command("ph_map", _cmd_map, "Play a map next: ph_map <id> (at the end of this round)", "")
+	add_command(world.command_name("ph_map", "ph_map"), _cmd_map, "Play a map next: ph_map <id> (at the end of this round)", "")
 	# A player's wish for the next draw, from chat as !hunter / !prop / !any.
 	add_command("hunter", _cmd_wish.bind(PhGame.HUNTERS), "Ask to hunt in the next draw", "")
 	add_command("prop", _cmd_wish.bind(PhGame.PROPS), "Ask to hide in the next draw", "")
@@ -226,6 +240,8 @@ func _game_load() -> DotResult:
 	# is ever told about. Invisible floors: a player stands on nothing and the server says they
 	# are fine.
 	var _delivered: int = await _add_delivered_maps(world)
+	# A rotation file's wildcards match what is installed, so match again with the delivered maps.
+	world.apply_rotation()
 
 	# The vote was built above, before these arrived; read without them, its list held only
 	# the practice map and never opened a ballot. ph_reload refreshes it the same way.
@@ -617,13 +633,17 @@ func _build_vote(world: PhGame) -> void:
 
 	vote = PhVote.new()
 	vote.name = "MapVote"
+	vote.commands_spec_fn = world.rotation_commands
+	vote.in_rotation_fn = func(id: StringName) -> bool: return world.catalogue.in_rotation(id)
+	vote.rotation_order_fn = func() -> Array: return world.catalogue.rotation_order
 	vote.maps_fn = func() -> Array:
 		var out: Array = []
 
 		# The game's own maps only: the Workshop's come from the source's own follow, which
 		# reads the index on every ballot and so shows none of them online.
 		for id in world.catalogue.playable(world.config.map_ids):
-			if not world.catalogue.is_workshop(id):
+			# maps.yml: a map outside the active rotation is not balloted or nominated.
+			if not world.catalogue.is_workshop(id) and world.catalogue.in_rotation(id):
 				out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
 
 		return out
@@ -908,6 +928,7 @@ func _cmd_reload(ctx: DotCmdContext) -> void:
 
 	var loaded := world.catalogue.load_from(world.config.map_directory)
 	loaded += await _add_delivered_maps(world)
+	world.apply_rotation()
 
 	if vote != null:
 		vote.refresh_maps()

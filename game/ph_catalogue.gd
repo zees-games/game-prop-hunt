@@ -35,6 +35,18 @@ var _order: Array[StringName] = []
 var _next: int = 0
 var _workshop_docs: Dictionary = {}
 
+## `(StringName) -> bool`: whether maps.yml's active rotation plays this id. Unset, every map
+## does. Read by the draw ([method next_map]) only: an operator's `ph_map`, the map menu and the
+## ballot's own list ask [method playable], so an unlisted map stays installed and loadable.
+var in_rotation_fn: Callable = Callable()
+
+## The active rotation's written order, used by the draw when not shuffling. Empty is the
+## catalogue's own (alphabetical) order.
+var rotation_order: Array[StringName] = []
+
+## The pack ref (`owner/map`) of each subscribed map, so maps.yml can name it.
+var _content_refs: Dictionary = {}
+
 
 ## Reads every document under [param directory] (relative to this game's root), and adds the
 ## one built in. Forgets anything read before.
@@ -156,6 +168,7 @@ func sync_content() -> void:
 
 			if not doc.is_empty():
 				wanted[id] = [doc, entry.pack_title]
+				_content_refs[id] = str(entry.content_id)
 
 	var changed := false
 
@@ -232,6 +245,46 @@ func label_of(id: StringName) -> String:
 	return "%s [%s]" % [name, pack] if pack != "" else name
 
 
+## The pack ref of a subscribed map, "" for the game's own.
+func content_ref(id: StringName) -> String:
+	return str(_content_refs.get(id, ""))
+
+
+## Whether maps.yml's active rotation plays [param id]; true with no rotation file.
+func in_rotation(id: StringName) -> bool:
+	return not in_rotation_fn.is_valid() or bool(in_rotation_fn.call(id))
+
+
+## [method playable] less the maps outside the active rotation: what a draw may choose. When
+## the rotation leaves nothing installed, every playable map: a rotation must never strand the
+## server.
+func drawable(allowed: PackedStringArray) -> Array[StringName]:
+	var all := playable(allowed)
+	var out: Array[StringName] = []
+
+	for id in all:
+		if in_rotation(id):
+			out.append(id)
+
+	if out.is_empty():
+		return all
+
+	if not rotation_order.is_empty():
+		var ordered: Array[StringName] = []
+
+		for id in rotation_order:
+			if out.has(id):
+				ordered.append(id)
+
+		for id in out:
+			if not ordered.has(id):
+				ordered.append(id)
+
+		return ordered
+
+	return out
+
+
 ## The ids a server may draw from, after [param allowed] (empty is all). The built-in practice
 ## map drops out once there is anything else.
 func playable(allowed: PackedStringArray) -> Array[StringName]:
@@ -252,7 +305,7 @@ func playable(allowed: PackedStringArray) -> Array[StringName]:
 ## same one twice running when there is a choice.
 func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream,
 		previous: StringName) -> Dictionary:
-	var ids := playable(allowed)
+	var ids := drawable(allowed)
 
 	if ids.is_empty():
 		DotLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
@@ -280,8 +333,9 @@ func describe_lines() -> PackedStringArray:
 
 	for id in _order:
 		var doc: Dictionary = maps[id]
-		lines.append("  %-22s %-28s %4d props  %s" % [
+		lines.append("  %-22s %-28s %4d props  %s%s" % [
 			id, label_of(id), (doc["props"] as Array).size(), str(doc["author"]),
+			"" if in_rotation(id) else "  (not in rotation)",
 		])
 
 	if not refused.is_empty():
