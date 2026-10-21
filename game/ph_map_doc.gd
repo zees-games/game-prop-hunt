@@ -43,6 +43,9 @@ const MAX_TOYS := 96
 const MAX_LIGHTS := 128
 const MAX_SPAWNS := 64
 
+## The ambience beds dot-audio ships (CC0, its stock/CREDITS.md), which a map may name.
+const AMBIENCE_BEDS := ["amb_wind", "amb_outdoor", "amb_night", "amb_city", "amb_indoor", "amb_eerie", "amb_industrial", "amb_cave", "amb_rain"]
+
 ## Every top-level field, and what a missing one becomes.
 const DEFAULT_ENV := {
 	"sky_top": [0.32, 0.52, 0.82],
@@ -110,7 +113,23 @@ static func validate(source: Dictionary) -> DotResult:
 				var value: Variant = (given as Dictionary)[key]
 				env[key] = _floats(value, 3) if DEFAULT_ENV[key] is Array else float(value)
 
+	# The map's own fog, in metres, when it has one: absent, the map gets the horizon haze every map has.
+	if given is Dictionary and (given as Dictionary).has("fog_end"):
+		var g := given as Dictionary
+		env["fog_colour"] = _floats(g.get("fog_colour", env["sky_horizon"]), 3)
+		env["fog_start"] = maxf(float(g.get("fog_start", 0.0)), 0.0)
+		env["fog_end"] = maxf(float(g["fog_end"]), env["fog_start"] + 1.0)
+		env["fog_max"] = clampf(float(g.get("fog_max", 1.0)), 0.0, 1.0)
+
 	doc["environment"] = env
+
+	# The beds under the map: outdoors, and indoors under any ceiling. Only dot-audio's stock ones.
+	for key: String in ["ambience", "ambience_indoor"]:
+		if source.has(key):
+			var bed := str(source[key])
+			if not (bed in AMBIENCE_BEDS):
+				return _refuse("%s '%s' is not one of %s" % [key, bed, ", ".join(AMBIENCE_BEDS)], source)
+			doc[key] = bed
 
 	var boxes: Array = []
 	for raw: Variant in source.get("boxes", []):

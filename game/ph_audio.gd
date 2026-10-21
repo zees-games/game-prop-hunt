@@ -299,6 +299,7 @@ func on_map_doc(id: StringName, doc: Dictionary) -> void:
 	if ambience == null:
 		return
 	ambience.clear_zones()
+	var indoor := StringName(str(doc.get("ambience_indoor", "amb_indoor")))
 	for box: Variant in doc.get("boxes", []):
 		if not (box is Dictionary) or not (str(box.get("mat", "")) in ["ceiling", "roof"]):
 			continue
@@ -307,7 +308,7 @@ func on_map_doc(id: StringName, doc: Dictionary) -> void:
 		var top := float(at[1]) + float(size[1]) * 0.5
 		var low := top - 6.0
 		ambience.add_zone(AABB(Vector3(float(at[0]) - float(size[0]) * 0.5, low, float(at[2]) - float(size[2]) * 0.5),
-			Vector3(float(size[0]), top - low, float(size[2]))), &"amb_indoor")
+			Vector3(float(size[0]), top - low, float(size[2]))), indoor)
 
 
 ## Everybody this client knows steps, once a frame: players and bots alike.
