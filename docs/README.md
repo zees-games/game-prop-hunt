@@ -11,3 +11,4 @@ The current design, one subject per file. The rules that bite are one line each 
 | [delivery.md](delivery.md) | the maps pack, the map vote, what must be tagged before publishing, `project.godot` |
 | [not-yet.md](not-yet.md) | what the game does not do yet: Workshop props, and what a Workshop map is |
 | [history.md](history.md) | bug stories, newest first |
+| [soak.md](soak.md) | the bot soak: `./game.sh soak`, what it judges, the first run's findings |
