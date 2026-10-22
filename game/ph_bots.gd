@@ -161,6 +161,40 @@ func on_taunted(player_id: StringName) -> void:
 
 # --- The map ------------------------------------------------------------------
 
+## Bakes the map just built, ahead of the round's first tick, so the survey still lands on the
+## same tick but the bake is not in it. Only where bots already are.
+func prepare_ahead() -> void:
+	var map: Node3D = game.get("map")
+	if map == null or not bool(game.get("authoritative")):
+		return
+	var players: Dictionary = game.get("players")
+	for id: StringName in players:
+		if (players[id] as PhPlayer).is_bot:
+			var doc: Dictionary = game.get("map_doc")
+			var key := "%s|%d" % [str(doc.get("id", "")), map.get_instance_id()]
+			if key != _baked:
+				_bake(map, doc, key)
+			return
+
+
+func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
+	_baked = key
+	spots.clear()
+	_places.clear()
+	_nav_places = false
+	var still: Array = [map.get("_solid"), map.get("_furniture")]
+	var baked := nav.bake(map, {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}, 0, still)
+	if not baked.ok:
+		_surveyed = key
+		DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": str(doc.get("id", "")), "why": baked.error.message})
+	_survey_at = -1
+
+
+## The survey comes a quarter second of game time after the first round tick, always the same tick.
+func _set_survey_tick() -> void:
+	_survey_at = int(game.get("_tick")) + maxi(int(game.get("tick_rate")) / 4, 1)
+
+
 ## Bakes and surveys the map now built, once per map. Only where bots run.
 func _prepare() -> void:
 	var map: Node3D = game.get("map")
@@ -175,18 +209,12 @@ func _prepare() -> void:
 		return
 
 	if key != _baked:
-		_baked = key
-		spots.clear()
-		_places.clear()
-		_nav_places = false
-		var still: Array = [map.get("_solid"), map.get("_furniture")]
-		var baked := nav.bake(map, {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}, 0, still)
-		if not baked.ok:
-			_surveyed = key
-			DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": str(doc.get("id", "")), "why": baked.error.message})
-		# Surveyed a quarter of a second of game time on, always the same tick, so a round
-		# plays the same however the frames fall.
-		_survey_at = int(game.get("_tick")) + maxi(int(game.get("tick_rate")) / 4, 1)
+		_bake(map, doc, key)
+		_set_survey_tick()
+		return
+
+	if _survey_at < 0:
+		_set_survey_tick()
 		return
 
 	if int(game.get("_tick")) < _survey_at or not nav.is_ready():

@@ -774,6 +774,7 @@ func _on_round_started(number: int) -> void:
 	_winner_name = ""
 	seek_elapsed = 0.0
 	bots.reset()
+	bots.prepare_ahead()
 
 	# Every broken piece whole again. A client does the same on the ROUND event.
 	_prop_damage.clear()
@@ -1093,6 +1094,7 @@ func build_map(doc: Dictionary) -> DotResult:
 		spectate.set_overviews(map.overview(), map.overview())
 
 	world_rebuilt.emit()
+	bots.prepare_ahead()
 	return built
 
 
