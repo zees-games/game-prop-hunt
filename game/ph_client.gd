@@ -291,6 +291,12 @@ func _build_netcode() -> DotResult:
 	bridge.open_link(link)
 	# The server's mp_forceview: this end places its own camera.
 	var _view := game.view_rules.follow_cvars(link)
+	# mp_forcecamera, mp_freeroam and mp_freeroam_speed: whether the free camera is offered, and
+	# how fast it flies. A change redraws the hint, so a key that would now be refused is not
+	# advertised.
+	if game.spectate != null and game.spectate.manager != null:
+		var _roam := game.spectate.manager.rules.follow_cvars(link)
+		game.spectate.manager.rules.rules_changed.connect(_refresh_watching_line)
 	# The server's sv_ragdoll* set: this end draws the bodies.
 	var _dead := game.ragdoll_rules.follow_cvars(link)
 	# And sv_toys*: a client hides the toys a server took away.
@@ -1460,6 +1466,13 @@ func _present_effects(delta: float) -> void:
 
 # --- Watching, once out -----------------------------------------------------
 
+## The pose the free camera holds between frames, seeded from the camera as it was the frame
+## the roam began, so the spectator starts where they were looking.
+var _free_cam: DotSpectatorFreeCam = null
+var _roam_seeded := false
+var _roam_look := Vector2.ZERO
+
+
 func is_spectating() -> bool:
 	return player != null and game != null and game.spectate != null \
 		and game.spectate.is_spectating(player.player_id)
@@ -1499,6 +1512,16 @@ func _drive_spectator_camera() -> bool:
 	if view_model != null and is_instance_valid(view_model):
 		view_model.visible = false
 
+	if game.spectate.is_roaming(player.player_id):
+		_drive_free_camera()
+
+		if hud != null:
+			hud.set_watching(_watching_line())
+
+		return true
+
+	_roam_seeded = false
+
 	# Chase and death cameras pulled out of the house by dot-spectate, given the level.
 	var manager: DotSpectatorManager = game.spectate.manager
 	if manager != null and manager.camera_world == null and game.physics != null:
@@ -1511,9 +1534,95 @@ func _drive_spectator_camera() -> bool:
 		camera.global_transform = where
 
 	if hud != null:
-		hud.set_watching(game.spectate.line_for(player.player_id))
+		hud.set_watching(_watching_line())
 
 	return true
+
+
+## The HUD line, with the free-camera key named only while the server offers one.
+func _watching_line() -> String:
+	return game.spectate.line_for(player.player_id, _key(PhBindings.ROAM))
+
+
+func _refresh_watching_line() -> void:
+	if hud != null and player != null and game != null and game.spectate != null:
+		hud.set_watching(_watching_line() if is_spectating() else "")
+
+
+## The free camera, once a frame: WASD along the view, Space and Ctrl up and down, Shift fast,
+## Alt slow, the mouse to look. Only the camera moves; the body stays where it fell.
+##
+## [b]The speed is the server's[/b] (`mp_freeroam_speed`, through the mirror's rules), so a
+## client cannot fly faster than it was told to. The server holds only the mode.
+func _drive_free_camera() -> void:
+	if _free_cam == null:
+		_free_cam = DotSpectatorFreeCam.new()
+
+	_free_cam.rules = game.spectate.manager.rules
+
+	if not _roam_seeded:
+		# The camera still holds last frame's pose: where this spectator was looking.
+		_free_cam.seed_from(camera.global_transform)
+		_roam_seeded = true
+		_roam_look = Vector2.ZERO
+
+	_free_cam.look(_roam_look)
+	_roam_look = Vector2.ZERO
+
+	var move := Vector3.ZERO
+
+	if not _covered() and not (platform != null and platform.is_input_blocked()):
+		move = Vector3(
+			Input.get_axis(&"dot_fps_left", &"dot_fps_right"),
+			Input.get_axis(&"dot_fps_crouch", &"dot_fps_jump"),
+			Input.get_axis(&"dot_fps_back", &"dot_fps_forward"))
+
+	var shift := Input.is_physical_key_pressed(KEY_SHIFT)
+	var alt := Input.is_physical_key_pressed(KEY_ALT)
+	camera.global_transform = _free_cam.step(
+		move, shift, alt and not shift, get_process_delta_time())
+
+
+## Mouse motion while roaming, as radians for [method DotSpectatorFreeCam.look]: positive x
+## turns left (mouse right is negative), positive y looks up (mouse down is negative).
+func _roam_mouse(motion: InputEventMouseMotion) -> void:
+	var sampler := _sampler if _sampler != null else player.sampler
+	var degrees := 0.12
+	var invert := 1.0
+
+	if sampler != null and sampler.tunables != null:
+		degrees = sampler.tunables.mouse_sensitivity
+		invert = -1.0 if sampler.tunables.invert_look_y else 1.0
+
+	_roam_look += Vector2(-motion.relative.x, -motion.relative.y * invert) * deg_to_rad(degrees)
+
+
+func is_roaming() -> bool:
+	return is_spectating() and game.spectate.is_roaming(player.player_id)
+
+
+## The free-camera key: into a free camera from watching, back onto a player from one. Only
+## for somebody already out; a stray press must not turn a player into a spectator.
+func toggle_roam() -> void:
+	if not is_spectating():
+		return
+
+	if not is_roaming() and not game.spectate.can_roam(player.player_id):
+		if chat != null:
+			chat.notice("Free camera is off on this server.")
+		return
+
+	if audio != null:
+		var _heard := audio.click()
+
+	if bridge != null:
+		bridge.ask_spectate_roam()
+		return
+
+	var res := game.spectate.toggle_roam(player.player_id)
+
+	if not res.ok and chat != null:
+		chat.notice(res.error.message)
 
 
 func spectate_step(direction: int) -> void:
@@ -1623,6 +1732,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	# A free camera turns on the mouse, and the sampler must not turn the body with it.
+	if event is InputEventMouseMotion and is_roaming():
+		if _pointer_ours():
+			_roam_mouse(event as InputEventMouseMotion)
+		return
+
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 
@@ -1699,6 +1814,10 @@ func _cycled_slot(step: int) -> int:
 
 ## The game's own keys, from the bindings. True when one was used.
 func _key_pressed(event: InputEvent) -> bool:
+	if event.is_action_pressed(PhBindings.ROAM):
+		toggle_roam()
+		return true
+
 	if event.is_action_pressed(PhBindings.VIEW):
 		if is_spectating():
 			spectate_step(0)

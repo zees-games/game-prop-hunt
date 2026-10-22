@@ -25,9 +25,9 @@ const PhEvents := preload("../game/net/ph_events.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 28
+const SECTIONS := 29
 
-const CHECKS := 149
+const CHECKS := 162
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -84,6 +84,7 @@ func _run() -> void:
 	await _test_hunter_weapons()
 	await _test_hunter_loadout()
 	await _test_bodies()
+	await _test_free_roam()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1218,6 +1219,75 @@ func _test_the_map_menu() -> void:
 	_check(not settings.menu.picker.is_open(), "and the picker is closed")
 	settings.queue_free()
 	await get_tree().process_frame
+	_finished()
+
+
+## Somebody who is out can fly a free camera: on by default, off by mp_freeroam, held off by
+## mp_forcecamera, and a free view survives the wire with nobody in it.
+func _test_free_roam() -> void:
+	_section("free roam: on by default, mp_freeroam and mp_forcecamera refuse it, the mode crosses the wire")
+	var stock := (load("res://game/ph_spectate.gd") as GDScript).call(&"rules_for", TICK_RATE, PhConfig.new().spectate_camera) as DotSpectatorRules
+	_check(stock.allow_roaming and stock.force_camera == 0 and stock.roaming_permitted(),
+		"the stock policy allows roaming: the config's spectate_camera gives force_camera 0")
+
+	var game := await _seek_round()
+	var dead: PhPlayer = game.players[&"u301"]
+	_kill(game, dead, game.players[&"u300"])
+	await _step(game, 2)
+	var spec := game.spectate
+	_check(spec.is_spectating(dead.player_id) and spec.can_roam(dead.player_id),
+		"somebody who is out is offered the free camera")
+
+	var res := spec.toggle_roam(dead.player_id)
+	_check(res.ok and spec.is_roaming(dead.player_id) and spec.mode_of(dead.player_id) == DotSpectatorView.Mode.ROAMING,
+		"the key puts them in a free camera", "" if res.ok else res.error.message)
+
+	var cam := DotSpectatorFreeCam.new()
+	cam.rules = spec.manager.rules
+	cam.seed_from(Transform3D(Basis.IDENTITY, Vector3(0, 2, 0)))
+	var flown := cam.step(Vector3(0, 0, 1), false, false, 1.0)
+	_check(flown.origin.distance_to(Vector3(0, 2, 0)) > 0.5,
+		"and a second of forward flies the camera away from where it was", str(flown.origin))
+	_check(spec.camera_for(dead.player_id) == Transform3D(spec.manager.view(String(dead.player_id)).free_basis, spec.manager.view(String(dead.player_id)).free_position),
+		"the manager's own pose for a roaming view is the free one (the client drives it per frame)")
+
+	var back := spec.toggle_roam(dead.player_id)
+	_check(back.ok and not spec.is_roaming(dead.player_id),
+		"the key again goes back onto a player or the fixed view", "" if back.ok else back.error.message)
+
+	spec.manager.rules.allow_roaming = false
+	var off := spec.toggle_roam(dead.player_id)
+	_check(not off.ok and not spec.can_roam(dead.player_id) and not spec.is_roaming(dead.player_id),
+		"mp_freeroam 0 refuses it")
+	spec.manager.rules.allow_roaming = true
+
+	spec.set_force_camera(1)
+	var held := spec.toggle_roam(dead.player_id)
+	_check(not held.ok and not spec.can_roam(dead.player_id), "mp_forcecamera 1 refuses it, and the key is not offered")
+	spec.set_force_camera(0)
+	_check(spec.can_roam(dead.player_id), "and mp_forcecamera 0 gives it back")
+
+	var wire := PhEvents.read_spectate(DotNetReader.new(PhEvents.write_spectate(
+		7, DotSpectatorView.Mode.ROAMING, 0, 0, Vector3.ZERO)))
+	_check(bool(wire["ok"]) and int(wire["mode"]) == DotSpectatorView.Mode.ROAMING and int(wire["target"]) == 0,
+		"a free view crosses the wire as ROAMING with nobody in it")
+
+	var mirror: Node = (load("res://game/ph_spectate.gd") as GDScript).new()
+	add_child(mirror)
+	var made: DotResult = mirror.call(&"setup", false, TICK_RATE, 0)
+	mirror.call(&"apply_view", &"u301", DotSpectatorView.Mode.ROAMING, &"", &"", Vector3.ZERO)
+	_check(made.ok and bool(mirror.call(&"is_roaming", &"u301")) and bool(mirror.call(&"is_spectating", &"u301")),
+		"a mirror told ROAMING with no target is roaming, not 'stopped watching'")
+	remove_child(mirror)
+	mirror.free()
+
+	var ask := PhEvents.read_ask_spectate(DotNetReader.new(PhEvents.write_ask_spectate_roam()))
+	var step := PhEvents.read_ask_spectate(DotNetReader.new(PhEvents.write_ask_spectate(1)))
+	_check(bool(ask["ok"]) and bool(ask["roam"]) and not bool(step["roam"]) and int(step["direction"]) == 1,
+		"the roam request is its own value of the spectate ask; a step is still a step")
+
+	var binding := PhBindings.make().row_for_action(PhBindings.ROAM)
+	_check(str(binding.get("default", "")) == "G", "G is the free-camera key, and a row the help screen lists")
 	_finished()
 
 

@@ -38,6 +38,8 @@ const AIM := &"ph_aim"
 ## A hunter's quick melee (zee's alt-fire), on F since the right mouse button aims.
 const BASH := &"ph_bash"
 const VIEW := &"ph_view"
+## A spectator's free camera: does nothing to anybody who is playing.
+const ROAM := &"ph_roam"
 const SCOREBOARD := &"ph_scoreboard"
 ## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
 const CHAT := &"chat_open"
@@ -69,6 +71,7 @@ static func make() -> DotMenuBindings:
 	keys.add(CHAT, &"bind_chat", "Chat", "Y", "Communication")
 	keys.add(CHAT_TEAM, &"bind_chat_team", "Chat to your side", "U", "Communication")
 	keys.add(VIEW, &"bind_view", "First or third person", "F5", "General")
+	keys.add(ROAM, &"bind_roam", "Free camera (spectating)", "G", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# B is a hunter's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
 	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):

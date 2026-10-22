@@ -426,7 +426,11 @@ func _add_tunables(world: PhGame) -> void:
 		"Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody",
 		func(value: float) -> void:
 			config.spectate_camera = clampi(int(value), 0, 2)
-			if world.spectate != null:
+			# One setting, two names: through mp_forcecamera when it is bound, so the two
+			# never disagree; straight onto the rules when it is not.
+			if _force_camera_cvar != null:
+				var _held := _force_camera_cvar.set_value(str(config.spectate_camera))
+			elif world.spectate != null:
 				world.spectate.set_force_camera(config.spectate_camera))
 	# [b]Deprecated: the count is `bot_quota` now[/b], and this forwards to it. Kept rather than
 	# removed because every shipped server config sets it; left as its own number it would be
@@ -473,6 +477,10 @@ func _add_tunables(world: PhGame) -> void:
 ## then reported that the game would not load.
 static func _number(value: float) -> String:
 	return "%d" % int(round(value)) if is_equal_approx(value, round(value)) else "%.3f" % value
+
+
+## mp_forcecamera, once bound. See where the module binds dot-spectate's cvars.
+var _force_camera_cvar: DotConVar = null
 
 
 ## One cvar, its default taken from the configuration rather than written twice.

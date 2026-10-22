@@ -40,7 +40,7 @@ game/
   ph_bindings.gd     every key, as dot-menu bindings; ph_settings.gd the Escape menu
   ph_module.gd       the DotGameModule: cvars, ph_status / ph_maps / ph_taunts / ph_map, stand-ins
   ph_services.gd     chat, voice and moderation over dot-game's base
-  ph_progress.gd     stats and achievements; ph_vote.gd the map vote; ph_spectate.gd who watches whom
+  ph_progress.gd     stats and achievements; ph_vote.gd the map vote; ph_spectate.gd who watches whom (free roam is on by default: G, `mp_freeroam`, `mp_forcecamera`; the camera is the client's `DotSpectatorFreeCam`, the server holds only the mode)
   net/               the codec (MAP, DISGUISE, TAUNT, DECOY…), the link, the player behaviour,
                      the bridge, and PhInterest (the blindfold on the wire)
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)

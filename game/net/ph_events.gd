@@ -443,9 +443,17 @@ static func write_ask_spectate(direction: int) -> PackedByteArray:
 	return w.to_bytes()
 
 
+## The free-camera key: into a free camera, or back onto a player. The fourth value of the
+## same two bits, so an older server reads it as nothing rather than as a step.
+static func write_ask_spectate_roam() -> PackedByteArray:
+	var w := _w()
+	w.write_uint(3, 2)
+	return w.to_bytes()
+
+
 static func read_ask_spectate(r: DotNetReader) -> Dictionary:
 	var raw := r.read_uint(2)
-	return {"direction": clampi(raw, 0, 2) - 1, "ok": r.ok()}
+	return {"direction": clampi(raw, 0, 2) - 1, "roam": raw == 3, "ok": r.ok()}
 
 
 # --- Hiding ----------------------------------------------------------------

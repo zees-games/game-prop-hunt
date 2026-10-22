@@ -41,6 +41,7 @@ There are five maps: a small practice house built into the game, and **Maple Gro
 | **B** | Loadout: your primary, secondary and a grenade (slot 5, if you want one) as a hunter |
 | **V** | Talk (voice) |
 | **F5** | First or third person |
+| **G** | While out: a free camera (WASD, Space / Ctrl up and down, Shift fast, Alt slow, mouse to look), and back onto a player |
 | **Tab** | Scoreboard (hold) |
 | **H** | Help: the goal, the rules and every key as you have it bound |
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
@@ -96,7 +97,10 @@ ph_beacon_props_left 1         // beacon every prop once this few are left (0 ne
 ph_beacon_seconds_left 0       // beacon every prop with this many seconds left (0 never)
 ph_decoy_penalty 0.2           // share of a shot's damage a hunter takes for hitting furniture (0 off)
 ph_rounds_per_map 4            // rounds on a map before the next one
-ph_spectate_camera 0           // who the dead may watch: 0 anybody, 1 their own side, 2 nobody
+ph_spectate_camera 0           // who the dead may watch: 0 anybody, 1 their own side, 2 nobody (the same setting as mp_forcecamera)
+mp_freeroam 1                  // the dead may fly a free camera; 0 keeps them on players
+mp_freeroam_speed 12           // free camera speed, metres a second
+mp_forcecamera 0               // 1 or 2 restricts the camera and switches free roam off
 ph_autobhop 0                  // 1 = hold jump to keep hopping
 mp_teammate_passthrough 1      // shots and team-mates: 0 a team-mate is hit and blocks, 1 through one at the muzzle, 2 through every team-mate
 bot_quota 4                    // players a round is kept at with bots; each person who joins replaces one

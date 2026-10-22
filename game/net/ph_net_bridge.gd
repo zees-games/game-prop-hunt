@@ -967,7 +967,7 @@ func _on_request(message: DotNetMessage) -> void:
 			var step := PhEvents.read_ask_spectate(ask.reader())
 
 			if bool(step["ok"]):
-				_spectate_step(peer_id, int(step["direction"]))
+				_spectate_step(peer_id, int(step["direction"]), bool(step["roam"]))
 		PhEvents.Ask.DISGUISE:
 			var _became := game.request_disguise(player_key(player_for_peer(peer_id)))
 		PhEvents.Ask.REVEAL:
@@ -987,13 +987,14 @@ func _on_request(message: DotNetMessage) -> void:
 ## [b]A refusal goes back as a notice rather than being dropped.[/b] "This server only lets
 ## you watch your own side" is the answer to a key that did nothing, and a key that silently
 ## does nothing is reported as broken.
-func _spectate_step(peer_id: int, direction: int) -> void:
+func _spectate_step(peer_id: int, direction: int, roam: bool = false) -> void:
 	var session_id := player_for_peer(peer_id)
 
 	if session_id == 0 or game.spectate == null:
 		return
 
-	var moved: DotResult = game.spectate.step(player_key(session_id), direction)
+	var moved: DotResult = game.spectate.toggle_roam(player_key(session_id)) if roam \
+		else game.spectate.step(player_key(session_id), direction)
 
 	if not moved.ok:
 		notice(peer_id, moved.error.message)
@@ -1135,6 +1136,11 @@ func ask_say(channel_id: StringName, text: String) -> void:
 ## Out, and asking to watch somebody else: +1 next, -1 previous, 0 the other camera.
 func ask_spectate(direction: int) -> void:
 	_ask(PhEvents.Ask.SPECTATE, PhEvents.write_ask_spectate(direction))
+
+
+## The free-camera key.
+func ask_spectate_roam() -> void:
+	_ask(PhEvents.Ask.SPECTATE, PhEvents.write_ask_spectate_roam())
 
 
 ## Become what I am looking at. The server looks, from where it has this player's eyes.
