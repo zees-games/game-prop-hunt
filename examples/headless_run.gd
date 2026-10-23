@@ -138,12 +138,12 @@ func _test_config() -> void:
 	var timing := PhGame.new()
 	timing.config = PhConfig.new()
 	var pause := DotMatchRules.new()
-	_check(is_equal_approx(timing.config.killcam_seconds, 7.0), "the killcam is seven seconds by default")
-	timing.apply_intermission(pause)
-	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds + 7.0), "the intermission carries the killcam")
-	timing.config.killcam_seconds = 0.0
+	_check(is_zero_approx(timing.config.killcam_seconds), "the killcam is off by default")
 	timing.apply_intermission(pause)
 	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds), "no killcam, the intermission as it was")
+	timing.config.killcam_seconds = 7.0
+	timing.apply_intermission(pause)
+	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds + 7.0), "the intermission carries the killcam")
 	timing.config.intermission_seconds = 0.0
 	timing.config.killcam_seconds = 7.0
 	timing.apply_intermission(pause)

@@ -154,7 +154,8 @@ func _ready() -> void:
 ## How a player moves in their own body. Static: a connected client builds a sampler before it
 ## has a player, and the two must agree.
 static func tunables_for(config: PhConfig) -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+	# Pinned: the numbers below and the bots' pacing were tuned on the legacy motor, not the classic default.
+	var t := DotFpsTunables.with_profile("legacy")
 	t.max_speed = config.run_speed if config != null else 6.5
 	t.gravity = config.gravity if config != null else 20.0
 	t.jump_height = config.jump_height if config != null else 1.15

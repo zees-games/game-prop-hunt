@@ -99,7 +99,7 @@ Short forms; the reasoning is in the linked file.
 - **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `PhAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [hud](docs/hud.md#sound)
 - **H is help and M is the map list** (dot-menu's stock keys): nothing in `PhBindings` may default to either; `headless_run` and `dedicated` check it. A map choice never reaches `_on_taunt_picked`. [hud](docs/hud.md)
 
-- **A round ends on its last moment** (`PhKillcam`): the last hider found (the hunter's eyes) or the clock running out (a prop still hidden) is replayed, then dot-ui's `DotWinnerReveal` names the winning side and its best three, then the Tab board. `mp_killcam_time` (REPLICATED, 7, 0 off) is added to the intermission on the server (`PhGame.apply_intermission`, not when the intermission is 0); `reduce_motion` (General, Comfort) shows the reveal's last frame at once. No `requires.floor.json`: nothing here guards an older addon, so a floor would fail `floor_audit`. `tools/shot.sh --view=killcam --seconds=2|9.5` renders both. Needs dot-replay (2) and dot-ui (9).
+- **A round ends on its last moment** (`PhKillcam`): the last hider found (the hunter's eyes) or the clock running out (a prop still hidden) is replayed, then dot-ui's `DotWinnerReveal` names the winning side and its best three, then the Tab board. `mp_killcam_time` (REPLICATED, 0 off by default, 7 is the usual length) is added to the intermission on the server (`PhGame.apply_intermission`, not when the intermission is 0); `reduce_motion` (General, Comfort) shows the reveal's last frame at once. No `requires.floor.json`: nothing here guards an older addon, so a floor would fail `floor_audit`. `tools/shot.sh --view=killcam --seconds=2|9.5` renders both. Needs dot-replay (2) and dot-ui (9).
 
 **Maps and drawing**
 
@@ -143,3 +143,5 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 
 1. **Put it live.** Tag the addons above, rebuild the shell, publish the maps pack before the game.
 2. **Try it in a browser**, with people: how long a hide should be and how much a decoy should cost are numbers only play settles.
+
+**Per-map settings** (`PhModule._map_config_keys`, dot-game's `DotGameMapConfig`): `cfg/game/mg-prop-hunt/dot_map/map/<map>.yml` (globs such as `ph_*.yml`; `cfg/server/...` overrides) may set the `ph_*` round tunables and `mp_killcam_time`; the next map restores them. The client predicts with none of them, so it wires nothing. `examples/headless_mapcfg` checks it. No `ph_*` BSP is in dot-map's store, so the shipped `ph_*.yml` is a commented template, not converter output.

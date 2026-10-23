@@ -1,0 +1,6 @@
+# Per-map settings for every ph_* map (a file named after one map id overrides this).
+# Uncomment to change a value on these maps only; the previous map's values come back on the next map.
+# Keys: ph_hide_seconds, ph_round_seconds, ph_timeout_winner, ph_players_per_hunter,
+# ph_min_hunters, ph_max_hunters, ph_auto_taunt_seconds, ph_beacon_props_left, mp_killcam_time.
+# ph_round_seconds: 300
+# ph_hide_seconds: 30

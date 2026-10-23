@@ -70,6 +70,25 @@ func _module_name() -> String:
 	return "prophunt"
 
 
+## The cvars a map's per-map file may set (dot-game's DotGameMapConfig); the file is cfg/game/mg-prop-hunt/dot_map/map/<map>.yml.
+func _map_config_keys() -> Dictionary:
+	return {
+		"ph_hide_seconds": {"type": "float", "min": 0.0, "max": 600.0},
+		"ph_round_seconds": {"type": "float", "min": 10.0, "max": 3600.0},
+		"ph_timeout_winner": {"type": "int", "min": 0, "max": 2},
+		"ph_players_per_hunter": {"type": "float", "min": 1.0, "max": 64.0},
+		"ph_min_hunters": {"type": "int", "min": 1, "max": 16},
+		"ph_max_hunters": {"type": "int", "min": 1, "max": 16},
+		"ph_auto_taunt_seconds": {"type": "float", "min": 0.0, "max": 600.0},
+		"ph_beacon_props_left": {"type": "int", "min": 0, "max": 64},
+		"mp_killcam_time": {"type": "float", "min": 0.0, "max": 30.0},
+	}
+
+
+func _map_config_game() -> String:
+	return "mg-prop-hunt"
+
+
 func _game_service() -> StringName:
 	return PhGame.SERVICE
 
