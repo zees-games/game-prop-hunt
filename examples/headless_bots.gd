@@ -29,7 +29,7 @@ const PhBots := preload("../game/ph_bots.gd")
 ## - every place a prop may hide is reachable from where the props start (the school's
 ##   bathrooms once had a toilet in each doorway).
 ##
-## Ninety-six rounds by default (it was forty-eight over four maps), twelve a map, about ten minutes: a band on eight rounds was a
+## Ninety-six rounds by default (it was forty-eight over four maps), twelve a map, about 13 minutes on dev02, 24 on the staging laptop: a band on eight rounds was a
 ## band on noise, and each map is held to its own band once it has twelve. `-- --rounds N` plays
 ## another number, `-- --first N` starts at the Nth round's map and seed, `-- --map ph_house`
 ## plays that map's rounds of the rotation only, `-- --difficulty hard` plays another preset, and

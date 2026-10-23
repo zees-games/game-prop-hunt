@@ -4,7 +4,7 @@
 
 ## headless_bots has two lengths
 
-The full run plays 96 rounds (twelve a map over the eight rotation maps) and takes about twelve minutes; that is the local default, and the one that holds each map to its own band. **It does not fit a CI runner**: dot-ci caps a suite at 900 s (`suite-timeout`) and a job at 30 minutes.
+The full run plays 96 rounds (twelve a map over the eight rotation maps) and takes about 13 minutes on dev02 (under 800 s measured 2026-10-22) and about 24 on the staging laptop (1443 s); that is the local default, and the one that holds each map to its own band. **It does not fit a CI runner**: dot-ci caps a suite at 900 s (`suite-timeout`) and a job at 30 minutes.
 
 When the `CI` environment variable is `true` (GitHub Actions sets it) and `--rounds` is not given, the suite plays `CI_ROUNDS` (16: two a map) instead. Every section and every check still runs; what changes is the statistics:
 

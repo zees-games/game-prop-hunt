@@ -120,7 +120,7 @@ Short forms; the reasoning is in the linked file.
 
 ```bash
 ./game.sh test                                         # parse, then all five suites
-timeout 900 godot --headless --path . res://examples/headless_bots.tscn -- --difficulty hard   # the bots' numbers at another preset (24 rounds, ~4 min)
+timeout 1800 godot --headless --path . res://examples/headless_bots.tscn -- --difficulty hard   # the bots' numbers at another preset (96 rounds, ~13 min; `--rounds 24` for ~4)
 python3 ../mg-prop-hunt-maps/tools/build_maps.py --check
 xvfb-run -a godot --path . res://tools/audio_probe.tscn
 tools/shot.sh --view=overview --ph-map-ids=ph_school
