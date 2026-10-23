@@ -27,7 +27,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 29
 
-const CHECKS := 162
+const CHECKS := 166
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -134,6 +134,21 @@ func _test_config() -> void:
 
 	config.hunter_pick = 9
 	_check(not config.validate().ok, "a way of picking hunters that is none of the three is refused")
+
+	var timing := PhGame.new()
+	timing.config = PhConfig.new()
+	var pause := DotMatchRules.new()
+	_check(is_equal_approx(timing.config.killcam_seconds, 7.0), "the killcam is seven seconds by default")
+	timing.apply_intermission(pause)
+	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds + 7.0), "the intermission carries the killcam")
+	timing.config.killcam_seconds = 0.0
+	timing.apply_intermission(pause)
+	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds), "no killcam, the intermission as it was")
+	timing.config.intermission_seconds = 0.0
+	timing.config.killcam_seconds = 7.0
+	timing.apply_intermission(pause)
+	_check(is_zero_approx(pause.intermission_sec), "an intermission of 0 stays 0 whatever the killcam")
+	timing.free()
 	_finished()
 
 

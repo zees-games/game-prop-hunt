@@ -113,7 +113,7 @@ func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
 	var local = _client.get("player")
-	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade"]
+	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade", "killcam"]
 
 	# The person at this keyboard on the side the view is about; one stand-in on the other.
 	var other_side_drawn := false
@@ -170,6 +170,24 @@ func _run() -> void:
 			# Leant forward this many steps (6 is on its side, 12 on its nose at 15 degrees a step).
 			for _i in range(_lean):
 				var _turned := game.turn(local.player_id, PhGame.Turn.TILT_FORWARD)
+			await _seconds_of(_seconds)
+		"killcam":
+			# The last hider found, then the round decided; --seconds is how long after: ~2 is
+			# the replay, ~9 the winner reveal.
+			game._set_phase(PhGame.Phase.SEEK)
+			var prey: PhPlayer = null
+			for id: StringName in game.players:
+				if game.players[id] != local:
+					prey = game.players[id]
+					break
+			var ahead: Vector3 = local.controller.state.position + Vector3(0.0, 0.0, -3.0)
+			prey.place_at(ahead, 180.0)
+			var _dressed := game.disguise_as(prey.player_id, _as)
+			await _seconds_of(4.0)
+			var found := DotDamage.make(local.entity_id, prey.entity_id, prey.health.max_health * 10.0, null)
+			found.tick = game._tick
+			var _hit: Variant = game.combat.apply_damage(found)
+			game._decide(PhGame.HUNTERS, "the hunters found every prop")
 			await _seconds_of(_seconds)
 		"dead":
 			# Somebody killed in front of a free camera and [member _seconds] of what follows: a

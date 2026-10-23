@@ -34,6 +34,7 @@ game/
   ph_rules.gd        a DotMatchRules whose outcome is whatever PhGame decided
   ph_loadout.gd      a hunter's loadout as dot-loadout data (B)
   ph_projectiles.gd  grenades in flight and where they go off; ph_projectile_view.gd draws them
+  ph_killcam.gd      the round's last moment: every drawn frame into dot-replay's DotKillcamBuffer, replayed from the finder's eyes (or a hidden prop's on a time-out)
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
   ph_client.gd       one local player, alone or against a server; third person as a prop; its platform wiring (loading cover, settings, console, Tab, M, pointer, input block) is dot-game's `DotGameClient` (`platform`)
@@ -97,6 +98,8 @@ Short forms; the reasoning is in the linked file.
 - The HUD is dot-ui's pieces in the menu's theme and HUD size (`PhHud.follow_menu`); `PhHud.piece_theme()` is the accent only, Labels set no colour of their own but accent lines, the health plate ends above a full chat log; needs dot-ui 4. [hud](docs/hud.md)
 - **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `PhAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [hud](docs/hud.md#sound)
 - **H is help and M is the map list** (dot-menu's stock keys): nothing in `PhBindings` may default to either; `headless_run` and `dedicated` check it. A map choice never reaches `_on_taunt_picked`. [hud](docs/hud.md)
+
+- **A round ends on its last moment** (`PhKillcam`): the last hider found (the hunter's eyes) or the clock running out (a prop still hidden) is replayed, then dot-ui's `DotWinnerReveal` names the winning side and its best three, then the Tab board. `mp_killcam_time` (REPLICATED, 7, 0 off) is added to the intermission on the server (`PhGame.apply_intermission`, not when the intermission is 0); `reduce_motion` (General, Comfort) shows the reveal's last frame at once. No `requires.floor.json`: nothing here guards an older addon, so a floor would fail `floor_audit`. `tools/shot.sh --view=killcam --seconds=2|9.5` renders both. Needs dot-replay (2) and dot-ui (9).
 
 **Maps and drawing**
 

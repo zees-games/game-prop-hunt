@@ -14,6 +14,7 @@ const PhGame := preload("ph_game.gd")
 const PhHud := preload("ph_hud.gd")
 const PhPaths := preload("ph_paths.gd")
 const PhPlayer := preload("ph_player.gd")
+const PhKillcam := preload("ph_killcam.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhProjectileView := preload("ph_projectile_view.gd")
 
@@ -69,6 +70,17 @@ var projectile_view: PhProjectileView = null
 var net: DotNetManager = null
 var bridge: PhNetBridge = null
 var link: Node = null
+## Records every frame and replays the round's last moment ([PhKillcam]); then the reveal.
+var killcam: PhKillcam = null
+var winner_reveal: DotWinnerReveal = null
+## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
+var _killcam_sec: float = -1.0
+var _round_ending: bool = false
+var _round_end_number: int = 0
+var _round_end_winner: int = 0
+var _round_end_why: String = ""
+var _round_board_open: bool = false
+var _hud_was_visible: bool = true
 
 ## Whether the camera hangs behind the player. Follows the side; F5 swaps it.
 var third_person: bool = false
@@ -152,6 +164,7 @@ func _ready() -> void:
 	_build_chat()
 	_build_audio()
 	_build_settings()
+	_build_killcam()
 	_build_break_rules()
 
 	if _offline:
@@ -301,6 +314,10 @@ func _build_netcode() -> DotResult:
 	var _dead := game.ragdoll_rules.follow_cvars(link)
 	# And sv_toys*: a client hides the toys a server took away.
 	var _toys := game.toy_rules.follow_cvars(link)
+	if link.has_method(&"replicated_cvar"):
+		_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
+		if link.has_signal(&"replicated_cvar_changed"):
+			link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 	net.messages.seal()
 
 	bridge.hello_received.connect(_on_hello)
@@ -515,6 +532,7 @@ func _on_map(map_id: StringName) -> void:
 func _on_round(number: int, began: bool, winner: int, why: String = "") -> void:
 	if began:
 		hud.shout("ROUND %d" % number, 2.0)
+		_end_round_presentation()
 		return
 
 	if audio != null and player != null:
@@ -522,6 +540,8 @@ func _on_round(number: int, began: bool, winner: int, why: String = "") -> void:
 
 	var who := game.side_name(winner).to_upper() + " WIN" if winner != 0 else "DRAW"
 	hud.shout("%s — %s" % [who, why] if why != "" else who, 4.0)
+
+	_begin_round_end(number, winner, why)
 
 	if chat != null and why != "":
 		chat.say_locally(why, Color(0.98, 0.86, 0.40))
@@ -531,6 +551,8 @@ func _on_death(session_id: int, by: int, why: StringName) -> void:
 	var who := _player_of(session_id)
 	var mine := session_id == _watch_id
 	var was_hunter := who != null and game.team_of(who.player_id) == PhGame.HUNTERS
+
+	_note_death(who, _player_of(by) if by != 0 else null)
 
 	if audio != null and who != null:
 		var _heard := audio.on_death(who.global_position, mine, was_hunter)
@@ -999,6 +1021,119 @@ func _portrait(atlas: String) -> Texture2D:
 	return texture
 
 
+# --- The end of a round: killcam, winner reveal, board ---------------------------
+
+## A hider found is the moment, seen from the hunter who found them; anything else from the
+## victim's own eyes.
+func _note_death(victim: PhPlayer, by: PhPlayer) -> void:
+	if killcam == null or victim == null:
+		return
+	if by != null and by != victim:
+		killcam.note_moment(by.player_id, "found", victim.display_name)
+	else:
+		killcam.note_moment(victim.player_id, "out")
+
+
+func _build_killcam() -> void:
+	killcam = PhKillcam.new()
+	killcam.name = "RoundKillcam"
+	killcam.players_fn = func() -> Array: return game.players.values() if game != null else []
+	killcam.player_for_fn = func(key: StringName) -> Variant: return game.players.get(key) if game != null else null
+	killcam.feet_fn = func(p: PhPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
+	killcam.colour_fn = func(p: PhPlayer) -> Color: return game.side_colour(game.team_of(p.player_id))
+	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
+	killcam.over.connect(func(_skipped: bool) -> void: _reveal_round())
+	add_child(killcam)
+	winner_reveal = DotWinnerReveal.new()
+	winner_reveal.name = "WinnerReveal"
+	winner_reveal.skip_actions = PhKillcam.SKIP_ACTIONS
+	winner_reveal.hold_seconds = 4.0
+	winner_reveal.finished.connect(_on_reveal_finished)
+	add_child(winner_reveal)
+
+
+## `mp_killcam_time`, from the server's replicated cvar.
+func _on_killcam_cvar(cvar_name: String, value: String) -> void:
+	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
+		_killcam_sec = clampf(value.to_float(), 0.0, 30.0)
+
+
+func _begin_round_end(number: int, winner: int, why: String) -> void:
+	_round_end_number = number
+	_round_end_winner = winner
+	_round_end_why = why
+	_round_ending = true
+	if killcam == null:
+		_reveal_round()
+		return
+	# The clock running out has no death to show: the replay is from a prop still hidden.
+	if why.begins_with("time"):
+		for p: PhPlayer in game.players_on(PhGame.PROPS):
+			if p.is_alive():
+				killcam.note_moment(p.player_id, "still hidden when time ran out")
+				break
+	killcam.hide_while_playing = [hud, chat.window if chat != null else null, view_model, platform.hud if platform != null else null]
+	if killcam.round_ended():
+		DotLog.debug(CHANNEL, "the winner waits for the killcam")
+
+
+## The winning side and its best three, after the killcam and before the board.
+func _reveal_round() -> void:
+	if not _round_ending or winner_reveal == null or winner_reveal.is_active():
+		return
+	var rows: Array = []
+	for key: StringName in game.players:
+		var who: PhPlayer = game.players[key]
+		if _round_end_winner == 0 or game.team_of(key) == _round_end_winner:
+			rows.append(who)
+	rows.sort_custom(func(a: PhPlayer, b: PhPlayer) -> bool: return a.points > b.points)
+	var entries: Array = []
+	for who: PhPlayer in rows.slice(0, 3):
+		entries.append({"name": who.display_name, "score": "%d %s" % [who.points, "point" if who.points == 1 else "points"],
+			"colour": game.side_colour(game.team_of(who.player_id))})
+	winner_reveal.reduced_motion = settings != null and settings.settings != null and settings.settings.get_bool(&"reduce_motion", false)
+	var title := "%s WIN" % game.side_name(_round_end_winner).to_upper() if _round_end_winner != 0 else "DRAW"
+	var shown := winner_reveal.present(entries, {"title": title,
+		"subtitle": _round_end_why.substr(0, 1).to_upper() + _round_end_why.substr(1) if _round_end_why != "" else "Round %d" % _round_end_number,
+		"hint": "Jump to skip"}) if not entries.is_empty() else DotResult.fail(DotError.CODE_INVALID, "nobody to show")
+	if not shown.ok:
+		_open_round_board()
+		return
+	if hud != null:
+		_hud_was_visible = hud.visible
+		hud.visible = false
+
+
+func _on_reveal_finished(_skipped: bool) -> void:
+	if hud != null and not killcam.is_playing():
+		hud.visible = _hud_was_visible
+	if _round_ending:
+		_open_round_board()
+
+
+func _open_round_board() -> void:
+	if board != null and not board.is_open():
+		board.open()
+		_round_board_open = true
+
+
+## A new round: whatever is still up goes, so it never covers the start.
+func _end_round_presentation() -> void:
+	_round_ending = false
+	if killcam != null:
+		killcam.skip()
+	if winner_reveal != null:
+		winner_reveal.skip()
+	if _round_board_open and board != null:
+		board.close()
+	_round_board_open = false
+
+
+func _killcam_frame() -> void:
+	if killcam != null and game != null:
+		killcam.frame()
+
+
 # --- Chat, sound, settings ---------------------------------------------------
 
 ## dot-game's chat box and microphone, with this game's channels and voice format.
@@ -1393,6 +1528,7 @@ func _on_hit(point: Vector3, killed: bool, headshot: bool) -> void:
 func _process(delta: float) -> void:
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
 	_present_hide()
+	_killcam_frame()
 
 	if camera == null or player == null:
 		return

@@ -513,6 +513,11 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 	return shown
 
 
+## Draws the furniture they are at [param at], for a replay of a moment that is over.
+func show_prop_at(at: Vector3) -> void:
+	_present_prop(true, at)
+
+
 func _present_prop(shown: bool, at: Vector3) -> void:
 	if catalogue == null:
 		return

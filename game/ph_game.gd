@@ -458,7 +458,7 @@ func _build_match() -> void:
 	match_node.config = match_config
 
 	var match_rules: DotMatchRules = PhRules.make()
-	match_rules.intermission_sec = config.intermission_seconds
+	apply_intermission(match_rules)
 	match_rules.warmup_sec = config.warmup_seconds
 	match_rules.countdown_sec = 0.0
 	match_rules.team_based = true
@@ -1326,6 +1326,15 @@ func _check_round(seeking: bool) -> void:
 				_decide(HUNTERS, "time: the hunters hold the house")
 			_:
 				_decide(0, "time")
+
+
+## The intermission is the pause plus the killcam the clients play inside it, so the server never waits on one.
+func apply_intermission(rules: DotMatchRules = null) -> void:
+	var target: DotMatchRules = rules if rules != null else (match_node.rules if match_node != null else null)
+	if target == null:
+		return
+	var pause := config.intermission_seconds
+	target.intermission_sec = pause + (config.killcam_seconds if pause > 0.0 else 0.0)
 
 
 func _decide(winner: int, why: String) -> void:
