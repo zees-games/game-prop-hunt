@@ -133,6 +133,9 @@ static func _w() -> DotNetWriter:
 	return DotNetWriter.new()
 
 
+## How many movement floats the HELLO carries (PhConfig.movement_floats).
+const MOVE_COUNT := 9
+
 # --- Hello -----------------------------------------------------------------
 
 static func write_hello(
@@ -142,7 +145,9 @@ static func write_hello(
 	hide_seconds: float,
 	round_seconds: float,
 	beacon_period: float,
-	taunt_range: float
+	taunt_range: float,
+	move: PackedFloat32Array = PackedFloat32Array(),
+	auto_hop: bool = false
 ) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(player_id)
@@ -152,6 +157,10 @@ static func write_hello(
 	w.write_float_range(round_seconds, 0.0, CLOCK_MAX, CLOCK_BITS)
 	w.write_float_range(beacon_period, 0.0, 10.0, 10)
 	w.write_float_range(taunt_range, 0.0, 400.0, 12)
+	# What the client predicts with: PhConfig.movement_floats, then auto_bunny_hop.
+	for i in MOVE_COUNT:
+		w.write_float32(move[i] if i < move.size() else 0.0)
+	w.write_bool(auto_hop)
 	return w.to_bytes()
 
 
@@ -163,6 +172,10 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	var round_seconds := r.read_float_range(0.0, CLOCK_MAX, CLOCK_BITS)
 	var beacon_period := r.read_float_range(0.0, 10.0, 10)
 	var taunt_range := r.read_float_range(0.0, 400.0, 12)
+	var move := PackedFloat32Array()
+	for i in MOVE_COUNT:
+		move.append(r.read_float32())
+	var auto_hop := r.read_bool()
 	return {
 		"player_id": player_id,
 		"tick_rate": tick_rate,
@@ -171,6 +184,8 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 		"round_seconds": round_seconds,
 		"beacon_period": beacon_period,
 		"taunt_range": taunt_range,
+		"move": move,
+		"auto_hop": auto_hop,
 		"ok": r.ok(),
 	}
 

@@ -164,10 +164,10 @@ static func tunables_for(config: PhConfig) -> DotFpsTunables:
 	t.can_walk = true
 	t.can_sprint = false
 	t.can_crouch = true
-	t.crouch_speed_scale = 0.45
-	t.accelerate = 10.0
-	t.friction = 6.0
-	t.stop_speed = 2.5
+	t.crouch_speed_scale = config.crouch_speed_scale if config != null else 0.45
+	t.accelerate = config.accelerate if config != null else 10.0
+	t.friction = config.friction if config != null else 6.0
+	t.stop_speed = config.stop_speed if config != null else 2.5
 	t.air_accelerate = config.air_accelerate if config != null else 20.0
 	t.max_air_wish_speed = 1.2
 	t.coyote_time = 0.1

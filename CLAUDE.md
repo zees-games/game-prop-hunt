@@ -21,7 +21,7 @@ Built from mg-deathrun's skeleton; a comment naming another game's finding is th
 
 ```
 game/
-  ph_config.gd       every rule a round is played under (maps are documents)
+  ph_config.gd       every rule a round is played under (maps are documents); each field is a cvar, a cfg/ yml key and a workbench setting
   ph_map_doc.gd      what a map IS: boxes, props by catalogue id, lights, spawns; validated
   ph_map.gd          a document built: solid boxes, furniture shapes, drawn batches, spawns
   ph_props.gd        the prop catalogue (props/catalogue.json): sizes, models, recolour, parts
@@ -67,6 +67,11 @@ Short forms; the reasoning is in the linked file.
 - Map toys are loose only (dot-props): pushed by a walk, shot along the ray without stopping the shot or costing a decoy, home each round, sent to no hunter during the hide; a client registers every toy mirror on TOYS before its map is built. [design](docs/design.md#toys-loose-ones-only-never-a-hiding-place)
 - **A READY before the player is seated is kept** (`_ready_unseated`) and answered by `add_player`; `headless_net` sends it first (armed). [history](docs/history.md)
 - `net_max_health` is 14 bits: 12 made a chair's 98 health 97.9 on the client. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
+
+**Config, workbench and noblock**
+
+- Every `PhConfig` field is a `ph_<field>` cvar, a key in `cfg/game/mg-prop-hunt/config/game.yml` (or `cfg/server/...`) and a workbench setting, through dot-game's `DotGameConfigBinder` (`ph_config_diff`, `ph_config_dump`); an unknown key stops a dedicated boot. The older names (`ph_side_choice`, `ph_autobhop`, `ph_reveal_points`, `ph_min_players`, `sv_map_rotation_file`) are aliases of a field, and `PhModule._on_config_field` pushes an edit into what the world copied (taunts, disguise rules, damage rules, movement). The movement numbers travel in the HELLO (`PhConfig.movement_floats`), so a client predicts with the server's; the death/freeze camera, debris lifetime and bot budgets stay in code. [suite](examples/headless_config.gd)
+- `mp_teamblock` 0 / `mp_enemyblock` 1 and `!block` / `!noblock` come from dot-game's `DotGameNoblock`, sides from `PhGame.team_of_side`. Players never collide here (the layout, and a disguise's hull is its prop's), so `body_rules` stays non-solid and no block setting changes anything physical.
 
 **Hunters, decoys and stand-ins**
 

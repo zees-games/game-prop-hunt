@@ -76,6 +76,10 @@ var _gravity: float = 20.0
 var _next_id: int = 1
 
 
+func set_gravity(gravity: float) -> void:
+	_gravity = gravity
+
+
 func setup(combat: DotCombatManager, gravity: float = 20.0) -> void:
 	_combat = combat
 	_gravity = gravity

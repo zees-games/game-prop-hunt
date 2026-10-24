@@ -9,9 +9,10 @@ extends DotConfig
 ## [b]Every rule the brief named is here, and its default is the brief's.[/b] Which side a
 ## player is on and how hunters are chosen, how long the props get to hide, what showing your
 ## face pays, when a taunt is forced, when the last props are given away, what shooting the
-## furniture costs a hunter: a server owner changes any of them in `user://cfg/prophunt.json`,
-## an environment variable (`PH_HIDE_SECONDS`) or a flag (`--ph-hide-seconds`), and the
-## commonly turned ones are cvars as well (see `PhModule._add_tunables`).
+## furniture costs a hunter: a server owner changes any of them in `cfg/game/mg-prop-hunt/config/game.yml`
+## (or `cfg/server/...`), `user://cfg/prophunt.json`, an environment variable (`PH_HIDE_SECONDS`), a
+## flag (`--ph-hide-seconds`), the `ph_<field>` cvar or the workbench. All of that is
+## [DotGameConfigBinder]; every field here is reachable and an unknown key stops a dedicated boot.
 
 # --- The round -------------------------------------------------------------
 
@@ -31,6 +32,9 @@ extends DotConfig
 
 ## Seconds of warmup before the first round. 0 starts immediately.
 @export_range(0.0, 300.0, 1.0) var warmup_seconds: float = 8.0
+
+## People in the match before a round starts (stand-ins count).
+@export_range(1, 24, 1) var min_players_to_start: int = 2
 
 ## Who wins a round the clock ends: 1 the props, 2 the hunters, 0 nobody.
 ##
@@ -153,6 +157,9 @@ extends DotConfig
 	"smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol", "frag", "sticky",
 ])
 
+## Whether a shot hurts a player of the shooter's own side (hunters shooting hunters, props shooting props).
+@export var friendly_fire: bool = false
+
 ## What shooting the furniture costs a hunter: this fraction of the damage the shot would have
 ## done comes off their own health. 0 turns it off.
 @export_range(0.0, 5.0, 0.05) var decoy_penalty: float = 0.2
@@ -197,6 +204,10 @@ extends DotConfig
 @export_range(1.0, 60.0, 0.5) var gravity: float = 20.0
 @export var auto_bunny_hop: bool = false
 @export_range(0.0, 200.0, 1.0) var air_accelerate: float = 20.0
+@export_range(0.5, 100.0, 0.5) var accelerate: float = 10.0
+@export_range(0.0, 30.0, 0.5) var friction: float = 6.0
+@export_range(0.0, 20.0, 0.1) var stop_speed: float = 2.5
+@export_range(0.1, 1.0, 0.01) var crouch_speed_scale: float = 0.45
 
 # --- The maps --------------------------------------------------------------
 
@@ -282,6 +293,12 @@ extends DotConfig
 @export var report_progress: bool = false
 
 
+## The movement numbers a client predicts with, in the order the HELLO carries them (the bool is [member auto_bunny_hop]).
+func movement_floats() -> PackedFloat32Array:
+	return PackedFloat32Array([run_speed, walk_speed_scale, jump_height, gravity, air_accelerate,
+		accelerate, friction, stop_speed, crouch_speed_scale])
+
+
 func env_prefix() -> String:
 	return "PH_"
 
@@ -299,6 +316,12 @@ func hunters_for(players: int, per: float = 0.0) -> int:
 ## The disguise rules, from this configuration.
 func disguise_rules() -> DotPropDisguiseRules:
 	var r := DotPropDisguiseRules.new()
+	apply_disguise_rules(r)
+	return r
+
+
+## Writes the disguise numbers onto live rules (a workbench or cvar edit).
+func apply_disguise_rules(r: DotPropDisguiseRules) -> void:
 	r.health_scale = prop_health_scale
 	r.health_exponent = prop_health_exponent
 	r.min_health = prop_min_health
@@ -311,7 +334,6 @@ func disguise_rules() -> DotPropDisguiseRules:
 	r.reveal_cooldown = reveal_cooldown
 	r.reveal_points_per_second = reveal_points_per_second
 	r.reveal_paid_seconds = reveal_paid_seconds
-	return r
 
 
 func validate() -> DotResult:

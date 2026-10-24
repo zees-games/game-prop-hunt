@@ -16,7 +16,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 13
-const CHECKS := 95
+const CHECKS := 102
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -180,6 +180,9 @@ func _test_the_module_loads() -> void:
 	game = PhGame.new()
 	game.name = "World"
 	game.config = config
+	game.config_binder = DotGameConfigBinder.create(config, "mg-prop-hunt", "ph")
+	game.config_binder.strict = true
+	var _layers := game.config_binder.load_layers()
 	game.tick_rate = Engine.physics_ticks_per_second
 	add_child(game)
 	await get_tree().process_frame
@@ -199,7 +202,33 @@ func _test_the_module_loads() -> void:
 	_check(net != null and net.config.tick_rate == TICK_RATE, "the netcode runs at the configured rate")
 	_check(net != null and absf(net.config.world_extent - PhGame.NET_WORLD_EXTENT) < 0.01,
 		"against the world extent both ends decode with")
+	_noblock_and_config(module)
 	_finished()
+
+
+## Config cvars, the workbench, and dot-team's block rules through dot-game's DotGameNoblock.
+func _noblock_and_config(module: DotModule) -> void:
+	var teamblock := server.console.find_cvar("mp_teamblock")
+	var enemyblock := server.console.find_cvar("mp_enemyblock")
+	_check(teamblock != null and teamblock.get_string() == "0" and enemyblock != null and enemyblock.get_string() == "1",
+		"mp_teamblock is 0 and mp_enemyblock is 1 by default")
+	_check(server.console.has_name("ph_decoy_penalty") and server.console.has_name("ph_friendly_fire") and server.console.has_name("ph_accelerate"),
+		"config fields are ph_ cvars")
+	_check(module.get("workbench") != null, "the module hosts the workbench")
+	var rotation := server.console.find_cvar("sv_map_rotation_file")
+	game.config.map_rotation_file = "cfg/other.yml"
+	module.call("_on_config_field", "map_rotation_file", game.config.map_rotation_file, "workbench")
+	_check(rotation != null and rotation.get_string() == "cfg/other.yml", "a workbench edit reaches the older sv_map_rotation_file")
+	game.config.map_rotation_file = "cfg/maps.yml"
+	module.call("_on_config_field", "map_rotation_file", game.config.map_rotation_file, "workbench")
+	game.config.friendly_fire = true
+	module.call("_on_config_field", "friendly_fire", true, "workbench")
+	_check(game.combat.rules.friendly_fire, "friendly_fire reaches the live damage rules")
+	game.config.friendly_fire = false
+	module.call("_on_config_field", "friendly_fire", false, "workbench")
+	_check(game.block_rules != null and not game.body_rules.solid and not game.body_rules.blocks(&"a", &"b"),
+		"players stay non-solid, so the block rules change nothing physical")
+	_check(game.team_of_side(&"nobody") == "", "a player with no side has none")
 
 
 func _test_the_commands() -> void:

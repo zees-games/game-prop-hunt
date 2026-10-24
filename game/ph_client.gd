@@ -136,10 +136,12 @@ func _ready() -> void:
 	ZeeModelCache.set_asset_root(PhPaths.root())
 
 	var config := PhConfig.new()
-	var loaded := config.load_layered(config_file)
+	var binder := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph", config_file)
+	var loaded := binder.load_layers()
 
 	if not loaded.ok:
-		DotLog.warn(CHANNEL, "falling back to defaults", {"why": loaded.error.message})
+		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		return
 
 	link = platform.link as Node
 	_offline = platform.offline
@@ -147,6 +149,7 @@ func _ready() -> void:
 	game = PhGame.new()
 	game.name = "World"
 	game.config = config
+	game.config_binder = binder
 	game.authoritative = _offline
 	game.register_service = _offline
 	game.tick_rate = int(ProjectSettings.get_setting("physics/common/physics_ticks_per_second", 64))
@@ -1164,6 +1167,24 @@ func _build_audio() -> void:
 		audio = null
 
 
+## dot-team's block rules followed from the server, or, solo, the F9 tuning panel over this process's own config.
+func _add_noblock_and_workbench() -> void:
+	if link != null and not _offline:
+		DotLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
+		return
+	var wb := DotGameWorkbench.new()
+	wb.name = "Workbench"
+	wb.listen_host_fn = func() -> bool: return true
+	wb.config = {"enabled": false}
+	wb.add_set(game.config_binder.profile_set(), "Game settings")
+	add_child(wb)
+	var started := wb.start()
+	DotLog.result(CHANNEL, "the workbench", started)
+	if started.ok and wb.api != null:
+		game.config_binder.attach(wb.api.runtime as DotProfileRuntime)
+	platform.add_workbench(wb)
+
+
 func _build_settings() -> void:
 	settings = PhSettings.new()
 	settings.name = "Settings"
@@ -1181,6 +1202,7 @@ func _build_settings() -> void:
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
+	_add_noblock_and_workbench()
 	# Walking is off while the cover is up, a menu is open or a line is typed: the sampler polls
 	# the keyboard.
 	platform.input_blocked_changed.connect(_suspend_input)

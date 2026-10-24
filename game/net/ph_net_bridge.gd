@@ -1028,7 +1028,9 @@ func _admit(peer_id: int) -> void:
 		game.hide_limit(),
 		game.round_limit(),
 		game.config.beacon_period,
-		game.config.taunt_range
+		game.config.taunt_range,
+		game.config.movement_floats(),
+		game.config.auto_bunny_hop
 	))
 
 	# The map, before anything that stands on it, and what of it is already broken.
@@ -1354,6 +1356,7 @@ func _apply_hello(reader: DotNetReader) -> void:
 	game.config.round_seconds = float(hello["round_seconds"])
 	game.config.beacon_period = float(hello["beacon_period"])
 	game.config.taunt_range = float(hello["taunt_range"])
+	game.adopt_movement(hello["move"], bool(hello["auto_hop"]))
 
 	_claim_local_player()
 

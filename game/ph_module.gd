@@ -82,6 +82,10 @@ func _map_config_keys() -> Dictionary:
 		"ph_auto_taunt_seconds": {"type": "float", "min": 0.0, "max": 600.0},
 		"ph_beacon_props_left": {"type": "int", "min": 0, "max": 64},
 		"mp_killcam_time": {"type": "float", "min": 0.0, "max": 30.0},
+		"ph_decoy_penalty": {"type": "float", "min": 0.0, "max": 5.0},
+		"ph_reveal_cooldown": {"type": "float", "min": 0.0, "max": 600.0},
+		"ph_beacon_seconds_left": {"type": "float", "min": 0.0, "max": 600.0},
+		"ph_taunt_cooldown": {"type": "float", "min": 0.0, "max": 60.0},
 	}
 
 
@@ -172,17 +176,6 @@ func _game_load() -> DotResult:
 	# maps.yml, before the commands: its `commands: names:` block renames ph_maps / ph_map (roles
 	# of those names) as it does dot-vote's, and the ballot reads the marks it sets.
 	var _rotation := world.load_rotation()
-	add_cvar(
-		"sv_map_rotation_file", world.config.map_rotation_file,
-		"maps.yml: the maps that rotate, in named rotations. Unlisted maps stay installed."
-	).changed.connect(
-		func(_old: String, new_value: String) -> void:
-			world.config.map_rotation_file = new_value.strip_edges()
-			var _read := world.load_rotation()
-			if vote != null:
-				vote.refresh_maps()
-	)
-
 	add_command(world.command_name("ph_maps", "ph_maps"), _cmd_maps, "List the maps, and any refused file")
 	add_command("ph_reload", _cmd_reload, "Read the map directory again (from the next map)")
 	add_command("ph_taunts", _cmd_taunts, "List the taunts")
@@ -244,6 +237,7 @@ func _game_load() -> DotResult:
 	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
 		"Seconds the killcam of a round's last moment plays, added to the intermission (0 for none)",
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	_killcam_cvar = killcam
 	if killcam != null:
 		killcam.changed.connect(func(_old: String, new_value: String) -> void:
 			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
@@ -361,139 +355,133 @@ func _on_profile(event: DotEvent) -> void:
 	link.refresh_player(session_id, session.display_name, _avatar_for(session_id))
 
 
-## The numbers an operator is actually going to want to change, as cvars.
-##
-## [b]Live, and each one writes through to the configuration the world already reads.[/b] A
-## server owner finds their server's balance by moving one of them between rounds with people
-## watching; a JSON file and a restart is a balance nobody tunes.
-##
-## [b]What is NOT here is anything the round has already decided.[/b] `ph_players_per_hunter`
-## changes how many are drawn for the NEXT round; it does not hand somebody a gun now.
 func _add_tunables(world: PhGame) -> void:
-	var config := world.config
-
-	_tunable("ph_hide_seconds", config.hide_seconds,
-		"Seconds the props have to hide while the hunters are blindfolded",
-		func(value: float) -> void: config.hide_seconds = clampf(value, 0.0, 180.0))
-	_tunable("ph_round_seconds", config.round_seconds,
-		"Seconds the hunters have to find everybody (a map may ask for less)",
-		func(value: float) -> void: config.round_seconds = clampf(value, 30.0, 1800.0))
-	_tunable("ph_timeout_winner", float(config.timeout_winner),
-		"Who wins when the clock runs out: 0 nobody, 1 the props, 2 the hunters",
-		func(value: float) -> void: config.timeout_winner = clampi(int(value), 0, 2))
-	_tunable("ph_players_per_hunter", config.players_per_hunter,
-		"One hunter for every this many players, from the next round",
-		func(value: float) -> void: config.players_per_hunter = clampf(value, 1.0, 32.0))
-	_tunable("ph_min_hunters", float(config.min_hunters),
-		"The fewest hunters a round has, from the next round",
-		func(value: float) -> void: config.min_hunters = clampi(int(value), 1, config.max_hunters))
-	_tunable("ph_max_hunters", float(config.max_hunters),
-		"The most hunters a round has, from the next round",
-		func(value: float) -> void: config.max_hunters = clampi(int(value), config.min_hunters, 32))
-	_tunable("ph_hunter_pick", float(config.hunter_pick),
-		"How hunters are chosen: 0 random, 1 an equal share each, 2 the sides swap",
-		func(value: float) -> void: config.hunter_pick = clampi(int(value), 0, 2))
-	_tunable("ph_side_choice", 1.0 if config.allow_side_choice else 0.0,
-		"Whether !hunter and !prop count in the draw",
-		func(value: float) -> void: config.allow_side_choice = value > 0.5)
-	_tunable("ph_auto_taunt_seconds", config.auto_taunt_seconds,
-		"Seconds a prop may stand still before a taunt is forced (0 never)",
-		func(value: float) -> void:
-			config.auto_taunt_seconds = clampf(value, 0.0, 600.0)
-			if world.taunts != null:
-				world.taunts.auto_after = config.auto_taunt_seconds)
-	_tunable("ph_auto_taunt_radius", config.auto_taunt_radius,
-		"Metres a prop must move for that to count as moving",
-		func(value: float) -> void:
-			config.auto_taunt_radius = clampf(value, 0.1, 20.0)
-			if world.taunts != null:
-				world.taunts.auto_radius = config.auto_taunt_radius)
-	_tunable("ph_taunt_points", float(config.taunt_points),
-		"Points for a taunt a prop chose",
-		func(value: float) -> void:
-			config.taunt_points = clampi(int(value), 0, 100)
-			if world.taunts != null:
-				world.taunts.points_voluntary = config.taunt_points)
-	_tunable("ph_forced_taunt_points", float(config.forced_taunt_points),
-		"Points for a taunt forced on a prop that stood still",
-		func(value: float) -> void:
-			config.forced_taunt_points = clampi(int(value), 0, 100)
-			if world.taunts != null:
-				world.taunts.points_forced = config.forced_taunt_points)
-	_tunable("ph_reveal_cooldown", config.reveal_cooldown,
-		"Seconds before a prop may show its face again after hiding",
-		func(value: float) -> void:
-			config.reveal_cooldown = clampf(value, 0.0, 600.0)
-			world.rules.reveal_cooldown = config.reveal_cooldown)
-	_tunable("ph_reveal_points", config.reveal_points_per_second,
-		"Points a second a prop earns showing its face",
-		func(value: float) -> void:
-			config.reveal_points_per_second = clampf(value, 0.0, 100.0)
-			world.rules.reveal_points_per_second = config.reveal_points_per_second)
-	_tunable("ph_beacon_props_left", float(config.beacon_props_left),
-		"Beacon every prop still alive once this few are left (0 never)",
-		func(value: float) -> void: config.beacon_props_left = clampi(int(value), 0, 32))
-	_tunable("ph_beacon_seconds_left", config.beacon_seconds_left,
-		"Beacon every prop still alive once this few seconds are left (0 never)",
-		func(value: float) -> void: config.beacon_seconds_left = clampf(value, 0.0, 600.0))
-	_tunable("ph_decoy_penalty", config.decoy_penalty,
-		"Share of a shot's damage a hunter takes for hitting real furniture (0 off)",
-		func(value: float) -> void: config.decoy_penalty = clampf(value, 0.0, 5.0))
-	_tunable("ph_rounds_per_map", float(config.rounds_per_map),
-		"Rounds on a map before the next one",
-		func(value: float) -> void: config.rounds_per_map = clampi(int(value), 1, 50))
-	_tunable("ph_gravity", config.gravity, "Metres per second squared, for everything",
-		func(value: float) -> void: config.gravity = value)
-	_tunable("ph_autobhop", 1.0 if config.auto_bunny_hop else 0.0,
-		"Whether holding jump hops again on landing, from the next round",
-		func(value: float) -> void:
-			config.auto_bunny_hop = value > 0.5
-			for id: StringName in world.players:
-				(world.players[id] as PhPlayer).retune())
-	_tunable("ph_spectate_camera", float(config.spectate_camera),
-		"Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody",
-		func(value: float) -> void:
-			config.spectate_camera = clampi(int(value), 0, 2)
-			# One setting, two names: through mp_forcecamera when it is bound, so the two
-			# never disagree; straight onto the rules when it is not.
-			if _force_camera_cvar != null:
-				var _held := _force_camera_cvar.set_value(str(config.spectate_camera))
-			elif world.spectate != null:
-				world.spectate.set_force_camera(config.spectate_camera))
-	# [b]Deprecated: the count is `bot_quota` now[/b], and this forwards to it. Kept rather than
-	# removed because every shipped server config sets it; left as its own number it would be
-	# a second cvar deciding the same count, and whichever was read last would win.
-	_tunable("ph_min_players", float(config.minimum_players),
-		"Deprecated, sets bot_quota. How many players the server keeps in a round with stand-ins",
-		func(value: float) -> void:
-			config.minimum_players = clampi(int(value), 0, 24)
-			if _quota != null and _quota.quota_cvar != null:
-				var _set := _quota.quota_cvar.set_value(str(config.minimum_players)))
-	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` (easy, medium, hard,
-	# nightmare; medium by default) and every `bot_*` setting it bundles, the names every game in
-	# the family uses. On the game as metadata, where its bots read it; never the registry.
+	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` and every `bot_*`
+	# setting it bundles, the names every game in the family uses. On the game as metadata.
 	var _bot_cvars := DotBotSettings.of(world).bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
-	_tunable("ph_bot_suspicion", config.bot_suspicion,
-		"How much a stand-in hunter doubts furniture with no other reason to, in hundredths (0 tests nothing without a reason)",
-		func(value: float) -> void: config.bot_suspicion = clampf(value, 0.0, 100.0))
-	_tunable("ph_bot_disguise_delay", config.bot_disguise_delay,
-		"Seconds into the hide before a stand-in prop puts its disguise on (0 at once)",
-		func(value: float) -> void: config.bot_disguise_delay = clampf(value, 0.0, 60.0))
-	_tunable("ph_bot_relocate_seconds", config.bot_relocate_seconds,
-		"About how many seconds a hidden stand-in prop stays before moving to another place of its kind (0 never)",
-		func(value: float) -> void: config.bot_relocate_seconds = clampf(value, 0.0, 3600.0))
-	_tunable("ph_bot_relocate_range", config.bot_relocate_range,
-		"Metres a stand-in prop's move to another place may reach",
-		func(value: float) -> void: config.bot_relocate_range = clampf(value, 2.0, 60.0))
-	_tunable("ph_bot_nav", 1.0 if config.bot_nav else 0.0,
-		"1: stand-ins read the map's nav annotations (props hide beside furniture of their size, tucked in and out of sight; hunters sweep the best spots and chokepoints); 0: the first way",
-		func(value: float) -> void: config.bot_nav = value >= 0.5)
-	_tunable("ph_bot_sweep", config.bot_sweep,
-		"With ph_bot_nav: how much of the annotated map a stand-in hunter knows (0..1); it sweeps the best hiding spots and chokepoints first as far as it knows",
-		func(value: float) -> void: config.bot_sweep = clampf(value, 0.0, 1.0))
-	_tunable("ph_bot_beside", config.bot_beside,
-		"Metres from a piece of furniture a stand-in prop's hiding spot may be and still be beside it",
-		func(value: float) -> void: config.bot_beside = clampf(value, 0.3, 4.0))
+	_bind_config(world)
+
+
+## Older cvar names kept for shipped server configs and map files: alias -> PhConfig field.
+const ALIASES := {
+	"ph_side_choice": "allow_side_choice",
+	"ph_autobhop": "auto_bunny_hop",
+	"ph_reveal_points": "reveal_points_per_second",
+	"ph_min_players": "minimum_players",
+	"sv_map_rotation_file": "map_rotation_file",
+}
+
+## dot-workbench over the config; the F9 panel off a dedicated server, the HTTP page only with `workbench.enabled`.
+var workbench: DotGameWorkbench = null
+
+var _killcam_cvar: DotConVar = null
+
+
+## Every [PhConfig] field as a `ph_<field>` cvar, a cfg/ yml key and a workbench set, the cfg/ diff commands, and the older names as aliases that follow the field.
+func _bind_config(world: PhGame) -> void:
+	var binder := world.config_binder
+	if binder == null:
+		return
+	workbench = DotGameWorkbench.new()
+	workbench.name = "Workbench"
+	workbench.dedicated = DisplayServer.get_name() == "headless"
+	workbench.listen_host_fn = func() -> bool: return DisplayServer.get_name() != "headless"
+	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
+		return server != null and server.admins != null and actor is String \
+			and bool(server.admins.uid_has_permission(actor, flag))
+	workbench.add_set(binder.profile_set(), "Game settings")
+	add_child(workbench)
+	var started := workbench.start()
+	var runtime: DotProfileRuntime = workbench.api.runtime if started.ok and workbench.api != null else null
+	if not started.ok:
+		log_warn("the workbench did not start", {"why": started.error.message})
+	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY,
+		func(name: String) -> bool: return console.has_name(name))
+	binder.bind_commands(add_command)
+	for alias: String in ALIASES:
+		_alias(world, alias, ALIASES[alias])
+	binder.field_changed.connect(_on_config_field)
+	if runtime != null:
+		binder.attach(runtime)
+
+
+## An older cvar name for a config field: it reports the field and writes through the field's own cvar.
+func _alias(world: PhGame, alias: String, key: String) -> void:
+	var target := world.config_binder.cvar_for(key)
+	var cvar := add_cvar(alias, _field_text(world.config.get(key)), "Same as ph_%s" % key)
+	if cvar == null or target == null:
+		return
+	cvar.changed.connect(func(_old: String, new_value: String) -> void:
+		var value: Variant = world.config.get(key)
+		var text := new_value
+		if value is bool:
+			text = "1" if new_value.to_float() >= 0.5 else "0"
+		elif value is int:
+			text = str(roundi(new_value.to_float()))
+		var _set: Variant = target.set_value(text))
+
+
+static func _field_text(value: Variant) -> String:
+	if value is bool:
+		return "1" if value else "0"
+	return str(value)
+
+
+## A field changed from a cvar, the workbench or a file: the aliases follow, and whatever the world copied from the config is told.
+func _on_config_field(key: String, _value: Variant, _source: String) -> void:
+	var world := game as PhGame
+	if world == null:
+		return
+	var config := world.config
+	for alias: String in ALIASES:
+		if ALIASES[alias] == key and console != null and console.has_name(alias):
+			var _set: Variant = console.set_cvar(alias, _field_text(config.get(key)))
+	match key:
+		"auto_taunt_seconds", "auto_taunt_radius", "taunt_points", "forced_taunt_points", "taunt_cooldown":
+			if world.taunts != null:
+				world.taunts.auto_after = config.auto_taunt_seconds
+				world.taunts.auto_radius = config.auto_taunt_radius
+				world.taunts.cooldown = config.taunt_cooldown
+				world.taunts.points_voluntary = config.taunt_points
+				world.taunts.points_forced = config.forced_taunt_points
+		"disguise_reach", "prop_health_scale", "prop_health_exponent", "prop_min_health", "prop_max_health", \
+		"prop_min_dimension", "prop_max_volume", "reveal_cooldown", "reveal_points_per_second", \
+		"reveal_paid_seconds", "tilt_step", "max_tilt":
+			if world.rules != null:
+				config.apply_disguise_rules(world.rules)
+		"friendly_fire":
+			if world.combat != null and world.combat.rules != null:
+				world.combat.rules.friendly_fire = config.friendly_fire
+		"run_speed", "walk_speed_scale", "jump_height", "gravity", "air_accelerate", "accelerate", "friction", \
+		"stop_speed", "crouch_speed_scale", "auto_bunny_hop":
+			world.adopt_movement(config.movement_floats(), config.auto_bunny_hop)
+		"killcam_seconds":
+			if _killcam_cvar != null and _killcam_cvar.get_string() != _number(config.killcam_seconds):
+				var _set: Variant = _killcam_cvar.set_value(_number(config.killcam_seconds))
+		"spectate_camera":
+			# Through the cvar, so what `mp_forcecamera` reports is what is in force.
+			if _force_camera_cvar != null:
+				var _held: Variant = _force_camera_cvar.set_value(str(config.spectate_camera))
+			elif world.spectate != null:
+				world.spectate.set_force_camera(config.spectate_camera)
+		"minimum_players":
+			if _quota != null and _quota.quota_cvar != null:
+				var _set: Variant = _quota.quota_cvar.set_value(str(config.minimum_players))
+		"map_rotation_file":
+			config.map_rotation_file = config.map_rotation_file.strip_edges()
+			var _read := world.load_rotation()
+			if vote != null:
+				vote.refresh_maps()
+
+
+## The workbench's runtime, so its "noblock" kind is listed beside the config.
+func _noblock_runtime() -> Object:
+	return workbench.api.runtime if workbench != null and workbench.api != null else null
+
+
+## Props pass props and hunters pass hunters under `mp_teamblock 0`; players are non-solid here, so nothing physical follows (see [member PhGame.body_rules]).
+func _noblock_side(id: Variant) -> Variant:
+	return (game as PhGame).team_of_side(id) if game != null else ""
 
 
 ## A number as an operator would type it: `34`, not `34.000000`.
@@ -511,34 +499,18 @@ static func _number(value: float) -> String:
 var _force_camera_cvar: DotConVar = null
 
 
-## One cvar, its default taken from the configuration rather than written twice.
-##
-## [b]The default is the value the world was built with, and that is the whole point.[/b] A
-## cvar declared with a literal default is a second copy of a number that
-## `defaults < JSON < environment < argv` has already decided — so an operator who set
-## `PH_ROUND_SECONDS=240` would see `ph_round_seconds` report 300 and, worse, would reset
-## their own setting the moment anything wrote the value back.
-func _tunable(
-	cvar_name: String, current: float, description: String, apply: Callable
-) -> void:
-	var cvar := add_cvar(cvar_name, _number(current), description)
-
-	if cvar == null:
-		return
-
-	# The handler must not capture `cvar`: it would be a reference cycle the engine never frees.
-	cvar.changed.connect(func(_old: String, new_value: String) -> void:
-		apply.call(new_value.to_float())
-		log_info("a tunable changed", {"cvar": cvar_name, "now": new_value})
-	)
-
-
 ## [b]Nothing to undo.[/b] The commands are the module's own and [DotModule] removes them;
 ## the netcode, the bridge and the roster are [DotGameModule]'s and it tears them down in
 ## the reverse order it built them. The world is NOT this module's to free: it was in the
 ## tree before the module loaded, and a server can unload and reload a game module without
 ## the map going away, which is what `module reload` is for.
 func _game_unload() -> void:
+	if workbench != null:
+		workbench.queue_free()
+		workbench = null
+	if game != null and "block_rules" in game:
+		game.set(&"block_rules", null)
+	noblock = null
 	_bot_ids.clear()
 
 	if vote != null:
@@ -759,11 +731,12 @@ func _build_vote(world: PhGame) -> void:
 		(menu_half as Object).set(&"change_fn", world.change_map_now)
 		(menu_half as Object).set(&"rows_fn", func(_rows: Array) -> Array: return world.map_rows())
 
-	_tunable("ph_vote_after", vote.open_after_sec,
-		"Seconds into the last round on a map before the vote for the next one opens",
-		func(value: float) -> void:
+	var vote_after := add_cvar("ph_vote_after", _number(vote.open_after_sec),
+		"Seconds into the last round on a map before the vote for the next one opens")
+	if vote_after != null:
+		vote_after.changed.connect(func(_old: String, new_value: String) -> void:
 			if vote != null:
-				vote.open_after_sec = maxf(value, 0.0))
+				vote.open_after_sec = maxf(new_value.to_float(), 0.0))
 
 	world.world_rebuilt.connect(func() -> void:
 		if vote != null and world.map != null:

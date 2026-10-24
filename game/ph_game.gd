@@ -175,6 +175,21 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
 
+## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by the server scene or the client.
+var config_binder: DotGameConfigBinder = null
+
+## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so dot-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
+var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+
+## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`.
+var block_rules: Object = null:
+	set(value):
+		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
+			block_rules.disconnect(&"changed", body_rules.refresh)
+		block_rules = value
+		if block_rules != null and block_rules.has_signal(&"changed"):
+			block_rules.connect(&"changed", body_rules.refresh)
+
 ## player id -> side.
 var sides: Dictionary = {}
 
@@ -225,6 +240,8 @@ func _ready() -> void:
 		config = PhConfig.new()
 
 	var valid := config.validate()
+
+	body_rules.solid = false
 
 	if not valid.ok:
 		DotLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
@@ -328,6 +345,29 @@ func _apply_gravity() -> void:
 	PhysicsServer3D.area_set_param(world.space, PhysicsServer3D.AREA_PARAM_GRAVITY, config.gravity)
 
 
+## The server's movement numbers (its HELLO), so this client predicts with what the server simulates.
+func adopt_movement(move: PackedFloat32Array, auto_hop: bool) -> void:
+	if move.size() < 9:
+		return
+	config.run_speed = move[0]
+	config.walk_speed_scale = move[1]
+	config.jump_height = move[2]
+	config.gravity = move[3]
+	config.air_accelerate = move[4]
+	config.accelerate = move[5]
+	config.friction = move[6]
+	config.stop_speed = move[7]
+	config.crouch_speed_scale = move[8]
+	config.auto_bunny_hop = auto_hop
+	_apply_gravity()
+	if projectiles != null:
+		projectiles.set_gravity(config.gravity)
+	if map != null:
+		map.gravity = config.gravity
+	for id: StringName in players:
+		(players[id] as PhPlayer).retune()
+
+
 func _build_random() -> void:
 	random = DotRandomManager.new()
 	random.name = "Random"
@@ -364,7 +404,7 @@ func _build_combat() -> void:
 	combat.register_service = false
 
 	var damage_rules := DotDamageRules.new()
-	damage_rules.friendly_fire = false
+	damage_rules.friendly_fire = config.friendly_fire
 	damage_rules.self_damage = true
 	damage_rules.hit_groups = true
 	combat.rules = damage_rules
@@ -462,7 +502,7 @@ func _build_match() -> void:
 	match_rules.warmup_sec = config.warmup_seconds
 	match_rules.countdown_sec = 0.0
 	match_rules.team_based = true
-	match_rules.min_players = 2
+	match_rules.min_players = config.min_players_to_start
 	match_rules.set(&"decision_fn", _decision)
 	match_rules.time_limit_sec = config.hide_seconds + config.round_seconds + 60.0
 	match_node.rules = match_rules
@@ -672,6 +712,8 @@ func remove_player(player_id: StringName) -> void:
 		taunts.forget(player_id)
 
 	player.queue_free()
+	if block_rules != null:
+		block_rules.call(&"forget", player_id)
 
 	if spectate != null:
 		spectate.on_left(player_id)
@@ -684,6 +726,12 @@ func remove_player(player_id: StringName) -> void:
 
 func team_of(player_id: StringName) -> int:
 	return int(sides.get(player_id, 0))
+
+
+## The side id dot-team's block rules compare ("" for none): props with props, hunters with hunters.
+func team_of_side(player_id: Variant) -> Variant:
+	var side := team_of(StringName(str(player_id)))
+	return str(side) if side > 0 else ""
 
 
 func side_name(side: int) -> String:

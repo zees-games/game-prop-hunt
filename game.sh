@@ -33,7 +33,7 @@
 GAME_NAME="Prop Hunt"
 PACK="prophunt"
 EXTRA_PACKS="prophunt_maps:mg-prop-hunt-maps"
-SUITES="headless_run headless_mapcfg headless_workshop headless_maps headless_bots headless_net dedicated"
+SUITES="headless_config headless_run headless_mapcfg headless_workshop headless_maps headless_bots headless_net dedicated"
 # A suite that legitimately runs longer than the default, as name=seconds. headless_bots plays 96
 # rounds and took 814 s under `heavy` on dev02 (2026-10-20) and under 800 s on 2026-10-22 (no regression), but 1443 s on the
 # staging laptop, so 900 s was its edge.
