@@ -1340,14 +1340,15 @@ func _test_bodies() -> void:
 	# A person: a stand-in not in disguise, drawn as a figure.
 	var person: PhPlayer = null
 	var prop: PhPlayer = null
+	var prop_bots: Array[PhPlayer] = []
 	for id: StringName in world.players:
 		var p: PhPlayer = world.players[id]
 		if id == &"local" or not p.is_alive():
 			continue
 		if person == null and not p.is_disguised() and p.figure != null and p.figure.visible:
 			person = p
-		elif prop == null and world.team_of(id) == PhGame.PROPS and person != p:
-			prop = p
+		elif world.team_of(id) == PhGame.PROPS and person != p:
+			prop_bots.append(p)
 	if person != null:
 		var slay := DotDamage.make(0, person.entity_id, person.health.max_health * 10.0, null)
 		slay.tick = world._tick
@@ -1373,7 +1374,13 @@ func _test_bodies() -> void:
 	# A prop, disguised and drawn as what it is wearing: found, it bursts and leaves no body.
 	var burst := false
 	var toppled := false
-	if prop != null and world.disguise_as(prop.player_id, &"furniture_bookcase_closed"):
+	# A bot may be hiding where a bookcase does not fit (the server refuses with "no room"), so
+	# the first stand-in that has room for one is the one found.
+	for candidate in prop_bots:
+		if world.disguise_as(candidate.player_id, &"furniture_bookcase_closed"):
+			prop = candidate
+			break
+	if prop != null:
 		for i in 4:
 			await get_tree().process_frame
 		var was := ragdolls.live().size()
