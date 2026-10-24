@@ -30,8 +30,19 @@ var _client: Node = null
 var _aim := false
 
 
+## `--action <kind> <id>` (`--action emote dance`): the local player, undisguised and in third
+## person, playing an avatar action through the client's own input path, from the front, early
+## and later in the clip. `--as=<prop id>` disguises them first, to see what an action shows then.
+var _action: Array = []
+
+
 func _ready() -> void:
-	for arg in OS.get_cmdline_user_args():
+	var user_args := OS.get_cmdline_user_args()
+	var action_at := user_args.find("--action")
+	if action_at >= 0 and action_at + 2 < user_args.size():
+		_action = [StringName(user_args[action_at + 1]), String(user_args[action_at + 2])]
+		_view = "action"
+	for arg in user_args:
 		if arg.begins_with("--view="):
 			_view = arg.trim_prefix("--view=")
 		elif arg.begins_with("--lean="):
@@ -64,6 +75,7 @@ func _ready() -> void:
 	_client.name = "Client"
 	_client.set("force_offline", true)
 	_client.set("remember_loadout", false)
+	_client.set("third_person", _view == "action")
 	add_child(_client)
 	# --view=cover: the loading cover dot-game's DotGameClient puts up first, before it lifts.
 	if _view == "cover":
@@ -137,6 +149,10 @@ func _run() -> void:
 	_client.call("_follow_side")
 
 	match _view:
+		"action":
+			await _stage_action(game, local)
+			get_tree().quit(0)
+			return
 		"overview":
 			await _frames(6)
 			var box: AABB = game.map.bounds()
@@ -400,6 +416,51 @@ func _until_a_round(game: PhGame) -> void:
 		if game.phase != PhGame.Phase.IDLE and _client.get("player") != null:
 			return
 		await get_tree().process_frame
+
+
+## Writes <out>_a.png and <out>_b.png.
+func _stage_action(game: PhGame, me: PhPlayer) -> void:
+	if Array(OS.get_cmdline_user_args()).any(func(a: String) -> bool: return a.begins_with("--as=")):
+		var _worn := game.disguise_as(me.player_id, _as)
+	else:
+		# The round starts a prop in a disguise; this is about the person under it.
+		me.apply_disguise(null)
+	await _seconds_of(1.5)
+	var figure: Object = _client.call("_avatar_figure", 0)
+	print("action %s/%s: figure=%s disguised=%s third_person=%s" % [_action[0], _action[1], figure != null, me.is_disguised(), _client.get("third_person")])
+	var entry := DotAvatarActions.defaults().find(_action[0], _action[1])
+	var input: Object = (_client.get("platform") as DotGameClient).avatar_actions.input
+	input.emit_signal(&"action_requested", entry)
+	var yaw := deg_to_rad(float(me.controller.state.yaw))
+	var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var feet: Vector3 = me.global_position
+	# The way the drawn figure faces, which is not always the controller's yaw.
+	if figure is Node3D:
+		ahead = -(figure as Node3D).global_basis.z
+		ahead.y = 0.0
+		ahead = ahead.normalized()
+	# The other side's stand-ins stand about the pen; leave only this one in the frame.
+	for id: StringName in game.players:
+		var other: Node3D = game.players[id]
+		if other != me:
+			other.visible = false
+	var camera := _free_camera()
+	camera.fov = 60.0
+	for part in ["a", "b"]:
+		await _frames(12 if part == "a" else 30)
+		# The figure turns on its own during the wait; face the camera to where it points now.
+		if figure is Node3D:
+			ahead = -(figure as Node3D).global_basis.z
+			ahead.y = 0.0
+			ahead = ahead.normalized()
+			feet = (figure as Node3D).global_position
+		camera.look_at_from_position(feet + ahead * 3.2 + Vector3.UP * 1.6, feet + Vector3.UP * 1.0)
+		await _frames(3)
+		await RenderingServer.frame_post_draw
+		var path := ProjectSettings.globalize_path(_out.trim_suffix(".png") + "_%s.png" % part)
+		DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+		var _saved := get_viewport().get_texture().get_image().save_png(path)
+		print("wrote ", path, " action=", figure.get("action") if figure != null else "n/a")
 
 
 func _free_camera() -> Camera3D:

@@ -6,6 +6,7 @@
 #   tools/shot.sh --view=hunter                                   # a hunter's eyes, seeking
 #   tools/shot.sh --view=prop --as=furniture_chair                # a prop in third person, hidden
 #   tools/shot.sh --view=prop --as=survival_bottle --lean=6       # leant: 6 steps is on its side, 12 on its nose
+#   tools/shot.sh --action emote dance [--as=furniture_chair]     # the local player, third person, playing an avatar action (action_a/_b.png)
 #   tools/shot.sh --view=dead --seconds=1.5                      # a hunter killed: their ragdoll (--victim=prop --as=<id>: a found prop bursts)
 #   tools/shot.sh --view=killcam --seconds=2                      # the last hider found, replayed (--seconds=9: the winner reveal)
 #   tools/shot.sh --view=person --seconds=1                      # somebody else, with their hull (green) and hitboxes (red)
@@ -32,8 +33,11 @@ out=""
 config=("--ph-warmup-seconds=0" "--ph-hide-seconds=3")
 extra=()
 
+take=0
 for arg in "$@"; do
+    if [ "$take" -gt 0 ]; then extra+=("$arg"); take=$((take - 1)); continue; fi
     case "$arg" in
+        --action)    extra+=("$arg"); take=2; view=action ;;
         --view=*)    view="${arg#*=}" ;;
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
