@@ -2,8 +2,10 @@ extends Node
 
 const PhBindings := preload("../game/ph_bindings.gd")
 const PhCatalogue := preload("../game/ph_catalogue.gd")
+const PhClient := preload("../game/ph_client.gd")
 const PhConfig := preload("../game/ph_config.gd")
 const PhController := preload("../game/ph_controller.gd")
+const PhFigure := preload("../game/ph_figure.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhInterest := preload("../game/net/ph_interest.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
@@ -27,7 +29,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 29
 
-const CHECKS := 166
+const CHECKS := 167
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -316,6 +318,24 @@ func _test_disguise() -> void:
 	await _step(game, 1)
 	_check(game.request_disguise(prop.player_id) and prop.disguise.prop_id == &"furniture_chair",
 		"a prop looking at a chair becomes a chair", String(prop.disguise.prop_id))
+
+	# An avatar action has no figure to play on while disguised: the prop is drawn, not the person.
+	var client: Node = PhClient.new()
+	for who: PhPlayer in [hunter, prop]:
+		who.figure = PhFigure.new()
+		who.figure.person = DotHumanoidFigure.new()
+	client.set(&"game", game)
+	client.set(&"_offline", true)
+	client.set(&"player", hunter)
+	var hunter_fig: Object = client.call(&"_avatar_figure", 0)
+	client.set(&"player", prop)
+	_check(hunter_fig != null and hunter.figure != null and client.call(&"_avatar_figure", 0) == null,
+		"a disguised player has no figure for an avatar action, an undisguised one does")
+	client.free()
+	for who: PhPlayer in [hunter, prop]:
+		who.figure.person.free()
+		who.figure.free()
+		who.figure = null
 
 	var size := game.props_catalogue.size_of(&"furniture_chair")
 	var hull := DotPropDisguise.hull(size, game.rules)

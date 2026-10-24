@@ -196,14 +196,17 @@ func _covered() -> bool:
 	return gate != null and not gate.is_open()
 
 
-## The figure an avatar action plays on: that peer's player, or the local one offline.
+## The figure an avatar action plays on: that peer's player, or the local one offline. A disguised player has
+## no figure drawn (they are a prop), so nothing plays on them.
 func _avatar_figure(peer_id: int) -> Object:
 	var who: PhPlayer = null
 	if bridge != null and peer_id != 0:
 		who = game.players.get(PhNetBridge.player_key(bridge.player_for_peer(peer_id)), null)
 	if who == null and player != null and (net == null or peer_id == net.local_peer_id):
 		who = player
-	return who.figure.person if who != null and who.figure != null else null
+	if who == null or who.figure == null or who.is_disguised():
+		return null
+	return who.figure.person
 
 
 func _exit_tree() -> void:
@@ -1217,6 +1220,11 @@ func _build_settings() -> void:
 	DotLog.result(CHANNEL, "the platform", platform.setup())
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
 	DotLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
+	# Disguised, the keys do nothing and send nothing: there is no figure to play on, and the others would draw none.
+	if platform.avatar_actions != null:
+		var menus_block := platform.avatar_actions.blocked_fn
+		platform.avatar_actions.blocked_fn = func() -> bool:
+			return (menus_block.is_valid() and bool(menus_block.call())) or (player != null and player.is_disguised())
 	_add_noblock_and_workbench()
 	# Walking is off while the cover is up, a menu is open or a line is typed: the sampler polls
 	# the keyboard.
