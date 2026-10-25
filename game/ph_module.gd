@@ -3,6 +3,9 @@ extends DotGameModule
 const PhNetBridge := preload("net/ph_net_bridge.gd")
 const PhServices := preload("ph_services.gd")
 
+const PhAmbience := preload("ph_ambience.gd")
+## The workbench kind of the ambience cvar set (saved to cfg/.../ambience/server.yml).
+const AMBIENT_KIND := "ambience"
 const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhAvatars := preload("ph_avatars.gd")
@@ -238,6 +241,7 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
 	)
+	_bind_config(world)
 
 	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
 	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
@@ -365,7 +369,6 @@ func _add_tunables(world: PhGame) -> void:
 	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` and every `bot_*`
 	# setting it bundles, the names every game in the family uses. On the game as metadata.
 	var _bot_cvars := DotBotSettings.of(world).bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
-	_bind_config(world)
 
 
 ## Older cvar names kept for shipped server configs and map files: alias -> PhConfig field.
@@ -395,7 +398,11 @@ func _bind_config(world: PhGame) -> void:
 	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
 		return server != null and server.admins != null and actor is String \
 			and bool(server.admins.uid_has_permission(actor, flag))
-	workbench.add_set(binder.profile_set(), "Game settings")
+	for set: DotProfileSet in binder.profile_sets():
+		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var ambient_set := DotGameWorkbench.cvar_set(console, PhAmbience.cvar_types(), AMBIENT_KIND)
+	if ambient_set != null:
+		workbench.add_set(ambient_set, "Ambience (ph_ambient*)")
 	add_child(workbench)
 	var started := workbench.start()
 	var runtime: DotProfileRuntime = workbench.api.runtime if started.ok and workbench.api != null else null
@@ -409,6 +416,8 @@ func _bind_config(world: PhGame) -> void:
 	binder.field_changed.connect(_on_config_field)
 	if runtime != null:
 		binder.attach(runtime)
+		if ambient_set != null:
+			var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, runtime, console)
 
 
 ## An older cvar name for a config field: it reports the field and writes through the field's own cvar.

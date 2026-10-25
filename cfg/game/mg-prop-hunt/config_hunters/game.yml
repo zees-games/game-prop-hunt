@@ -1,0 +1,43 @@
+# mg-prop-hunt: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/mg-prop-hunt/config_hunters/game.yml. Layers: defaults < this < env < argv.
+
+# --- Hunters
+# The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first.
+# hunter_weapons: ["smg", "pistol", "hatchet"]
+# What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the grenades (`ph_loa...
+# hunter_choices: ["smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol", "frag", "sticky"]
+# Whether a shot hurts a player of the shooter's own side (hunters shooting hunters, props shooting props).
+# friendly_fire: false
+# What shooting the furniture costs a hunter: this fraction of the damage the shot would have done comes off ... [0.0..5.0]
+# decoy_penalty: 0.2
+# The least a decoy shot costs, so a shotgun's pellets are not each worth nothing. [0.0..50.0]
+# decoy_penalty_min: 1.0
+# What happens to a hunter who dies to the furniture: 0 nothing drawn, 1 they fall apart, 2 they burst. See [...
+# hunter_break: 2
+# What a disguised prop does when it is found: 0 bursts into its own pieces, as shot furniture does; 1 topple...
+# prop_death: 0
+
+# --- The players
+#  [1.0..400.0]
+# hunter_health: 100.0
+# A prop's health before they are disguised: their own body. [1.0..400.0]
+# prop_body_health: 100.0
+#  [1.0..20.0]
+# run_speed: 6.5
+#  [0.1..1.0]
+# walk_speed_scale: 0.45
+#  [0.1..5.0]
+# jump_height: 1.15
+#  [1.0..60.0]
+# gravity: 20.0
+# auto_bunny_hop: false
+#  [0.0..200.0]
+# air_accelerate: 20.0
+#  [0.5..100.0]
+# accelerate: 10.0
+#  [0.0..30.0]
+# friction: 6.0
+#  [0.0..20.0]
+# stop_speed: 2.5
+#  [0.1..1.0]
+# crouch_speed_scale: 0.45

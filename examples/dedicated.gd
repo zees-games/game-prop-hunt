@@ -17,7 +17,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 14
-const CHECKS := 105
+const CHECKS := 106
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -182,7 +182,7 @@ func _test_the_module_loads() -> void:
 	game = PhGame.new()
 	game.name = "World"
 	game.config = config
-	game.config_binder = DotGameConfigBinder.create(config, "mg-prop-hunt", "ph")
+	game.config_binder = PhConfig.make_binder(config)
 	game.config_binder.strict = true
 	var _layers := game.config_binder.load_layers()
 	game.tick_rate = Engine.physics_ticks_per_second
@@ -217,6 +217,9 @@ func _noblock_and_config(module: DotModule) -> void:
 	_check(server.console.has_name("ph_decoy_penalty") and server.console.has_name("ph_friendly_fire") and server.console.has_name("ph_accelerate"),
 		"config fields are ph_ cvars")
 	_check(module.get("workbench") != null, "the module hosts the workbench")
+	var wb: DotGameWorkbench = module.get("workbench")
+	var amb: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "ambience", "id": DotGameWorkbench.CVAR_SET_ID, "key": "ph_ambient_volume", "value": 0.2})
+	_check(amb.ok and is_equal_approx(server.console.get_float("ph_ambient_volume"), 0.2), "the ph_ambient* cvars are a workbench set and an edit moves the cvar", "" if amb.ok else amb.error.message)
 	var rotation := server.console.find_cvar("sv_map_rotation_file")
 	game.config.map_rotation_file = "cfg/other.yml"
 	module.call("_on_config_field", "map_rotation_file", game.config.map_rotation_file, "workbench")

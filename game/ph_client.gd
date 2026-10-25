@@ -136,7 +136,7 @@ func _ready() -> void:
 	ZeeModelCache.set_asset_root(PhPaths.root())
 
 	var config := PhConfig.new()
-	var binder := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph", config_file)
+	var binder := PhConfig.make_binder(config, config_file)
 	var loaded := binder.load_layers()
 
 	if not loaded.ok:
@@ -1192,7 +1192,8 @@ func _add_noblock_and_workbench() -> void:
 	wb.name = "Workbench"
 	wb.listen_host_fn = func() -> bool: return true
 	wb.config = {"enabled": false}
-	wb.add_set(game.config_binder.profile_set(), "Game settings")
+	for set: DotProfileSet in game.config_binder.profile_sets():
+		wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	add_child(wb)
 	var started := wb.start()
 	DotLog.result(CHANNEL, "the workbench", started)

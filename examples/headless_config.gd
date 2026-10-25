@@ -8,7 +8,9 @@ extends Node
 
 const PhConfig := preload("../game/ph_config.gd")
 const PhEvents := preload("../game/net/ph_events.gd")
-const CHECKS := 24
+const ROOT := "user://ph_cfgtest"
+const GAME := "mg-prop-hunt"
+const CHECKS := 32
 
 var _passed := 0
 var _failed := 0
@@ -29,9 +31,12 @@ func _check(ok: bool, what: String, _detail := "") -> void:
 
 
 func _run() -> void:
+	if OS.get_cmdline_user_args().has("--probe"):
+		_probe()
+		return
 	print("mg-prop-hunt: config binder")
 	var config := PhConfig.new()
-	var binder := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph")
+	var binder := PhConfig.make_binder(config)
 	binder.strict = true
 	_check(binder.load_layers().ok, "defaults load")
 	_check(binder.diff().is_empty(), "no diff at the code defaults")
@@ -55,37 +60,36 @@ func _run() -> void:
 	var bad := FileAccess.open("user://ph_config_bad.json", FileAccess.WRITE)
 	bad.store_string('{"no_such_field": 1}')
 	bad.close()
-	var strict := DotGameConfigBinder.create(PhConfig.new(), "mg-prop-hunt", "ph", "user://ph_config_bad.json")
+	var strict := PhConfig.make_binder(PhConfig.new(), "user://ph_config_bad.json")
 	strict.strict = true
 	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
 	DirAccess.remove_absolute("user://ph_config_bad.json")
 
-	var shipped := "res://cfg/game/mg-prop-hunt/config/game.yml"
-	DirAccess.make_dir_recursive_absolute("res://cfg/game/mg-prop-hunt/config")
-	var yml := FileAccess.open(shipped, FileAccess.WRITE)
-	yml.store_string("hide_seconds: 25.0\nfriendly_fire: true\n")
-	yml.close()
-	var loaded := PhConfig.new()
-	var from_yml := DotGameConfigBinder.create(loaded, "mg-prop-hunt", "ph")
-	from_yml.strict = true
-	var got := from_yml.load_layers()
-	_check(got.ok and loaded.hide_seconds == 25.0 and loaded.friendly_fire and from_yml.source_of("hide_seconds") != "default",
-		"an exported cfg/game/<game>/config/game.yml loads back as defaults", "" if got.ok else got.error.message)
-	DirAccess.remove_absolute(shipped)
-	DirAccess.remove_absolute("res://cfg/game/mg-prop-hunt/config")
+	_layers()
+	_templates(binder)
 
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
 	wb.config = {"enabled": false}
-	wb.add_set(binder.profile_set(), "Game settings")
+	for set: DotProfileSet in binder.profile_sets():
+		wb.add_set(set, set.rel_path)
 	add_child(wb)
 	_check(wb.start().ok, "the workbench starts")
 	binder.attach(wb.api.runtime)
-	var set: DotProfileSet = binder.profile_set()
-	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": set.rel_path, "id": binder.profile_id, "key": "hide_seconds", "value": 90.0})
+	var listed := PackedStringArray()
+	for kind: String in wb.api.kinds():
+		var got: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
+		if got.ok:
+			listed.append_array(PackedStringArray((got.value as Dictionary).get("values", {}).keys()))
+	var missing := PackedStringArray()
+	for k in keys:
+		if not listed.has(k):
+			missing.append(k)
+	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
+	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "hide_seconds", "value": 90.0})
 	_check(res.ok and config.hide_seconds == 90.0, "a workbench edit reaches the live config")
 	var files: Dictionary = wb.exporter.call("collect")
-	var text: String = files.get("cfg/game/mg-prop-hunt/config/game.yml", "")
+	var text: String = files.get("cfg/game/mg-prop-hunt/config_round/game.yml", "")
 	_check(text.contains("hide_seconds: 90"), "the export holds the edit in the cfg layout")
 
 	var move := config.movement_floats()
@@ -103,3 +107,63 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+## Child process: loads the layers strictly over the test root and prints what the live config holds.
+func _probe() -> void:
+	var config := PhConfig.new()
+	var binder := PhConfig.make_binder(config)
+	binder.strict = true
+	binder.roots = PackedStringArray([ProjectSettings.globalize_path(ROOT)])
+	var loaded := binder.load_layers()
+	var console := DotConsole.new()
+	add_child(console)
+	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	print("PROBE ok=%s round=%s round_src=%s cooldown=%s cooldown_src=%s cvar=%s speed=%s speed_src=%s penalty=%s penalty_src=%s" % [
+		loaded.ok, config.round_seconds, binder.source_of("round_seconds"), config.reveal_cooldown, binder.source_of("reveal_cooldown"),
+		console.find_cvar("ph_reveal_cooldown").get_string(), config.run_speed, binder.source_of("run_speed"),
+		config.decoy_penalty, binder.source_of("decoy_penalty")])
+	get_tree().quit(0)
+
+
+func _write(rel: String, text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(ROOT.path_join(rel).get_base_dir())
+	var f := FileAccess.open(ROOT.path_join(rel), FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+
+
+func _child() -> String:
+	var out: Array = []
+	OS.execute(OS.get_executable_path(), ["--headless", "--path", ProjectSettings.globalize_path("res://"),
+		"res://examples/headless_config.tscn", "--", "--probe", "--ph-run-speed=7.5", "--ph-decoy-penalty=0.9"], out, true)
+	return "".join(PackedStringArray(out))
+
+
+## A value set in a cfg file, the environment and argv each reaches the live config, and later layers win.
+func _layers() -> void:
+	_write("game/%s/config_round/game.yml" % GAME, "round_seconds: 222.0\n")
+	_write("game/%s/config_props/game.yml" % GAME, "reveal_cooldown: 4.5\n")
+	OS.set_environment("PH_REVEAL_COOLDOWN", "3.25")
+	var text := _child()
+	_check(text.contains("PROBE ok=true"), "the layers load strictly in a fresh process", text.right(300))
+	_check(text.contains("round=222") and text.contains("round_src=yml"), "a cfg file reaches the live config")
+	_check(text.contains("cooldown=3.25") and text.contains("cooldown_src=env") and text.contains("cvar=3.25"), "the environment beats a second file and reaches the cvar")
+	_check(text.contains("speed=7.5") and text.contains("speed_src=argv"), "argv alone reaches the config")
+	_check(text.contains("penalty=0.9") and text.contains("penalty_src=argv"), "a second argv flag reaches it too")
+	OS.unset_environment("PH_REVEAL_COOLDOWN")
+	_write("game/%s/config_round/game.yml" % GAME, "reveal_cooldown: 4.5\n")
+	_check(_child().contains("PROBE ok=false"), "strict: a key in the wrong file is refused")
+	for f in ["config_round", "config_props"]:
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(ROOT.path_join("game/%s/%s/game.yml" % [GAME, f])))
+
+
+## The shipped cfg files hold every key, in step with PhConfig, and change nothing as they are.
+func _templates(binder: DotGameConfigBinder) -> void:
+	var files := binder.template_files()
+	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
+	var stale := PackedStringArray()
+	for path: String in files:
+		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
+			stale.append(path)
+	_check(stale.is_empty(), "the shipped files match the config (run tools/cfg_templates.gd)", ",".join(stale))

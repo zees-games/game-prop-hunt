@@ -9,7 +9,7 @@ extends DotConfig
 ## [b]Every rule the brief named is here, and its default is the brief's.[/b] Which side a
 ## player is on and how hunters are chosen, how long the props get to hide, what showing your
 ## face pays, when a taunt is forced, when the last props are given away, what shooting the
-## furniture costs a hunter: a server owner changes any of them in `cfg/game/mg-prop-hunt/config/game.yml`
+## furniture costs a hunter: a server owner changes any of them in `cfg/game/mg-prop-hunt/config_<round|props|hunters|maps>/game.yml`
 ## (or `cfg/server/...`), `user://cfg/prophunt.json`, an environment variable (`PH_HIDE_SECONDS`), a
 ## flag (`--ph-hide-seconds`), the `ph_<field>` cvar or the workbench. All of that is
 ## [DotGameConfigBinder]; every field here is reachable and an unknown key stops a dedicated boot.
@@ -297,6 +297,23 @@ extends DotConfig
 func movement_floats() -> PackedFloat32Array:
 	return PackedFloat32Array([run_speed, walk_speed_scale, jump_height, gravity, air_accelerate,
 		accelerate, friction, stop_speed, crouch_speed_scale])
+
+
+## `@export_group` -> the cfg file it lives in: `cfg/game/mg-prop-hunt/config_<file>/game.yml`.
+const CFG_FILES := {
+	"The round": "round", "The sides": "round", "Points": "round",
+	"Hiding": "props", "Taunts": "props", "The beacon": "props",
+	"Hunters": "hunters", "The players": "hunters",
+	"The maps": "maps", "Bots": "maps", "Watching": "maps", "Progress": "maps",
+}
+
+
+## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
+static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
+	var b := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph", json_path)
+	b.grouped = true
+	b.group_files = CFG_FILES
+	return b
 
 
 func env_prefix() -> String:

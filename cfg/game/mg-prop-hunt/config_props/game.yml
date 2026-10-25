@@ -1,0 +1,54 @@
+# mg-prop-hunt: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/mg-prop-hunt/config_props/game.yml. Layers: defaults < this < env < argv.
+
+# --- Hiding
+# How far from the eye a prop may be copied, in metres. [0.5..10.0]
+# disguise_reach: 3.0
+# A disguise's health at one cubic metre, and how fast it rises with size. See [DotPropDisguiseRules]: a cabi... [1.0..1000.0]
+# prop_health_scale: 190.0
+#  [0.0..1.0]
+# prop_health_exponent: 0.45
+#  [1.0..1000.0]
+# prop_min_health: 10.0
+#  [1.0..1000.0]
+# prop_max_health: 200.0
+# The smallest dimension and the largest volume a player may hide as. [0.0..2.0]
+# prop_min_dimension: 0.1
+#  [0.0..100.0]
+# prop_max_volume: 8.0
+# Seconds a prop must wait after putting a disguise back on before taking it off again. [0.0..600.0]
+# reveal_cooldown: 10.0
+# Points a second for showing your own face, and the most seconds of it that pay per reveal. [0.0..100.0]
+# reveal_points_per_second: 1.0
+#  [0.0..600.0]
+# reveal_paid_seconds: 20.0
+# Degrees one press of a tilt key turns a prop, and the most it may lean. [1.0..90.0]
+# tilt_step: 15.0
+# 180 so a prop goes every way up: on either side, on its back, on its nose (Christian's water bottle). The h... [0.0..180.0]
+# max_tilt: 180.0
+
+# --- Taunts
+# Where the taunt list is read from, relative to this game's root. A list of `{"id", "title", "seconds", "sou...
+# taunt_file: "taunts/taunts.json"
+# Seconds a prop may stand within auto_taunt_radius before a taunt is forced. 0 never. 60, as game-hide-n-see... [0.0..600.0]
+# auto_taunt_seconds: 60.0
+#  [0.1..20.0]
+# auto_taunt_radius: 1.5
+# Whether a prop sees the meter filling toward a forced taunt.
+# show_taunt_meter: true
+# Seconds between taunts, on top of the last one's length. [0.0..60.0]
+# taunt_cooldown: 2.0
+# Points for a taunt a prop chose, and for one forced on them. [0..100]
+# taunt_points: 2
+#  [0..100]
+# forced_taunt_points: 0
+# Metres a taunt carries. [5.0..300.0]
+# taunt_range: 60.0
+
+# --- The beacon
+# Every prop still alive is beaconed once this few are left. 0 never. [0..32]
+# beacon_props_left: 1
+# Every prop still alive is beaconed once this few seconds are left. 0 never, the default: with it at 30 the ... [0.0..600.0]
+# beacon_seconds_left: 0.0
+# Seconds between a beacon's pings. [0.25..10.0]
+# beacon_period: 2.0

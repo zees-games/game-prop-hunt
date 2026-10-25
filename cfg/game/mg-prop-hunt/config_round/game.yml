@@ -1,0 +1,38 @@
+# mg-prop-hunt: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/mg-prop-hunt/config_round/game.yml. Layers: defaults < this < env < argv.
+
+# --- The round
+# Seconds the props have to hide while the hunters are blindfolded and held still. [0.0..180.0]
+# hide_seconds: 30.0
+# Seconds the hunters have to find everybody once they are let go. A map may ask for less. [30.0..1800.0]
+# round_seconds: 300.0
+# Seconds between rounds. [0.0..60.0]
+# intermission_seconds: 8.0
+# Seconds of the round's final killcam, added to the intermission (`mp_killcam_time`); 0 is off. Not added wh... [0.0..30.0]
+# killcam_seconds: 0.0
+# Seconds of warmup before the first round. 0 starts immediately. [0.0..300.0]
+# warmup_seconds: 8.0
+# People in the match before a round starts (stand-ins count). [1..24]
+# min_players_to_start: 2
+# Who wins a round the clock ends: 1 the props, 2 the hunters, 0 nobody.
+# timeout_winner: 1
+
+# --- The sides
+# One hunter for every this many players, rounded up, at least min_hunters and at most max_hunters — and neve... [1.0..32.0]
+# players_per_hunter: 3.0
+#  [1..16]
+# min_hunters: 1
+#  [1..32]
+# max_hunters: 8
+# How hunters are chosen each round: 0 a random draw that skips last round's hunters, 1 a queue so everybody ...
+# hunter_pick: 0
+# Whether a player's own wish (`!hunter`, `!prop`, `!any`) counts: those who asked are picked first, and thos...
+# allow_side_choice: true
+
+# --- Points
+# Points to everybody on the winning side. [0..100]
+# winner_points: 10
+# Points to a hunter for each prop they find. [0..100]
+# find_points: 5
+# Points to every prop still alive when the round ends. [0..100]
+# survive_points: 5

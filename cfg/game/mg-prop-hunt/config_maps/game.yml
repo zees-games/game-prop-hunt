@@ -1,0 +1,43 @@
+# mg-prop-hunt: every key of this file at its code default, commented out. Uncomment a line to change it;
+# an operator overrides in cfg/server/game/mg-prop-hunt/config_maps/game.yml. Layers: defaults < this < env < argv.
+
+# --- The maps
+# Which maps this server may play, by id. Empty means every one it has.
+# map_ids: []
+# Whether the next map is drawn at random (seeded) rather than taken in order.
+# shuffle_maps: true
+# Rounds played on a map before the next one, unless the players vote first. [1..50]
+# rounds_per_map: 4
+# Where map documents are read from, relative to this game's root.
+# map_directory: "maps"
+# The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the game's own shipped `res://...
+# map_rotation_file: "cfg/maps.yml"
+# Seed every random choice is drawn from: the map, the hunters, the bots.
+# seed_value: 20261009
+
+# --- Bots
+# How many players the server keeps in the round by adding stand-ins. [0..24]
+# minimum_players: 4
+# How much a stand-in hunter doubts a piece of furniture it has no other reason to doubt, in hundredths: the ... [0.0..100.0]
+# bot_suspicion: 12.0
+# Seconds into the hide before a stand-in prop puts its disguise on (the piece it is walking to be beside), s... [0.0..60.0]
+# bot_disguise_delay: 1.5
+# About how many seconds a hidden stand-in prop stays before moving to another place of its kind (only with n... [0.0..3600.0]
+# bot_relocate_seconds: 150.0
+# Metres a stand-in prop's move to another place may reach. [2.0..60.0]
+# bot_relocate_range: 12.0
+# Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints): props hide beside...
+# bot_nav: true
+# With `bot_nav`: how much of the annotated map a stand-in hunter knows, 0..1 (at least its own `bot_map_know... [0.0..1.0]
+# bot_sweep: 0.1
+# Metres from a piece of furniture a spot may be and still be "beside" it, for a stand-in prop. [0.3..4.0]
+# bot_beside: 1.3
+
+# --- Watching
+# Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
+# spectate_camera: 0
+
+# --- Progress
+# keep_progress: true
+# progress_directory: ""
+# report_progress: false

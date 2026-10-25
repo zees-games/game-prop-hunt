@@ -32,7 +32,7 @@ func _ready() -> void:
 	# an operator sets `PH_HIDE_SECONDS` or `--ph-round-seconds` without editing anything, and
 	# the cvars the module adds are the live half of the same numbers.
 	# Through DotGameConfigBinder: cfg/game and cfg/server yml too, strict on a dedicated server.
-	var binder := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph", "user://cfg/prophunt.json")
+	var binder := PhConfig.make_binder(config, "user://cfg/prophunt.json")
 	var loaded := binder.load_layers()
 
 	if not loaded.ok:
