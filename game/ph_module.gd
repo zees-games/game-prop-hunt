@@ -233,6 +233,12 @@ func _game_load() -> DotResult:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# ph_ambient*: REPLICATED, because each client plays its own ambience under the server's intent; the directory cvar stays local.
+	var _ambient := world.ambient_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
+
 	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
 	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
 		"Seconds the killcam of a round's last moment plays, added to the intermission (0 for none)",

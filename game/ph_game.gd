@@ -11,6 +11,7 @@ const PhProps := preload("ph_props.gd")
 const PhRules := preload("ph_rules.gd")
 const PhSpectate := preload("ph_spectate.gd")
 const PhBots := preload("ph_bots.gd")
+const PhAmbience := preload("ph_ambience.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
@@ -174,6 +175,9 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
+
+## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
+var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by the server scene or the client.
 var config_binder: DotGameConfigBinder = null
