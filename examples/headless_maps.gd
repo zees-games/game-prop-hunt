@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
@@ -41,11 +41,8 @@ const MIN_WEARABLE := 8
 ## Furniture covered less than this by its own shapes is listed (see [method _partly_covered]).
 const PARTIAL := 0.8
 
-var _passed := 0
-var _failed := 0
 var _sections_entered := 0
 var _sections_finished := 0
-var _failures := PackedStringArray()
 
 
 func _ready() -> void:
@@ -62,27 +59,8 @@ func _run() -> void:
 	for id: String in _maps:
 		await _test_map(StringName(id))
 
-	print("")
-	print("%d sections entered, %d finished" % [_sections_entered, _sections_finished])
-	print("%d passed, %d failed" % [_passed, _failed])
-
-	for line in _failures:
-		print("  FAIL  %s" % line)
-
-	var code := 1 if _failed > 0 else 0
-
-	var sections := 1 + _maps.size()
-	var checks := 1 + CHECKS_PER_MAP * _maps.size()
-
-	if _sections_entered != _sections_finished or _sections_entered != sections:
-		print("ERROR: %d of %d sections finished, %d expected." % [_sections_finished, _sections_entered, sections])
-		code = 1
-
-	if _passed + _failed != checks or _maps.is_empty():
-		print("ERROR: %d checks ran, %d expected. A section aborted part-way." % [_passed + _failed, checks])
-		code = 1
-
-	get_tree().quit(code)
+	_broken = _maps.is_empty()
+	_report_sections(_sections_entered, _sections_finished, 1 + _maps.size(), 1 + CHECKS_PER_MAP * _maps.size())
 
 
 func _test_the_catalogue() -> void:
@@ -382,13 +360,3 @@ func _finished() -> void:
 	_sections_finished += 1
 
 
-func _check(ok: bool, what: String, detail: String = "") -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s%s" % [what, "" if detail == "" else "  (%s)" % detail])
-		return
-
-	_failed += 1
-	var line := "%s%s" % [what, "" if detail == "" else "  (%s)" % detail]
-	_failures.append(line)
-	print("  FAIL  %s" % line)
