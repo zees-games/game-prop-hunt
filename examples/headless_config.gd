@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 ## PhConfig through DotGameConfigBinder: fields, cvars, strict refusal, the diff, a shipped yml loading back, the workbench round trip and the HELLO's movement.
 ##
@@ -13,22 +13,10 @@ const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
 const CHECKS := 36
 
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
-
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.FATAL)
 	_run.call_deferred()
-
-
-func _check(ok: bool, what: String, _detail := "") -> void:
-	if ok:
-		_passed += 1
-	else:
-		_failed += 1
-		_failures.append(what)
 
 
 func _run() -> void:

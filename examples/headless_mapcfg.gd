@@ -1,4 +1,4 @@
-extends Node
+extends DotGameCheckSuite
 
 ## A map's file sets the whitelisted round cvars and the next map gets the previous values back.
 ##
@@ -7,10 +7,6 @@ extends Node
 ## [/codeblock]
 
 const CHECKS := 7
-
-var _passed := 0
-var _failed := 0
-var _failures := PackedStringArray()
 
 
 func _ready() -> void:
@@ -45,22 +41,4 @@ func _run() -> void:
 	_check(console.find_cvar("ph_hide_seconds").get_float() == 30.0, "and the hide time")
 	_check(console.find_cvar("sv_cheats") == null, "a key outside the whitelist is never set")
 
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
-
-
-func _check(ok: bool, what: String) -> void:
-	if ok:
-		_passed += 1
-		print("  ok    %s" % what)
-	else:
-		_failed += 1
-		_failures.append(what)
-		print("  FAIL  %s" % what)
+	_report(CHECKS)
