@@ -187,7 +187,7 @@ var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
 ## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
 ## server applies it through [member combat], a client never does.
-var fall_rules: DotFallDamageRules = _make_fall_rules()
+var fall_rules: DotFallDamageRules = make_fall_rules()
 
 ## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`.
 var block_rules: Object = null:
@@ -604,9 +604,11 @@ func taunt_ids() -> Array[StringName]:
 
 # --- Players ----------------------------------------------------------------
 
-static func _make_fall_rules() -> DotFallDamageRules:
+static func make_fall_rules() -> DotFallDamageRules:
 	var rules := DotFallDamageRules.new()
 	rules.enabled = true
+	# Hiding high on props is core play: only a very long drop (about 40 m/s) kills outright.
+	rules.lethal_speed = 40.0
 	return rules
 
 
@@ -666,6 +668,8 @@ func add_player(
 		fall.controller.mode = DotNodeRef.Mode.ABSOLUTE
 		fall.combat = DotNodeRef.of_path(combat.get_path())
 		fall.combat.mode = DotNodeRef.Mode.ABSOLUTE
+		# Nobody is hurt between rounds (the intermission).
+		fall.context_checks = {&"protected": func() -> bool: return phase == Phase.IDLE}
 		player.add_child(fall)
 		player.build_hitboxes(combat)
 

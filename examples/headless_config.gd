@@ -7,10 +7,11 @@ extends Node
 ## [/codeblock]
 
 const PhConfig := preload("../game/ph_config.gd")
+const PhGame := preload("../game/ph_game.gd")
 const PhEvents := preload("../game/net/ph_events.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
-const CHECKS := 32
+const CHECKS := 36
 
 var _passed := 0
 var _failed := 0
@@ -51,6 +52,13 @@ func _run() -> void:
 	add_child(console)
 	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
 	console.set_cvar("ph_rounds_per_map", "7")
+	var fall := PhGame.make_fall_rules()
+	var _made := fall.bind_cvars(console.cvar, DotConVar.FLAG_NOTIFY)
+	_check(console.get_int("sv_falldamage") == 1 and fall.enabled, "fall damage is on in this game")
+	_check(fall.damage_for(20.0) > 0.0 and fall.damage_for(5.0) == 0.0, "a hard landing hurts, a small one does not")
+	_check(console.get_int("sv_falldamage_lethal") == 40 and fall.damage_for(45.0) > 1000.0, "only a very high speed kills outright")
+	console.set_cvar("sv_falldamage", "0")
+	_check(not fall.enabled and fall.damage_for(60.0) == 0.0, "the cvar turns it off")
 	_check(config.rounds_per_map == 7 and binder.source_of("rounds_per_map") == "cvar", "a cvar writes the field")
 	_check(binder.diff_yaml().contains("rounds_per_map: 7"), "the diff names the edit")
 	var schema_path := "user://ph_config_schema.json"
