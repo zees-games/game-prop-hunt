@@ -182,6 +182,17 @@ var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by the server scene or the client.
 var config_binder: DotGameConfigBinder = null
 
+## The workbench's profile rows, made on first ask: the bridge's profile link must exist before the netcode seals, the workbench after.
+var profile_runtime: DotProfileRuntime = null
+
+
+func ensure_runtime() -> DotProfileRuntime:
+	if profile_runtime == null:
+		profile_runtime = DotProfileRuntime.new()
+		profile_runtime.permit = func(actor: Variant, _flag: String) -> bool:
+			return typeof(actor) == TYPE_STRING_NAME and actor == &"local"
+	return profile_runtime
+
 ## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so dot-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
