@@ -220,6 +220,10 @@ func _game_load() -> DotResult:
 	if world.loadout_command != null:
 		world.loadout_command.call(&"bind", self)
 
+	# sv_falldamage and its tunables: dot-combat's, on by default in this game. Server-side
+	# only, so no REPLICATED: the damage is the server's and arrives as health.
+	var _fall := world.fall_rules.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
+
 	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
 	# held. REPLICATED, because each client places its own camera under it.
 	var _views := world.view_rules.bind_cvars(

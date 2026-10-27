@@ -27,9 +27,9 @@ const PhEvents := preload("../game/net/ph_events.gd")
 ## Every number about the map here is the built-in practice house's
 ## ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 29
+const SECTIONS := 30
 
-const CHECKS := 167
+const CHECKS := 171
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -87,6 +87,7 @@ func _run() -> void:
 	await _test_hunter_loadout()
 	await _test_bodies()
 	await _test_free_roam()
+	await _test_fall_damage()
 
 	for world in _worlds.duplicate():
 		await _dispose(world)
@@ -1324,6 +1325,26 @@ func _test_free_roam() -> void:
 	var binding := PhBindings.make().row_for_action(PhBindings.ROAM)
 	_check(str(binding.get("default", "")) == "G", "G is the free-camera key, and a row the help screen lists")
 	_finished()
+
+
+func _test_fall_damage() -> void:
+	_section("sv_falldamage: a hard landing costs health, a short drop and the cvar off cost none")
+	var game := await _seek_round()
+	var me = game.players[&"u300"]
+	_check(game.fall_rules.enabled and me.get_node_or_null("FallDamage") != null, "on in this game, a component per player")
+	var floor_at: Vector3 = me.controller.state.position
+	var hurt := {}
+	for case in [["high", 14.0, true], ["short", 0.6, true], ["off", 14.0, false]]:
+		game.fall_rules.enabled = case[2]
+		me.health.health = me.health.max_health
+		me.place_at(floor_at + Vector3(0.0, case[1], 0.0), 0.0)
+		await _step(game, TICK_RATE * 2)
+		hurt[case[0]] = me.health.max_health - me.health.health
+	_check(hurt["high"] > 0.0, "a drop from 14 m hurts", "lost %.1f" % hurt["high"])
+	_check(hurt["short"] == 0.0, "a short drop does not", "lost %.1f" % hurt["short"])
+	_check(hurt["off"] == 0.0, "cvar off: a 14 m drop does not hurt", "lost %.1f" % hurt["off"])
+	_finished()
+
 
 
 func _section(name: String) -> void:

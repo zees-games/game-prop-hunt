@@ -185,6 +185,10 @@ var config_binder: DotGameConfigBinder = null
 ## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so dot-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
 var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
 
+## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
+## server applies it through [member combat], a client never does.
+var fall_rules: DotFallDamageRules = _make_fall_rules()
+
 ## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`.
 var block_rules: Object = null:
 	set(value):
@@ -600,6 +604,12 @@ func taunt_ids() -> Array[StringName]:
 
 # --- Players ----------------------------------------------------------------
 
+static func _make_fall_rules() -> DotFallDamageRules:
+	var rules := DotFallDamageRules.new()
+	rules.enabled = true
+	return rules
+
+
 ## Puts somebody in the world. [param wanted_side] is a side, or 0 to be placed.
 func add_player(
 	player_id: StringName,
@@ -646,6 +656,17 @@ func add_player(
 
 	if combat != null:
 		combat.register_health(player.entity_id, health)
+
+	if combat != null and player.controller != null:
+		var fall := DotFallDamage.new()
+		fall.name = "FallDamage"
+		fall.rules = fall_rules
+		fall.victim = player.entity_id
+		fall.controller = DotNodeRef.of_path(player.controller.get_path())
+		fall.controller.mode = DotNodeRef.Mode.ABSOLUTE
+		fall.combat = DotNodeRef.of_path(combat.get_path())
+		fall.combat.mode = DotNodeRef.Mode.ABSOLUTE
+		player.add_child(fall)
 		player.build_hitboxes(combat)
 
 	health.died.connect(func(damage: DotDamage) -> void: _on_player_died(player, damage))
