@@ -15,6 +15,7 @@ const PhHud := preload("ph_hud.gd")
 const PhPaths := preload("ph_paths.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhKillcam := preload("ph_killcam.gd")
+const PhWeaponIcons := preload("ph_weapon_icons.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhProjectileView := preload("ph_projectile_view.gd")
 
@@ -264,6 +265,10 @@ static func _bot_name(index: int) -> String:
 ## Solo, `bot_difficulty` and every `bot_*` setting at the console, the names a server has.
 ## Connected, the server's console holds them and a local copy would shadow it.
 func _bind_bot_console() -> void:
+	if console != null:
+		var local: Array = console.sources()
+		if not local.is_empty() and local[0] is DotConsoleLocal:
+			var _icons := PhWeaponIcons.shared.bind_console(local[0])
 	if not _offline or console == null or game == null:
 		return
 	var sources: Array = console.sources()
@@ -924,7 +929,10 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 	# The weapon's silhouette: game-arena's `tools/build_weapon_icons.sh` renders, copied for the
 	# guns a hunter is offered. A gun an owner adds without one is drawn as its letters.
 	var icon_path := "%s/%s.png" % [WEAPON_ICON_DIR, String(id)]
-	if ResourceLoader.exists(icon_path):
+	var sprite := PhWeaponIcons.shared.menu_texture(id)
+	if sprite != null:
+		out["icon"] = sprite
+	elif ResourceLoader.exists(icon_path):
 		out["icon"] = load(icon_path)
 	if _weapon_cards != null and _weapon_defs.has(id):
 		var card: Variant = _weapon_cards.call(&"card", _weapon_defs[id])

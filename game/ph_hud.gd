@@ -3,6 +3,7 @@ extends CanvasLayer
 const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhBindings := preload("ph_bindings.gd")
+const PhWeaponIcons := preload("ph_weapon_icons.gd")
 const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 
 ## What a player needs on screen: the clock and who it is counting for, which side they are on
@@ -99,6 +100,8 @@ var vitals: DotVitals = null
 var prompt: DotKeyPrompt = null
 ## Bottom right, a hunter's: the weapon in hand and `magazine | reserve`. See [method _draw_ammo].
 var ammo: DotAmmoCounter = null
+## The held weapon's sprite over [member ammo]; hidden when it has none.
+var weapon_icon: TextureRect = null
 ## The rig the counter reads: the gun the client draws (`PhClient.weapons`), which the server's
 ## count corrects (`PhClient._correct_drawn`). Unset, the player's own rig.
 var weapons_fn: Callable = Callable()
@@ -227,6 +230,20 @@ func _build() -> void:
 	ammo.offset_bottom = -24.0
 	ammo.visible = false
 	_root.add_child(ammo)
+
+	# The weapon's picture over the counter (`cl_weapon_icons`); hidden when it has none.
+	weapon_icon = TextureRect.new()
+	weapon_icon.name = "WeaponIcon"
+	weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	weapon_icon.offset_left = -204.0
+	weapon_icon.offset_right = -24.0
+	weapon_icon.offset_top = -172.0
+	weapon_icon.offset_bottom = -108.0
+	weapon_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	weapon_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	weapon_icon.visible = false
+	_root.add_child(weapon_icon)
 
 	hit_marker = DotHitMarker.new()
 	hit_marker.name = "HitMarker"
@@ -421,7 +438,13 @@ func _draw_ammo(side: int) -> void:
 
 	if not shown:
 		ammo.clear()
+		weapon_icon.visible = false
 		return
+
+	var sprite := PhWeaponIcons.shared.texture(def.id)
+	weapon_icon.texture = sprite
+	weapon_icon.visible = sprite != null
+	PhWeaponIcons.shared.filter(weapon_icon, true)
 
 	var title := def.display_name if def.display_name != "" else String(def.id)
 

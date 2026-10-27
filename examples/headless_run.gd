@@ -29,7 +29,7 @@ const PhEvents := preload("../game/net/ph_events.gd")
 
 const SECTIONS := 30
 
-const CHECKS := 171
+const CHECKS := 174
 
 const TICK_RATE := 64
 const TICK := 1.0 / float(TICK_RATE)
@@ -1024,8 +1024,8 @@ func _test_the_client() -> void:
 	# the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
 	var asks := DotAddonApi.derive()
 	_check(
-		int(asks.get("dot_ui", 0)) >= 4 and not FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
-		"the pack asks a shell for dot-ui level 4, the glance pieces",
+		int(asks.get("dot_ui", 0)) >= 13 and FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		"the pack asks a shell for dot-ui level 13, the weapon icons (requires.floor.json)",
 		str(asks.get("dot_ui"))
 	)
 
@@ -1153,6 +1153,23 @@ func _test_hunter_weapons() -> void:
 		and counter.count_text() == expected,
 		"a hunter's HUD has DotAmmoCounter, counting the drawn gun",
 		"%s %s, want %s" % [counter.weapon_name if counter else "-", counter.count_text() if counter else "-", expected])
+
+	var icon_script: Script = load("res://game/ph_weapon_icons.gd")
+	var icons: DotWeaponIconStyle = icon_script.get("shared")
+	var icon_rect: TextureRect = hud.get("weapon_icon")
+	var unmapped := PackedStringArray()
+	for weapon in icon_script.get("TAGS"):
+		if not icons.icon_set().has_icon(weapon):
+			unmapped.append(String(weapon))
+	_check(unmapped.is_empty() and icon_rect != null and icon_rect.visible and icon_rect.texture != null and icon_rect.texture == icons.texture(def.id),
+		"the HUD draws the held gun's sprite over the counter, and every mapped weapon has one", ", ".join(unmapped))
+	var _silhouette := icons.set_style(&"silhouette")
+	hud.call("_process", 0.0)
+	_check(icon_rect != null and not icon_rect.visible, "cl_weapon_icons silhouette hides the sprite")
+	var _pixel := icons.set_style(&"pixel")
+	hud.call("_process", 0.0)
+	_check(icon_rect != null and icon_rect.visible and icon_rect.get_global_rect().end.y <= counter.get_global_rect().position.y + 4.0,
+		"the sprite sits above the ammunition plate, not on it")
 
 	# The hints name the keys of what is carried. They said "1-3 Weapons" after grenades went on
 	# slot five (d516aec), so a grenade taken on B was on a key nothing named. Armed: the old line
