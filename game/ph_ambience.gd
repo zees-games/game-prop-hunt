@@ -4,8 +4,8 @@ extends RefCounted
 
 const PREFIX := "ph"
 ## Hiding is listening: the layer is felt, not heard, and the one-shots are rare so a footstep still gives someone away.
-const LEVEL := 0.3
-const RATE := 0.5
+const LEVEL := 0.15
+const RATE := 0.4
 const DEFAULT_MOOD := &"indoor_hall"
 
 ## By map id prefix; the rest are rooms.
