@@ -276,6 +276,7 @@ func setup() -> DotResult:
 	ambient.default_mood = PhAmbience.DEFAULT_MOOD
 	ambient.prefix_moods = PhAmbience.PREFIX_MOODS
 	ambient.rules = PhAmbience.make_rules()
+	ambient.beds = ambience
 	add_child(ambient)
 	var _moods := ambient.setup()
 	ambient.follow_settings(null)
