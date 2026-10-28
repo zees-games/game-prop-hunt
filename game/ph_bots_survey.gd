@@ -5,44 +5,9 @@ extends RefCounted
 const PhPlayer := preload("ph_player.gd")
 const PhNavAnnotator := preload("ph_nav_annotator.gd")
 
-## The stand-ins: props that hide as something that belongs where they stand, and hunters that
-## search the rooms and test what looks wrong, on dot-bot's settings and hiding helpers.
-##
-## [b]What the first play test saw[/b] (2026-10-11): "the bots don't know how to play the game
-## at all". A bot prop walked to the nearest piece of furniture it could become, became it where
-## it stood (four sinks and bins out in the school's hallway, which is where the props start),
-## and hopped whenever it thought it was stuck, so the "furniture" slid and jumped about. A bot
-## hunter walked from one random prop to another and fired at whatever was nearest now and
-## then. The board said "4 props left" for the whole hunt because nobody found anybody.
-##
-## - [b]The map is surveyed once[/b] when it is built: dot-bot's [DotBotNav] bakes where a body
-##   can walk from the walls and the furniture, and [DotBotHiding.survey] scores a place beside
-##   each piece of floor furniture a prop may become by how many of the map's sight lines reach
-##   it. Each place remembers the piece it is beside: that is the disguise.
-## - [b]A prop hides as what belongs there[/b]: a chair beside the classroom's chairs, a bin by
-##   the bins. A place counts for more the more of its kind stand round it (a chair among
-##   thirty is lost; a sink in a corridor is not), less the more it is seen, apart from the
-##   other props, away from the hunters' start, and only if it can walk there before the
-##   hunters are let go. It walks the mesh's path as a person, turns to the piece's own facing,
-##   becomes it, locks it, and keeps still. Shot, it runs to somewhere out of that hunter's
-##   sight and settles again. Before the standing-still clock forces a taunt it moves to
-##   another of its kind nearby, if no hunter has been near; now and then it taunts of its own
-##   accord when none has been near for a while.
-## - [b]A hunter searches[/b] with a [DotBotSearch] over the same places: likely ones first as
-##   far as `bot_map_knowledge` goes, near first, never where another hunter is going; a taunt
-##   it hears puts the places round it first and sends it there.
-## - [b]It tests what looks wrong, and pays for guessing.[/b] Every piece of furniture in view
-##   gathers suspicion: a little for nothing (`ph_bot_suspicion`), much for one it remembers
-##   was not there (a hunter who knows the map, `bot_map_knowledge`, notices the extra chair),
-##   for one alone of its kind, for one tilted, and for one near a taunt it heard. Past a
-##   threshold it shoots it for a moment: a prop that bleeds is found and hunted down, real
-##   furniture costs the decoy penalty and is crossed off. One test at a time, a few seconds
-##   apart, and below 40% health only what it is nearly sure of.
-## - [b]Nobody cheats.[/b] A hunter knows a prop only by seeing it move, seeing a face, hitting
-##   it, or the game's beacon; what it doubts is what a person who knows the map would doubt.
-##
-## Pure state per bot, deterministic: every draw is the bot's own [DotRandomStream] and the
-## clock is the game's tick, so a seeded round replays the same (`examples/headless_bots`).
+## The stand-ins: props that hide as something that belongs where they stand, and hunters that search
+## the rooms and test what looks wrong, on dot-bot's settings and hiding helpers. The map is surveyed
+## once when built; pure state per bot, every draw the bot's own DotRandomStream, the clock the game's tick.
 
 const CHANNEL := "ph.bots"
 
@@ -161,7 +126,6 @@ func on_taunted(player_id: StringName) -> void:
 	_taunts.append({"at": who.controller.state.position, "by": player_id, "t": now()})
 
 
-# --- The map ------------------------------------------------------------------
 
 ## Bakes the map just built, ahead of the round's first tick, so the survey still lands on the
 ## same tick but the bake is not in it. Only where bots already are.

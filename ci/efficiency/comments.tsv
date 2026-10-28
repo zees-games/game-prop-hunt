@@ -1,11 +1,10 @@
 # comments
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-examples/dedicated.gd::banner	1
 examples/dedicated.gd::history	2
-examples/dedicated.gd::long_block	11
+examples/dedicated.gd::long_block	9
 examples/headless_bots.gd::long_block	1
 examples/headless_maps.gd::long_block	3
-examples/headless_net.gd::banner	3
+examples/headless_net.gd::banner	2
 examples/headless_net.gd::long_block	5
 examples/headless_run.gd::banner	3
 examples/headless_run.gd::history	4
@@ -32,9 +31,8 @@ game/ph_audio.gd::long_block	1
 game/ph_avatars.gd::long_block	5
 game/ph_bindings.gd::history	3
 game/ph_bindings.gd::long_block	1
-game/ph_bots.gd::banner	5
-game/ph_bots.gd::history	1
-game/ph_bots.gd::long_block	2
+game/ph_bots.gd::banner	3
+game/ph_bots.gd::long_block	1
 game/ph_catalogue.gd::banner	1
 game/ph_catalogue.gd::long_block	3
 game/ph_client.gd::history	1
@@ -45,7 +43,7 @@ game/ph_debris.gd::long_block	1
 game/ph_figure.gd::history	1
 game/ph_figure.gd::long_block	2
 game/ph_game.gd::banner	13
-game/ph_game.gd::long_block	17
+game/ph_game.gd::long_block	16
 game/ph_hud.gd::history	3
 game/ph_hud.gd::long_block	3
 game/ph_loadout.gd::long_block	1
