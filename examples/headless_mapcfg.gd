@@ -1,10 +1,7 @@
 extends DotGameCheckSuite
 
 ## A map's file sets the whitelisted round cvars and the next map gets the previous values back.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_mapcfg.tscn
-## [/codeblock]
+## Run: godot --headless --path . res://examples/headless_mapcfg.tscn
 
 const CHECKS := 7
 

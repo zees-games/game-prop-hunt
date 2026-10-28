@@ -2,10 +2,8 @@ extends Node
 
 const PhPlayer := preload("ph_player.gd")
 
-## The killcam at a round's end. Client side: every frame drawn goes into dot-replay's
-## [DotKillcamBuffer], every decisive moment (a death, a finish) is noted, and when the round
-## ends on one, [DotKillcam] replays it from the eyes of the player it happened to.
-## The length is `mp_killcam_time`; 0 skips straight to [signal over].
+## The killcam at a round's end, client side: frames go into dot-replay's [DotKillcamBuffer], decisive moments are noted,
+## and [DotKillcam] replays the last from the eyes of the player it happened to. Length is `mp_killcam_time`; 0 skips to [signal over].
 
 const CHANNEL := "prophunt.killcam"
 

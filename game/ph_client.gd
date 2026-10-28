@@ -19,21 +19,9 @@ const PhWeaponIcons := preload("ph_weapon_icons.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhProjectileView := preload("ph_projectile_view.gd")
 
-## One local player, a camera and a HUD over a [PhGame] — offline, or against a server.
-##
-## [b]One client for both, and the offline half is not a demo mode.[/b] It is the same world
-## class with `authoritative` true, stand-ins on both sides, and nothing else different. What
-## changes is where the answers come from, and the whole of that difference is [PhNetBridge].
-##
-## [b]Which half runs is decided by whether there is a link in the registry.[/b] A dot-server
-## client publishes a [DotClientLink] under `dot_client_link` before the game scene loads; no
-## link means nobody connected us to anything, and the honest answer is a playable round.
-## `--offline` forces it.
-##
-## [b]A prop sees itself, a hunter sees down a gun.[/b] The camera follows the side: third
-## person behind a prop, at a distance that grows with what it is hiding as, because a prop's
-## whole game is knowing what it looks like from where the hunters stand; first person for a
-## hunter. F5 swaps either way. The simulation is the same in both — presentation only.
+## One local player, a camera and a HUD over a [PhGame], offline or against a server. The offline half is not a demo mode:
+## the same world class with `authoritative` true, and all the difference is [PhNetBridge]. A [DotClientLink] in the registry
+## under `dot_client_link` means connected; `--offline` forces solo. A prop sees itself in third person (F5 swaps), a hunter down a gun.
 
 const CHANNEL := "ph.client"
 
@@ -184,16 +172,9 @@ func _ready() -> void:
 			_start_remote_workbench()
 
 
-## The load gate is [member DotGameClient.gate].
-##
-## [b]Without it the first frames showed a half-built world.[/b] Solo, the body spawned and fell
-## in the tick the first map landed with shaders compiling in front of the player, a connected
-## client drew a HUD with no player and no camera until JOIN, and a map change tore the level
-## down in front of a body that kept falling. A frozen player is also skipped by
-## [method PhPlayer.simulate], which the world calls by name and `process_mode` does not stop.
-## A map is built: held from the moment the old one starts to go, released once the new one
-## stands. [signal PhGame.world_clearing] and [signal PhGame.world_rebuilt] fire for the first
-## map, a map change, and a map a server sent.
+## The load gate is [member DotGameClient.gate]. Without it the first frames showed a half-built world: the body fell while shaders
+## compiled, a HUD had no player until JOIN, and a map change tore the level down in front of a falling body. A frozen player is also
+## skipped by [method PhPlayer.simulate]. Held while the old map goes, released once the new one stands ([signal PhGame.world_clearing], [signal PhGame.world_rebuilt]).
 func _hold_for_maps() -> void:
 	game.world_clearing.connect(func() -> void: gate.hold(&"map", "Loading the map"))
 	game.world_rebuilt.connect(func() -> void: gate.release(&"map"))
@@ -238,7 +219,6 @@ func _on_blast(at: Vector3, _weapon_id: StringName) -> void:
 		var _heard := audio.on_blast(at)
 
 
-# --- Offline ---------------------------------------------------------------
 
 func _start_offline() -> void:
 	for i in range(offline_bots):
@@ -288,13 +268,11 @@ func _bind_bot_console() -> void:
 		DotLog.result(CHANNEL, "bot difficulty from the command line", DotBotSettings.of(game).set_difficulty(args[index + 1]))
 
 
-# --- Connected -------------------------------------------------------------
 
 func _build_netcode() -> DotResult:
-	# The server's `mp_teammate_passthrough`, and every change to it, through the link: this
-	# end traces its own shots for tracers and impacts, and on its default 1 against a server
-	# on 0 or 2 they ended in (or went through) a team-mate where the server's did the
-	# opposite. An older shell's link cannot say, and the manager keeps its default.
+	# The server's `mp_teammate_passthrough` and every change to it, through the link: this end traces its own shots,
+	# and against a server on 0 or 2 they ended in (or went through) a team-mate where the server's did not.
+	# An older shell's link cannot say, and the manager keeps its default.
 	if game.combat != null and link != null:
 		var _following := game.combat.follow_cvars(link)
 
@@ -450,7 +428,6 @@ func _follow_side() -> void:
 		_place_camera()
 
 
-# --- What the world, or the server, says --------------------------------------
 
 ## Offline: the world is the authority, so its own signals are what happened. A connected
 ## client hears the same from the bridge and calls the same functions with the same arguments,
@@ -668,7 +645,6 @@ func _on_armed(session_id: int, weapon_id: StringName) -> void:
 	_arm_locally(weapon_id)
 
 
-# --- The weapons, drawn ----------------------------------------------------
 
 func _arm_locally(weapon_id: StringName = &"") -> void:
 	if player == null:
@@ -705,11 +681,9 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 		_disarm_locally()
 		return
 
-	# [b]Only what the server armed, one weapon as each is armed[/b] (`player_armed`), never the
-	# whole pack. `give_everything` put all twenty-seven in five slots, so each slot held
-	# whichever weapon was given last: keys 1-3 drew a hammer, a pistol and a purple rifle, the
-	# heavy slot a green sniper, none of them the gun the server fired (the play test's "weapons
-	# appear with no slot logic"). headless_run's "the drawn gun is the armed one" holds it.
+	# Only what the server armed, one weapon as each is armed (`player_armed`), never the whole pack.
+	# `give_everything` put all twenty-seven in five slots so each held the last one given, none the gun the server fired.
+	# headless_run's "the drawn gun is the armed one" holds it.
 	_give_locally(weapon_id)
 
 	weapons.used.connect(func(outcome: DotWeaponOutcome) -> void:
@@ -751,7 +725,6 @@ func _disarm_locally() -> void:
 		view_model = null
 
 
-# --- The camera ------------------------------------------------------------
 
 func _build_camera() -> void:
 	if camera != null or player == null:
@@ -885,7 +858,6 @@ func _key(action: StringName) -> String:
 	return str(row.get("default", action))
 
 
-# --- The loadout menu (B) -----------------------------------------------------
 
 ## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
 var loadout_menu: Object = null
@@ -897,10 +869,8 @@ var _weapon_cards: Script = null
 var _weapon_defs: Dictionary = {}
 
 
-## B: a hunter's primary and secondary, as cards with zee's numbers. Solo the world's own
-## loadouts answer; connected the server does (dot-loadout's `/loadout`), under the owner's
-## `mp_loadout_*` rules. A prop may choose too: it is kept for the round they hunt. Guarded on
-## the host's dot-menu and dot-loadout levels, so an older client shell runs the game without it.
+## B: a hunter's primary and secondary, as cards. Solo the world's loadouts answer; connected the server does (dot-loadout's `/loadout`).
+## A prop may choose too, kept for the round they hunt. Guarded on the host's dot-menu and dot-loadout levels, so an older shell runs without it.
 func _use_loadout_menu() -> void:
 	if DotAddonApi.build_level("dot_menu") < 6 or DotAddonApi.build_level("dot_loadout") < 2:
 		return
@@ -1059,7 +1029,6 @@ func _portrait(atlas: String) -> Texture2D:
 	return texture
 
 
-# --- The end of a round: killcam, winner reveal, board ---------------------------
 
 ## A hider found is the moment, seen from the hunter who found them; anything else from the
 ## victim's own eyes.
@@ -1172,7 +1141,6 @@ func _killcam_frame() -> void:
 		killcam.frame()
 
 
-# --- Chat, sound, settings ---------------------------------------------------
 
 ## dot-game's chat box and microphone, with this game's channels and voice format.
 func _build_chat() -> void:
@@ -1254,10 +1222,8 @@ func _build_settings() -> void:
 	platform.chat = chat
 	platform.look_position_fn = _look_position
 	platform.board_snapshot_fn = board_snapshot
-	# M: the map list. Solo a choice changes the map here at once; connected the server decides,
-	# by the owner's `sv_map_menu_flag`, and anybody without it gets a vote instead (dot-vote's
-	# map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt
-	# list's `picked` handler.
+	# M: the map list. Solo a choice changes the map at once; connected the server decides by `sv_map_menu_flag`, and anybody without it gets a vote
+	# (dot-vote's map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt list's `picked` handler.
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
 	DotLog.result(CHANNEL, "the platform", platform.setup())
@@ -1299,7 +1265,6 @@ func _build_settings() -> void:
 		_use_loadout_menu()
 
 
-# --- Dead bodies -----------------------------------------------------------
 
 ## Where the dead lie: dot-player-char's ragdolls under the game's (the server's) rules.
 var ragdolls: DotPlayerRagdolls = null
@@ -1318,12 +1283,9 @@ func _ragdoll_sound(id: StringName, at: Vector3, volume: float) -> void:
 		var _played := audio.on_body(id, at, volume)
 
 
-## [param who]'s body goes down the way the server picked ([member PhPlayer.death]), from what
-## this client draws of them. A person (a hunter, a prop out of disguise) is copied from the
-## figure into a ragdoll. A disguised prop is a prop, not a person, and `PhConfig.prop_death`
-## says what it does: bursts into its own pieces like shot furniture (the default), topples
-## over as the prop, or vanishes. Nothing drawn here (your own first-person body), nothing.
-## Called from [method _on_death], solo and connected alike, before the next frame hides it.
+## [param who]'s body goes down the way the server picked ([member PhPlayer.death]), from what this client draws of them.
+## A person is copied into a ragdoll; a disguised prop does what `PhConfig.prop_death` says (burst, topple, or vanish).
+## Nothing drawn here (your own first-person body), nothing. Called from [method _on_death] before the next frame hides it.
 func _fall(who: PhPlayer) -> void:
 	if who == null or ragdolls == null:
 		return
@@ -1412,7 +1374,6 @@ func _pointer_ours() -> bool:
 	return Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
-# --- Asking ----------------------------------------------------------------
 
 func ask_disguise() -> void:
 	if bridge != null:
@@ -1460,7 +1421,6 @@ func _on_taunt_picked(id: StringName) -> void:
 		ask_taunt(id)
 
 
-# --- The frame -------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
 	if _offline:
@@ -1540,13 +1500,9 @@ const DRAWN_SETTLE_SEC := 0.6
 var _drawn_quiet: float = 0.0
 
 
-## Brings the drawn gun's magazine and reserve (what the HUD counts) to the server's once it has
-## been quiet [constant DRAWN_SETTLE_SEC]: online from this player's owner-only snapshot fields,
-## offline from the world's own rig. True when it changed anything.
-##
-## [b]The drawn gun predicts, so it can be wrong, and nothing else puts it right.[/b] A shot the
-## server refused (a blindfold tick, a stand-in's round start) or a fresh round's refill leaves the
-## counter on the client's own sum otherwise, as zombie-zone's 15 / 105 did.
+## Brings the drawn gun's magazine and reserve (what the HUD counts) to the server's once quiet for [constant DRAWN_SETTLE_SEC].
+## The drawn gun predicts, so a shot the server refused or a fresh round's refill would leave the counter wrong with nothing to correct it.
+## Returns true when it changed anything.
 func correct_drawn() -> bool:
 	if weapons == null or weapons.arsenal == null or _drawn_quiet < DRAWN_SETTLE_SEC:
 		return false
@@ -1653,10 +1609,8 @@ func _process(delta: float) -> void:
 	_present_effects(delta)
 
 
-## Down the sights: a hunter's hands come up while the Aim key is held, the lens zooms by what
-## the weapon's art says (`aim_fov_scale`, from [member base_fov] so nothing compounds), and the
-## HUD fades its dot and shows a scope. Nobody aims as a prop, dead, blindfolded, watching, in
-## third person or with the pointer free. Presentation only, as in the arena.
+## Down the sights: a hunter's hands come up while Aim is held, the lens zooms by the weapon's `aim_fov_scale` (from [member base_fov], so nothing compounds),
+## and the HUD fades its dot and shows a scope. Nobody aims as a prop, dead, blindfolded, watching, in third person or with the pointer free.
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
 	var blind := hud != null and hud.is_blindfolded()
@@ -1693,7 +1647,6 @@ func _present_effects(delta: float) -> void:
 		game.effects.advance(delta)
 
 
-# --- Watching, once out -----------------------------------------------------
 
 ## The pose the free camera holds between frames, seeded from the camera as it was the frame
 ## the roam began, so the spectator starts where they were looking.
@@ -1778,11 +1731,8 @@ func _refresh_watching_line() -> void:
 		hud.set_watching(_watching_line() if is_spectating() else "")
 
 
-## The free camera, once a frame: WASD along the view, Space and Ctrl up and down, Shift fast,
-## Alt slow, the mouse to look. Only the camera moves; the body stays where it fell.
-##
-## [b]The speed is the server's[/b] (`mp_freeroam_speed`, through the mirror's rules), so a
-## client cannot fly faster than it was told to. The server holds only the mode.
+## The free camera, once a frame: WASD along the view, Space and Ctrl up and down, Shift fast, Alt slow, mouse to look; the body stays where it fell.
+## The speed is the server's (`mp_freeroam_speed`), so a client cannot fly faster than it was told; the server holds only the mode.
 func _drive_free_camera() -> void:
 	if _free_cam == null:
 		_free_cam = DotSpectatorFreeCam.new()
@@ -1871,13 +1821,9 @@ func spectate_step(direction: int) -> void:
 		chat.notice(moved.error.message)
 
 
-## Everything a frame draws that a tick does not, in this order: the netcode's interpolation,
-## then every player — a person or the prop they are — then every beacon. Returns how many are
-## shown. Static so the net suite drives exactly this and not a copy of it.
-##
-## [param first_person] is whether [param own]'s camera is behind their eyes, which hides their
-## own body. A prop is always drawn to its own player in third person: that is what a prop is
-## looking at.
+## Everything a frame draws that a tick does not, in order: the netcode's interpolation, every player (or the prop they are), every beacon.
+## Returns how many are shown. Static so the net suite drives exactly this and not a copy.
+## [param first_person] hides [param own]'s body; a prop is always drawn to its own player in third person.
 static func present_frame(
 	p_net: DotNetManager,
 	p_game: PhGame,
@@ -1892,12 +1838,9 @@ static func present_frame(
 	if networked:
 		p_net.interpolate_frame(alpha)
 
-	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the
-	# clock stretches and shrinks its ticks while it settles on the server, so a physics frame
-	# now and then runs no tick or two, and drawn at the engine's fraction the eye stood still
-	# on one frame and moved double on the next. `DotFpsController.render_state` reads it from
-	# `render_clock` (dot-player-controller); by name both ways, so a shell older than either
-	# draws as before. Null offline, where every physics frame is one tick.
+	# Your own player is drawn at the clock's render alpha, not the engine's fraction: the clock stretches its ticks while settling on the server,
+	# and at the engine's fraction the eye stood still one frame and moved double the next. Read from `render_clock` by name both ways,
+	# so an older shell draws as before. Null offline, where every physics frame is one tick.
 	if own != null and own.controller != null:
 		own.controller.set(&"render_clock", p_net.clock if networked else null)
 

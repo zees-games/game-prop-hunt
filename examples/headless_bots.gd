@@ -5,37 +5,11 @@ const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 const PhBots := preload("../game/ph_bots.gd")
 
-## Stand-ins play whole rounds against each other on the real maps, and the suite measures how
-## they hide and how they hunt.
-##
-## [b]Why rounds, not a unit test.[/b] Christian's first play test: "the bots don't know how to
-## play the game at all". Four stand-in props stood in the school's hallway as sinks and bins,
-## hopping when they thought they were stuck, and the board said "4 props left" for the whole
-## hunt because the stand-in hunter wandered and found nobody. Whether a bot hides well is how
-## long it lasts against hunters that search, and whether a hunter hunts well is whether it
-## finds props without shooting the furniture to pieces, so this plays rounds (eight
-## stand-ins, the game drawing its own hunters, `bot_difficulty medium`) and holds the numbers
-## to bands:
-##
-## - every prop is disguised when the hunters are let go, as something that belongs where it
-##   stands (others of its kind round it), and the props are apart;
-## - a disguised prop keeps still unless it was shot (seconds moving per prop-minute);
-## - at medium a close game: the props win 35-55% of rounds (a hunt that finds everybody is as
-##   broken as one that finds nobody), and the hunters find somebody in most; easy leaves the
-##   props at least half the rounds, hard at most two in five;
-## - and each map on its own a close game too (25-65% of its rounds), not only the four together;
-## - the hunters test props more than furniture, and the decoy penalty kills few of them;
-## - the board's "props left" is the props alive, after every find;
-## - every place a prop may hide is reachable from where the props start (the school's
-##   bathrooms once had a toilet in each doorway).
-##
-## Ninety-six rounds by default (it was forty-eight over four maps), twelve a map, about 13 minutes on dev02, 24 on the staging laptop: a band on eight rounds was a
-## band on noise, and each map is held to its own band once it has twelve. `-- --rounds N` plays
-## another number, `-- --first N` starts at the Nth round's map and seed, `-- --map ph_house`
-## plays that map's rounds of the rotation only, `-- --difficulty hard` plays another preset, and
-## `PH_BOTS_TRACE=1` prints where everybody is every few seconds; `PH_ROUND_SECONDS` and
-## `PH_HIDE_SECONDS` set the server's ceilings for a measurement. Without `maps/` linked it plays
-## the practice house.
+## Stand-ins play whole rounds against each other on the real maps, and the suite holds how they hide and hunt to bands.
+## Rounds, not a unit test: stand-in props once stood as sinks in a hallway and the hunter found nobody, so "4 props left" never moved.
+## Bands: props disguised and apart, still unless shot, a close game (35-55% props at medium, per map 25-65%), a reachable hiding place.
+## Ninety-six rounds by default (twelve a map), about 13 minutes; `-- --rounds N`, `--first N`, `--map <id>`, `--difficulty <preset>`,
+## `PH_BOTS_TRACE=1`, `PH_ROUND_SECONDS` and `PH_HIDE_SECONDS` adjust a run. Without `maps/` linked it plays the practice house.
 
 const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church"]
 
@@ -61,10 +35,8 @@ const AMONG_MIN := 0.7
 const TUCKED_MIN := 0.26
 const SEEN_MAX := 0.2
 const COVER_MIN := 0.91
-## A map's own minimum where its best places lie too far apart for the hunters to sweep. ph_cyber_dinner
-## (1092 props, 260 places, 4 hunters): 24 rounds passed 80% (SE about 2 points); every miss was
-## reachable (34-62 m from the spawn, none cut off), but the same few far-corner places went
-## unvisited (`PH_BOTS_TRACE=1` lists each missed place, its closest hunter and its path length).
+## A map's own minimum where its best places lie too far apart for the hunters to sweep: ph_cyber_dinner
+## (1092 props, 260 places) passed 80% of 24 rounds; every miss was reachable, the same far corners just went unvisited.
 const COVER_MIN_OF := {"ph_cyber_dinner": 0.74}
 
 ## Seconds into the hide by which every stand-in prop wears a disguise (the delay is 1.5 s, the
@@ -81,26 +53,17 @@ const EASY_PROPS_WIN := 0.5
 ## band, because twelve rounds is still a small sample.
 const MAP_PROPS_WIN := Vector2(0.25, 0.65)
 const MAP_ROUNDS := 12
-## Maps whose fixed twelve rounds (the suite's seeds are the same every run) sit outside the band
-## while the map itself is balanced. Measured over 96 rounds of the map alone (`-- --map <id>`, the
-## same seeds and then some, 2026-10-18, identical before and after the load gate): ph_office
-## props won 41 of 85 (48%) and its first twelve gave 8; ph_abandoned_church 47 of 96 (49%) and
-## its first twelve gave 2. A twelve-round share has a spread of about 14 points at 50%, so these
-## two draws are the suite's seeds, not the maps' balance. Each band still excludes a map that is
-## really lopsided (the school was 75%), and is centred on the 96-round share. ph_apartment:
-## 48 of 96 (50%), in twelves 9, 5, 4, 5, 5, 9, 4, 7; its suite twelve gave 9, with or without the
-## pass 6 models (identical wins and props found).
+## Maps whose fixed twelve rounds sit outside the band while the map itself is balanced (measured over 96 rounds alone).
+## A twelve-round share spreads about 14 points at 50%, so these draws are the suite's seeds, not the maps' balance.
+## Each band still excludes a lopsided map (the school was 75%) and is centred on the 96-round share.
 const MAP_BANDS := {
 	"ph_office": Vector2(0.25, 0.75),
 	"ph_apartment": Vector2(0.25, 0.8),
 	"ph_abandoned_church": Vector2(0.1, 0.65),
 }
 const HARD_PROPS_WIN := 0.4
-## CI mode (the `CI` environment variable is "true", which GitHub Actions sets): two rounds a map
-## instead of twelve, because the full run takes longer than a runner's 900 s suite cap. Every
-## section and every check still runs; the sample is small, so the close-game share is held to the
-## per-map band instead of the mean's, and the per-map bands (which need twelve rounds) are only
-## reported. `--rounds N` overrides it, and a local run keeps the full default.
+## CI mode (`CI` is "true"): two rounds a map, because the full run exceeds a runner's 900 s suite cap; every check still runs.
+## The close-game share is held to the per-map band, and the per-map bands are only reported. `--rounds N` overrides it.
 const CI_ROUNDS := 16
 const CI_PROPS_WIN := Vector2(0.2, 0.7)
 

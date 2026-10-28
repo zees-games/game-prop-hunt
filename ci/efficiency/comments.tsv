@@ -3,8 +3,7 @@
 examples/dedicated.gd::banner	1
 examples/dedicated.gd::history	2
 examples/dedicated.gd::long_block	11
-examples/headless_bots.gd::history	1
-examples/headless_bots.gd::long_block	3
+examples/headless_bots.gd::long_block	1
 examples/headless_maps.gd::long_block	3
 examples/headless_net.gd::banner	3
 examples/headless_net.gd::long_block	5
@@ -18,9 +17,6 @@ game/net/ph_events.gd::banner	9
 game/net/ph_events.gd::history	1
 game/net/ph_events.gd::long_block	10
 game/net/ph_interest.gd::long_block	1
-game/net/ph_net_bridge.gd::banner	12
-game/net/ph_net_bridge.gd::history	2
-game/net/ph_net_bridge.gd::long_block	32
 game/net/ph_net_command.gd::long_block	1
 game/net/ph_net_link.gd::banner	2
 game/net/ph_net_link.gd::history	1
@@ -41,9 +37,7 @@ game/ph_bots.gd::history	1
 game/ph_bots.gd::long_block	2
 game/ph_catalogue.gd::banner	1
 game/ph_catalogue.gd::long_block	3
-game/ph_client.gd::banner	11
 game/ph_client.gd::history	1
-game/ph_client.gd::long_block	12
 game/ph_config.gd::banner	12
 game/ph_config.gd::long_block	7
 game/ph_controller.gd::long_block	1
@@ -62,7 +56,7 @@ game/ph_map_doc.gd::banner	1
 game/ph_map_doc.gd::long_block	1
 game/ph_materials.gd::long_block	2
 game/ph_module.gd::history	1
-game/ph_module.gd::long_block	22
+game/ph_module.gd::long_block	20
 game/ph_nav_annotator.gd::long_block	1
 game/ph_paths.gd::long_block	4
 game/ph_player.gd::banner	3
@@ -74,7 +68,6 @@ game/ph_projectile_view.gd::long_block	1
 game/ph_projectiles.gd::long_block	4
 game/ph_props.gd::long_block	2
 game/ph_rules.gd::long_block	2
-game/ph_server.gd::long_block	3
 game/ph_services.gd::banner	1
 game/ph_services.gd::long_block	10
 game/ph_settings.gd::history	1

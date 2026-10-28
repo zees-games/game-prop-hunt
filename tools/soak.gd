@@ -4,18 +4,9 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 
-## Bot soak on the real game: N stand-ins play rounds on one map for M simulated minutes through
-## dot-bot's DotBotSoak, fed by dot-spawn's DotSpawnWatch.
-##
-## [codeblock]
-## ./game.sh soak [map] [minutes]
-## godot --headless --path . res://tools/soak.tscn -- --map ph_house --bots 6 --minutes 2
-## [/codeblock]
-##
-## Takes the harness's own flags too (--soak-max-stuck-sec and the rest of DotBotSoakConfig).
-## Writes .godot/test-logs/soak-<map>.json, prints the SOAK line, exits 1 when the run fails.
-## Rounds run back to back. Only a live hunter in the seek counts as a mover with a goal: props
-## stand still by design and hunters are held in the hide.
+## Bot soak on the real game: N stand-ins play rounds back to back on one map for M simulated minutes through dot-bot's DotBotSoak.
+## Run: ./game.sh soak [map] [minutes]; the harness's own flags work too. Writes .godot/test-logs/soak-<map>.json and exits 1 on failure.
+## Only a live hunter in the seek counts as a mover with a goal: props stand still by design and hunters are held in the hide.
 
 const DEFAULT_MAP := &"ph_house"
 const DEFAULT_MINUTES := 1.0
