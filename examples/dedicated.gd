@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends "dedicated_base.gd"
 
 const PhAmbience := preload("../game/ph_ambience.gd")
 const PhConfig := preload("../game/ph_config.gd")
@@ -24,8 +24,6 @@ const PORT := 28931
 const QUERY_PORT := 28932
 const TICK_RATE := 60
 
-var _sections_entered := 0
-var _sections_finished := 0
 
 var server: DotServer = null
 var game: PhGame = null
@@ -377,21 +375,8 @@ func _covered_seat_cannot_be_harmed(module: Object, bridge: Object) -> void:
 ## The players' vote decides the next map: a ballot over the server's maps, one vote cast,
 ## and the round's end puts the winner on the next round. Driven by hand rather than by
 ## the clock, because stand-ins are not voters and a server of stand-ins never opens one.
-func _test_the_map_vote() -> void:
-	_section("the map vote")
-	var module := _module()
-	var vote: Node = module.get("vote") if module != null else null
-	_check(vote != null, "the module built a map vote")
-
-	if vote == null:
-		_finished()
-		return
-
-	_check(server.console.find_command("vote") != null if server.console.has_method("find_command") else true,
-		"and registered dot-vote's vote command")
-
-	# Hibernation: DotGameModule hands the director the server, the ballot's timer waits with
-	# it, and waking starts both again from the top.
+## Hibernation: the director follows the server's, and the ballot's timer waits with it.
+func _vote_sleeps_with_the_server(vote: Node) -> void:
 	var sleeper: DotVoteDirector = vote.get("director")
 	_check(server.hibernation_changed.is_connected(sleeper.set_hibernating),
 		"the vote follows the server's hibernation without a line of this game's")
@@ -406,6 +391,22 @@ func _test_the_map_vote() -> void:
 	_check(not sleeper.hibernating, "waking wakes the vote")
 	_check(is_zero_approx(vote.get("_on_map_sec")) and not vote.get("_opened_this_map"),
 		"and the map ballot is owed again from the top")
+
+
+func _test_the_map_vote() -> void:
+	_section("the map vote")
+	var module := _module()
+	var vote: Node = module.get("vote") if module != null else null
+	_check(vote != null, "the module built a map vote")
+
+	if vote == null:
+		_finished()
+		return
+
+	_check(server.console.find_command("vote") != null if server.console.has_method("find_command") else true,
+		"and registered dot-vote's vote command")
+
+	_vote_sleeps_with_the_server(vote)
 
 	# Every map in the directory, not only this suite's practice house.
 	game.config.map_ids = PackedStringArray()
@@ -925,172 +926,3 @@ func _said(lines: PackedStringArray, text: String) -> bool:
 			return true
 
 	return false
-
-
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
-
-
-# --- Exiting clean ----------------------------------------------------------------
-
-## The flag this suite hands the copy of itself it runs. See [method _run_exit_probe].
-const EXIT_PROBE_FLAG := "--exit-probe"
-
-## What the exit probe adds to a run — one section, these checks — and the copy does not.
-const EXIT_PROBE_CHECKS := 3
-
-
-## How long the copy may run before it is killed and this probe fails. A copy that is still
-## running this long after it started is hung, and the likeliest reason is the one that says
-## nothing at all: a scene whose script failed to parse never reaches `quit()` and prints
-## nothing. `-- --exit-probe-seconds N` lowers it, which is how the deadline itself is armed —
-## any N shorter than the suite takes is a copy that is still running when it expires.
-const EXIT_PROBE_SECONDS := 300
-
-
-func _is_exit_probe() -> bool:
-	return EXIT_PROBE_FLAG in OS.get_cmdline_user_args()
-
-
-func _exit_probe_seconds() -> int:
-	var args := OS.get_cmdline_user_args()
-	var at := args.find("--exit-probe-seconds")
-	if at >= 0 and at + 1 < args.size() and args[at + 1].is_valid_int():
-		return maxi(1, args[at + 1].to_int())
-	return EXIT_PROBE_SECONDS
-
-
-## Runs this same suite in a fresh process: `[exit code, its stdout, its stderr, whether it
-## had to be killed, the seconds it was allowed]`.
-##
-## [b]A leak is reported after `quit()`, by the engine, where nothing in the process that
-## leaked can read it.[/b] "N ObjectDB instances were leaked at exit" is printed once the
-## scene tree is gone, so the only process that can check a run's exit is another one. On
-## Godot 4.7.2 a script that names itself, loaded after its base, cuts the engine's exit
-## teardown short and every script loaded before it is reported leaked — hundreds of lines
-## a passing run printed for weeks, which is why this is a check now and not a warning.
-##
-## [b]First, before this run opens a port[/b], so the two never contend for a socket — and
-## so this run is always the second one against the same `user://`, which is the other
-## thing no single run can see.
-##
-## [b]Not `OS.execute`.[/b] That blocks until the copy exits, so a copy that hangs held this
-## run for ever; and when the outer `timeout` then killed this run, the copy was left behind
-## holding the suite's directory and port. So the copy is started, polled against a deadline
-## and killed at it. Two deadlines, because Godot dies on SIGTERM without running a line of
-## script — nothing in this process can clean up after it is killed:
-##
-## - coreutils `timeout` wraps the copy where it exists. It is an exec wrapper, not a shell,
-##   and it outlives this process, so a copy orphaned by the outer `timeout` still dies on
-##   time. Its exit status 124 is how its expiry is recognised.
-## - this loop's own deadline, a little later, for a platform without it.
-##
-## `execute_with_pipe` rather than `create_process`, because the latter captures nothing and
-## the whole point is reading what the copy printed. Non-blocking, and drained on every pass
-## rather than once at the end: a pipe holds 64 KiB, and a copy that fills it blocks on its
-## next print — a hang this probe would then report as the suite's own. The copy's stdin is
-## the other end of a pipe this process holds open, which is why every suite turns the
-## server's stdin console off: a reader blocked on it never lets the copy exit.
-func _run_exit_probe() -> Array:
-	var seconds := _exit_probe_seconds()
-	print("(running this suite once more in a fresh process, to read what it leaves at exit — %d s allowed)" % seconds)
-	var scene := scene_file_path if scene_file_path != "" else "res://examples/dedicated.tscn"
-	var exe := OS.get_executable_path()
-	var args := PackedStringArray([
-		"--headless", "--path", ProjectSettings.globalize_path("res://"),
-		scene, "--", EXIT_PROBE_FLAG,
-	])
-	var wrapped := false
-	for wrapper: String in ["/usr/bin/timeout", "/bin/timeout"]:
-		if FileAccess.file_exists(wrapper):
-			var outer := PackedStringArray(["--kill-after=10", str(seconds), exe])
-			outer.append_array(args)
-			exe = wrapper
-			args = outer
-			wrapped = true
-			break
-
-	var proc := OS.execute_with_pipe(exe, args, false)
-	if proc.is_empty():
-		return [-1, "", "could not start %s" % exe, false, seconds]
-	var pid: int = proc["pid"]
-	var pipes: Array[FileAccess] = [proc["stdio"], proc["stderr"]]
-	var bytes: Array[PackedByteArray] = [PackedByteArray(), PackedByteArray()]
-	var deadline := Time.get_ticks_msec() + (seconds + 30) * 1000
-	var hung := false
-	while OS.is_process_running(pid):
-		_drain_exit_probe(pipes, bytes)
-		if Time.get_ticks_msec() > deadline:
-			OS.kill(pid)
-			hung = true
-			break
-		await get_tree().create_timer(0.1).timeout
-	# Once more after it exits: what it wrote between the last pass and its exit is still in
-	# the pipe, and the leak report is always the last thing it writes.
-	_drain_exit_probe(pipes, bytes)
-
-	# OS.kill has already reaped it, and asking for the exit code of a reaped pid is an error.
-	var code := -1 if hung else OS.get_process_exit_code(pid)
-	if wrapped and code == 124:
-		hung = true
-	return [code, bytes[0].get_string_from_utf8(), bytes[1].get_string_from_utf8(), hung, seconds]
-
-
-func _drain_exit_probe(pipes: Array[FileAccess], bytes: Array[PackedByteArray]) -> void:
-	for i in pipes.size():
-		while true:
-			var chunk := pipes[i].get_buffer(65536)
-			if chunk.is_empty():
-				break
-			bytes[i].append_array(chunk)
-
-
-func _test_exits_clean(probe: Array) -> void:
-	_section("exiting clean, as a second process saw it")
-
-	var code: int = probe[0]
-	var stdout: String = probe[1]
-	var stderr: String = probe[2]
-	var hung: bool = probe[3]
-	var seconds: int = probe[4]
-	# Every leak line is the engine's, and the engine writes them to stderr; both are
-	# searched so that stays a fact about the engine rather than an assumption here. Shown
-	# apart, because a pipe each is two streams whose interleaving is lost, and where a hung
-	# copy had got to is the end of its stdout.
-	var text := stdout + "\n" + stderr
-	var tail := "its last lines:\n%s\nand the last on stderr:\n%s" % [
-		_last_lines(stdout, 15), _last_lines(stderr, 10)
-	]
-
-	# A copy that was killed never reached its exit, so neither of the last two was seen, and
-	# passing them on an absence of lines would be passing them blind.
-	var passes_detail := ""
-	if hung:
-		passes_detail = ("still running after %d s, so it was killed — a scene that failed to "
-			+ "parse, or a thread still blocked when it quit; %s") % [seconds, tail]
-	elif code != 0:
-		passes_detail = "exit %d; %s" % [code, tail]
-	_check(not hung and code == 0, "this suite, run again in a fresh process, passes",
-		passes_detail)
-	_check(not hung and not text.contains("leaked at exit"), "and leaves no object alive at exit",
-		"it was killed before it reached its exit" if hung else _line_with(text, "leaked at exit"))
-	_check(not hung and not text.contains("still in use at exit"), "and no resource",
-		"it was killed before it reached its exit" if hung else _line_with(text, "still in use at exit"))
-	_finished()
-
-
-func _line_with(text: String, needle: String) -> String:
-	for line in text.split("\n"):
-		if line.contains(needle):
-			return line.strip_edges()
-	return ""
-
-
-func _last_lines(text: String, count: int) -> String:
-	var lines := text.strip_edges().split("\n")
-	return "\n".join(lines.slice(maxi(0, lines.size() - count)))
