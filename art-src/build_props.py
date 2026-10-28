@@ -84,6 +84,7 @@ def palette():
     PAL["oilglass"] = mat("oilglass", (0.07, 0.17, 0.015), 0.0, 0.1)
     PAL["olive"] = mat("olive", (0.1, 0.16, 0.03), 0.0, 0.7)
     PAL["enamelBlue"] = mat("enamelBlue", (0.02, 0.07, 0.2), 0.0, 0.25)
+    PAL["terracottaDark"] = mat("terracottaDark", (0.3, 0.09, 0.045), 0.0, 0.85)
     PAL["coffee"] = mat("coffee", (0.05, 0.022, 0.01), 0.0, 0.1)
 
 # Kit material name -> ours.
@@ -102,7 +103,8 @@ FRIDGE = {"metalLight": "porcelain", "metalMedium": "steel", "metal": "steel", "
 OVERRIDES = {"kitchenFridgeLarge": FRIDGE, "kitchenFridgeSmall": FRIDGE, "toaster": {"metalMedium": "alu", "metal": "gunmetalDark"},
              "kitchenCabinet": {"metal": "steel"}, "speaker": {"metalMedium": "gunmetalDark"}, "lampSquareTable": {"metal": "brass"},
              "computerKeyboard": {"metalDark": "gunmetalDark", "metalMedium": "gunmetal"}, "loungeSofa": {"carpet": "cloth"},
-"trashcan": {"metal": "galv", "metalMedium": "galv", "_defaultMat": "galv"}, "cardboardBoxClosed": {"wood": "kraft", "woodDark": "kraftDark"}, "lampRoundTable": {"metal": "brass"}}
+"trashcan": {"metal": "galv", "metalMedium": "galv", "_defaultMat": "galv"}, "cardboardBoxClosed": {"wood": "kraft", "woodDark": "kraftDark"}, "lampRoundTable": {"metal": "brass"},
+             "pot_small": {"wood": "terracotta", "woodBarkDark": "soil", "_defaultMat": "walnutDark"}}
 
 def reskin(o, overrides=None):
     overrides = overrides or {}
@@ -140,10 +142,14 @@ def add_box(host, lo, hi, key, rot=0.0):
     bpy.ops.object.transform_apply(scale=True)
     join(host, p, key)
 
-def add_cyl(host, c, r, h, key, axis="Z", verts=16, r2=None):
+def add_cyl(host, c, r, h, key, axis="Z", verts=16, r2=None, sy=1.0):
     rot = {"Z": (0, 0, 0), "X": (0, math.pi / 2, 0), "Y": (math.pi / 2, 0, 0)}[axis]
     bpy.ops.mesh.primitive_cone_add(vertices=verts, radius1=r, radius2=r if r2 is None else r2, depth=h, location=c, rotation=rot)
-    join(host, bpy.context.active_object, key)
+    p = bpy.context.active_object
+    if sy != 1.0:
+        p.scale.y = sy
+        bpy.ops.object.transform_apply(scale=True)
+    join(host, p, key)
 
 def add_sphere(host, c, r, key, sq=1.0):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=12, ring_count=6, radius=r, location=c)
@@ -152,9 +158,13 @@ def add_sphere(host, c, r, key, sq=1.0):
     bpy.ops.object.transform_apply(scale=True)
     join(host, p, key)
 
-def add_torus(host, c, R, r, key):
+def add_torus(host, c, R, r, key, sy=1.0):
     bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=20, minor_segments=6, location=c)
-    join(host, bpy.context.active_object, key)
+    p = bpy.context.active_object
+    if sy != 1.0:
+        p.scale.y = sy
+        bpy.ops.object.transform_apply(scale=True)
+    join(host, p, key)
 
 def join(host, p, key):
     for f in p.data.polygons:
@@ -759,17 +769,120 @@ def do_kitchenFridgeSmall(by):
     lo, hi = world_box([o])
     add_box(o, (lo.x + 0.01, lo.y - 0.004, lo.z), (hi.x - 0.01, lo.y, lo.z + 0.07), "gunmetalDark")
 
+# ---- pass 7: the food, pots and jug ------------------------------------------------------------------------
+
+def lum(c):
+    return (c[0] + c[1] + c[2]) / 3
+
+def floor_z(o, rmax, zmax):
+    """Height of the highest upward face within rmax of the model's middle below zmax: the inside bottom of a pan or box."""
+    lo, hi = world_box([o])
+    cx, cy = (lo.x + hi.x) / 2, (lo.y + hi.y) / 2
+    zs = [c.z for c, _, _ in up_faces(o, lo.z, zmax) if math.hypot(c.x - cx, c.y - cy) < rmax]
+    return max(zs) if zs else lo.z
+
+def pre_fryingpan(by):
+    colormap_faces(by["frying-pan"], lambda c, z, p: "walnutDark" if c[0] > 0.7 else ("gunmetalDark" if lum(c) < 0.42 else "gunmetal"))
+
+def do_fryingpan(by):
+    o = by["frying-pan"]
+    lo, hi = world_box([o])
+    fz = floor_z(o, 0.2, 0.08)
+    print("panfloor", fz, hi.z)
+    add_cyl(o, (0, 0, fz + 0.002), 0.23, 0.004, "gunmetalDark", verts=20)
+    add_cyl(o, (0.04, 0.02, fz + 0.007), 0.16, 0.006, "paper", verts=14)
+    add_sphere(o, (0.07, 0.0, fz + 0.012), 0.06, "hazard", 0.5)
+    for k in (0.36, 0.5):
+        add_cyl(o, (0, k + 0.2, hi.z - 0.012), 0.014, 0.012, "brass", verts=8)
+    add_torus(o, (0, 0.62, hi.z - 0.012), 0.02, 0.006, "steel")
+
+def pre_pizzabox(by):
+    f = lambda c, z, p: "paper" if lum(c) > 0.82 else "kraft"
+    colormap_faces(by["pizza-box"], f)
+    colormap_faces(by["lid"], f)
+
+def do_pizzabox(by):
+    o = by["pizza-box"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    fz = floor_z(o, 0.3, hi.z)
+    r = min(hi.x - lo.x, hi.y - lo.y) / 2 - 0.07
+    add_cyl(o, (c.x, c.y, fz + 0.012), r, 0.024, "ochre", verts=20)
+    add_cyl(o, (c.x, c.y, fz + 0.03), r - 0.04, 0.012, "hazard", verts=20)
+    rnd = random.Random(7)
+    for k in range(7):
+        a = k * 2 * math.pi / 7 + 0.3
+        d = r * 0.5 if k else 0.0
+        add_cyl(o, (c.x + math.cos(a) * d, c.y + math.sin(a) * d, fz + 0.04), 0.06, 0.008, "red", verts=10)
+    add_box(o, (c.x - 0.14, lo.y - 0.002, lo.z + 0.01), (c.x + 0.14, lo.y + 0.003, lo.z + 0.05), "red")
+
+def pre_cupcoffee(by):
+    colormap_faces(by["cup-coffee"], lambda c, z, p: "coffee" if lum(c) < 0.4 else "porcelain")
+
+def do_cupcoffee(by):
+    o = by["cup-coffee"]
+    lo, hi = world_box([o])
+    add_torus(o, (0, 0, hi.z - 0.003), 0.104, 0.004, "porcelain")
+    add_cyl(o, (0, 0, lo.z + 0.05), 0.109, 0.016, "enamelBlue", verts=16)
+    add_cyl(o, (0, 0, lo.z + 0.012), 0.109, 0.012, "porcelain", verts=16)
+
+def pre_loafround(by):
+    colormap_faces(by["loaf-round"], lambda c, z, p: "linen" if c[1] > 0.5 else ("kraftDark" if z < 0.07 else "kraft"))
+
+def do_loafround(by):
+    o = by["loaf-round"]
+    lo, hi = world_box([o])
+    rnd = random.Random(3)
+    tops = [o.matrix_world @ v.co for v in o.data.vertices if (o.matrix_world @ v.co).z > hi.z * 0.82]
+    for w in rnd.sample(tops, min(14, len(tops))):
+        add_sphere(o, (w.x * 0.97, w.y * 0.97, w.z - 0.004), 0.016, "cork", 0.5)
+
+def pre_pot(by):
+    colormap_faces(by["pot"], lambda c, z, p: "alu" if lum(c) > 0.7 else ("gunmetalDark" if lum(c) < 0.42 else "enamelBlue"))
+
+def do_pot(by):
+    o = by["pot"]
+    lo, hi = world_box([o])
+    add_sphere(o, (0, 0, hi.z - 0.022), 0.035, "brass", 0.8)
+    add_torus(o, (0, 0, lo.z + 0.1), radius_at(o, lo.z + 0.08, lo.z + 0.12, max) + 0.001, 0.008, "steel")
+
+def band_xy(o, z0, z1):
+    """Half-extents along x and y of the vertices between two world heights: for models that are ovals, not circles."""
+    pts = [o.matrix_world @ v.co for v in o.data.vertices]
+    ps = [w for w in pts if z0 <= w.z <= z1]
+    return max(abs(w.x) for w in ps), max(abs(w.y) for w in ps)
+
+def do_potsmall(by):
+    o = by["pot_small"]
+    lo, hi = world_box([o])
+    rx, ry = band_xy(o, hi.z - 0.05, hi.z)
+    add_torus(o, (0, 0, hi.z - 0.012), rx - 0.01, 0.012, "terracotta", sy=ry / rx)
+    rx, ry = band_xy(o, lo.z + 0.14, lo.z + 0.2)
+    add_torus(o, (0, 0, lo.z + 0.168), rx - 0.002, 0.007, "terracottaDark", sy=ry / rx)
+
+def pre_bottlelarge(by):
+    colormap_faces(by["bottle-large"], lambda c, z, p: "enamelBlue" if z > 0.12 else "water")
+
+def do_bottlelarge(by):
+    o = by["bottle-large"]
+    lo, hi = world_box([o])
+    r, e = 0.036, 0.042 / 0.036
+    add_cyl(o, (0, 0, lo.z + 0.06), r + 0.0008, 0.034, "paper", verts=16, sy=e)
+    add_cyl(o, (0, 0, lo.z + 0.06), r + 0.0012, 0.008, "red", verts=16, sy=e)
+    add_torus(o, (0, 0, hi.z - 0.024), 0.02, 0.0025, "enamelBlue", sy=e)
+
 MODELS = {"chair": "furniture", "books": "furniture", "cardboardBoxClosed": "furniture", "lampRoundTable": "furniture",
           "sideTable": "furniture", "bottle": "survival", "bucket": "survival", "box": "survival", "barrel": "survival",
           "soda-can": "food", "bottle-oil": "food", "mug": "food", "carton": "food", "carton-small": "food",
           "plate": "food", "pottedPlant": "furniture", "trashcan": "furniture", "chairDesk": "furniture", "table": "furniture",
           "sideTableDrawers": "furniture", "bench": "furniture", "computerScreen": "furniture",
-          "cabinetBed": "furniture", "cabinetBedDrawer": "furniture", "computerKeyboard": "furniture", "desk": "furniture", "chairRounded": "furniture", "kitchenCabinet": "furniture", "toaster": "furniture", "kitchenFridgeLarge": "furniture", "bookcaseOpenLow": "furniture", "bookcaseClosed": "furniture", "speaker": "furniture", "loungeSofa": "furniture", "lampSquareTable": "furniture", "kitchenFridgeSmall": "furniture"}
+          "cabinetBed": "furniture", "cabinetBedDrawer": "furniture", "computerKeyboard": "furniture", "desk": "furniture", "chairRounded": "furniture", "kitchenCabinet": "furniture", "toaster": "furniture", "kitchenFridgeLarge": "furniture", "bookcaseOpenLow": "furniture", "bookcaseClosed": "furniture", "speaker": "furniture", "loungeSofa": "furniture", "lampSquareTable": "furniture", "kitchenFridgeSmall": "furniture",
+          "frying-pan": "food", "pizza-box": "food", "cup-coffee": "food", "loaf-round": "food", "pot": "food", "pot_small": "nature", "bottle-large": "survival"}
 BEVEL = {"bottle": 0.0015, "soda-can": 0.002, "barrel": 0.003, "bucket": 0.003, "books": 0.0025, "lampRoundTable": 0.003}
 
 def build(name):
     kit = MODELS[name]
-    fn = name.replace("-", "")
+    fn = name.replace("-", "").replace("_", "")
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o)
     for m in list(bpy.data.materials):
