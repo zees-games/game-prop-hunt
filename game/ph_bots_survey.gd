@@ -198,6 +198,47 @@ func _set_survey_tick() -> void:
 
 
 ## Bakes and surveys the map now built, once per map. Only where bots run.
+## Indices of the floor furniture a prop may become.
+func _usable_furniture(props: Array, catalogue: Object, rules: DotPropDisguiseRules) -> Array[int]:
+	var usable: Array[int] = []
+	for i in range(props.size()):
+		var prop: Dictionary = props[i]
+		var frame: Transform3D = prop["transform"]
+		if frame.origin.y > 0.3:
+			continue
+		if not bool(catalogue.call("may_disguise", prop["id"])) or not DotPropDisguise.may_take(prop["size"], rules).ok:
+			continue
+		usable.append(i)
+	return usable
+
+
+## A place beside the furniture, on the nav mesh, per surveyed piece: `[positions, owner indices]`.
+func _places_beside(props: Array, usable: Array[int], stream: DotRandomStream) -> Array:
+	var candidates := PackedVector3Array()
+	var owners: Array[int] = []
+	var step := maxf(1.0, float(usable.size()) / float(SURVEY_PLACES))
+	var k := 0.0
+	while int(k) < usable.size():
+		var i := usable[int(k)]
+		k += step
+		var prop: Dictionary = props[i]
+		var frame: Transform3D = prop["transform"]
+		var size: Vector3 = prop["size"]
+		var sides := [Vector3(size.x * 0.5 + BESIDE, 0.0, 0.0), Vector3(-size.x * 0.5 - BESIDE, 0.0, 0.0),
+			Vector3(0.0, 0.0, size.z * 0.5 + BESIDE), Vector3(0.0, 0.0, -size.z * 0.5 - BESIDE)]
+		var first := stream.next_range_i(0, 3)
+		for j in range(4):
+			var local: Vector3 = sides[(first + j) % 4]
+			var beside := frame.origin + frame.basis * local
+			beside.y = frame.origin.y
+			var on := nav.closest(beside)
+			if Vector2(on.x - beside.x, on.z - beside.z).length() < 0.35 and absf(on.y - beside.y) < 0.5:
+				candidates.append(on)
+				owners.append(i)
+				break
+	return [candidates, owners]
+
+
 func _prepare() -> void:
 	var map: Node3D = game.get("map")
 	var doc: Dictionary = game.get("map_doc")
@@ -230,39 +271,10 @@ func _prepare() -> void:
 	var rules: DotPropDisguiseRules = game.get("rules")
 	var props: Array = map.get("props")
 
-	# Every piece of floor furniture a prop may become, and a place beside it.
-	var usable: Array[int] = []
-	for i in range(props.size()):
-		var prop: Dictionary = props[i]
-		var frame: Transform3D = prop["transform"]
-		if frame.origin.y > 0.3:
-			continue
-		if not bool(catalogue.call("may_disguise", prop["id"])) or not DotPropDisguise.may_take(prop["size"], rules).ok:
-			continue
-		usable.append(i)
-
-	var candidates := PackedVector3Array()
-	var owners: Array[int] = []
-	var step := maxf(1.0, float(usable.size()) / float(SURVEY_PLACES))
-	var k := 0.0
-	while int(k) < usable.size():
-		var i := usable[int(k)]
-		k += step
-		var prop: Dictionary = props[i]
-		var frame: Transform3D = prop["transform"]
-		var size: Vector3 = prop["size"]
-		var sides := [Vector3(size.x * 0.5 + BESIDE, 0.0, 0.0), Vector3(-size.x * 0.5 - BESIDE, 0.0, 0.0),
-			Vector3(0.0, 0.0, size.z * 0.5 + BESIDE), Vector3(0.0, 0.0, -size.z * 0.5 - BESIDE)]
-		var first := stream.next_range_i(0, 3)
-		for j in range(4):
-			var local: Vector3 = sides[(first + j) % 4]
-			var beside := frame.origin + frame.basis * local
-			beside.y = frame.origin.y
-			var on := nav.closest(beside)
-			if Vector2(on.x - beside.x, on.z - beside.z).length() < 0.35 and absf(on.y - beside.y) < 0.5:
-				candidates.append(on)
-				owners.append(i)
-				break
+	var usable := _usable_furniture(props, catalogue, rules)
+	var placed := _places_beside(props, usable, stream)
+	var candidates: PackedVector3Array = placed[0]
+	var owners: Array[int] = placed[1]
 
 	var watchers := PackedVector3Array()
 	for _i in range(WATCHERS):
