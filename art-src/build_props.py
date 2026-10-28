@@ -77,11 +77,19 @@ def palette():
     PAL["crateDark"] = mat("crateDark", (0.09, 0.045, 0.02), 0.0, 0.85)
     PAL["hazard"] = mat("hazard", (0.75, 0.55, 0.02), 0.0, 0.5)
     PAL["blotter"] = mat("blotter", (0.02, 0.17, 0.07), 0.0, 0.7)
+    PAL["porcelain"] = mat("porcelain", (0.62, 0.6, 0.54), 0.0, 0.18)
+    PAL["shade"] = mat("shade", (0.55, 0.38, 0.17), 0.0, 0.8)
+    PAL["screen"] = mat("screen", (0.008, 0.01, 0.014), 0.2, 0.08)
+    PAL["glow"] = mat("glow", (0.05, 0.5, 0.14), 0.0, 0.4)
+    PAL["oilglass"] = mat("oilglass", (0.07, 0.17, 0.015), 0.0, 0.1)
+    PAL["olive"] = mat("olive", (0.1, 0.16, 0.03), 0.0, 0.7)
+    PAL["enamelBlue"] = mat("enamelBlue", (0.02, 0.07, 0.2), 0.0, 0.25)
+    PAL["coffee"] = mat("coffee", (0.05, 0.022, 0.01), 0.0, 0.1)
 
 # Kit material name -> ours.
 SWAP = {"wood": "walnut", "woodDark": "walnutDark", "metal": "brass", "metalMedium": "gunmetal",
         "metalDark": "gunmetalDark", "carpet": "velvet", "plant": "plant", "_defaultMat": "walnut",
-        "carpetDarker": "red", "carpetWhite": "cloth", "lamp": "linen"}
+        "metalLight": "steel", "carpetDarker": "red", "carpetWhite": "cloth", "lamp": "linen"}
 
 def meshes():
     return [o for o in bpy.data.objects if o.type == "MESH"]
@@ -90,7 +98,7 @@ def world_box(objs):
     pts = [o.matrix_world @ Vector(c) for o in objs for c in o.bound_box]
     return Vector(min(p[i] for p in pts) for i in range(3)), Vector(max(p[i] for p in pts) for i in range(3))
 
-OVERRIDES = {"cardboardBoxClosed": {"wood": "kraft", "woodDark": "kraftDark"}, "lampRoundTable": {"metal": "brass"}}
+OVERRIDES = {"trashcan": {"metal": "galv", "metalMedium": "galv", "_defaultMat": "galv"}, "cardboardBoxClosed": {"wood": "kraft", "woodDark": "kraftDark"}, "lampRoundTable": {"metal": "brass"}}
 
 def reskin(o, overrides=None):
     overrides = overrides or {}
@@ -223,17 +231,20 @@ def colormap_faces(o, classify):
     px = np.array(img.pixels[:]).reshape(H, W, 4)
     uv = o.data.uv_layers.active.data
     keys = []
+    seen = {}
     for p in o.data.polygons:
         u = sum(uv[l].uv[0] for l in p.loop_indices) / p.loop_total
         v = sum(uv[l].uv[1] for l in p.loop_indices) / p.loop_total
         rgb = px[min(H - 1, max(0, int(v * H))), min(W - 1, max(0, int(u * W))), :3]
         keys.append(classify(rgb, (o.matrix_world @ p.center).z, p))
+        seen.setdefault(tuple(int(v * 20) / 20 for v in rgb), []).append(round((o.matrix_world @ p.center).z, 2))
     used = sorted(set(keys))
     o.data.materials.clear()
     for k in used:
         o.data.materials.append(PAL[k])
     for p, k in zip(o.data.polygons, keys):
         p.material_index = used.index(k)
+    print("atlas", o.name, {k: (len(v), min(v), max(v)) for k, v in seen.items()})
     print("faces", o.name, {k: keys.count(k) for k in used})
 
 def reddish(rgb):
@@ -358,7 +369,7 @@ def pre_books(by):
         x += t
     by["_books"] = layout
 
-BOOK_COVER = {"carpetDarker": "red", "carpetWhite": "cloth", "plant": "plant", "metal": "ochre", "leather": "leather"}
+BOOK_COVER = {"metalLight": "steel", "carpetDarker": "red", "carpetWhite": "cloth", "plant": "plant", "metal": "ochre", "leather": "leather"}
 
 def do_books(by):
     o = by["books(Clone)"]
@@ -422,9 +433,156 @@ def do_sideTable(by):
         fhi = Vector(max(f[2][i] for f in fs) for i in range(3))
         add_box(o, (flo.x - 0.002, flo.y - 0.002, lo.z), (fhi.x + 0.002, fhi.y + 0.002, lo.z + 0.012), "brass")
 
+# ---- pass 2: the next twelve by use in the maps ---------------------------------------------------------------
+
+def pre_bottleoil(by):
+    colormap_faces(by["bottle-oil"], lambda c, z, p: "paper" if c[0] > 0.9 else ("brass" if c[0] > 0.7 else "oilglass"))
+
+def do_bottleoil(by):
+    o = by["bottle-oil"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    Rn = radius_at(o, lo.z + 0.24, lo.z + 0.28, min)
+    add_box(o, (c.x - 0.03, c.y - Rn - 0.002, lo.z + 0.23), (c.x + 0.03, c.y - Rn + 0.002, lo.z + 0.285), "olive")
+    add_box(o, (c.x - 0.02, c.y - Rn - 0.0026, lo.z + 0.25), (c.x + 0.02, c.y - Rn + 0.003, lo.z + 0.262), "ochre")
+    add_torus(o, (c.x, c.y, lo.z + 0.52), radius_at(o, lo.z + 0.5, lo.z + 0.54, min) - 0.001, 0.004, "gunmetal")
+    add_torus(o, (c.x, c.y, lo.z + 0.006), radius_at(o, lo.z, lo.z + 0.01, min) - 0.0015, 0.004, "gunmetal")
+
+def pre_mug(by):
+    colormap_faces(by["mug"], lambda c, z, p: "porcelain" if c[2] > c[0] + 0.1 else "enamelBlue")
+
+def do_mug(by):
+    o = by["mug"]
+    lo, hi = world_box([o])
+    cx, cy = 0.0, 0.0
+    add_cyl(o, (cx, cy, hi.z - 0.075), 0.115, 0.004, "coffee", verts=16)
+    add_torus(o, (cx, cy, hi.z - 0.004), 0.133, 0.006, "porcelain")
+
+def pre_carton(by):
+    colormap_faces(by["carton"], lambda c, z, p: "paper" if c[0] > 0.78 else "cloth")
+
+def do_carton(by):
+    o = by["carton"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    add_box(o, (c.x - 0.075, lo.y - 0.002, lo.z + 0.2), (c.x + 0.075, lo.y + 0.003, lo.z + 0.31), "red")
+    add_box(o, (c.x - 0.05, lo.y - 0.0028, lo.z + 0.23), (c.x + 0.05, lo.y + 0.003, lo.z + 0.24), "paper")
+    add_box(o, (c.x - 0.05, lo.y - 0.0028, lo.z + 0.265), (c.x + 0.02, lo.y + 0.003, lo.z + 0.275), "paper")
+    for x in (lo.x, hi.x):
+        add_box(o, (x - 0.002, lo.y + 0.01, lo.z + 0.14), (x + 0.002, hi.y - 0.01, lo.z + 0.146), "gunmetal")
+
+def pre_cartonsmall(by):
+    colormap_faces(by["carton-small"], lambda c, z, p: "paper" if c[1] > 0.7 else "wax")
+
+def do_cartonsmall(by):
+    o = by["carton-small"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    add_box(o, (c.x - 0.07, lo.y - 0.002, lo.z + 0.14), (c.x + 0.07, lo.y + 0.003, lo.z + 0.24), "olive")
+    add_box(o, (c.x - 0.045, lo.y - 0.0028, lo.z + 0.18), (c.x + 0.045, lo.y + 0.003, lo.z + 0.19), "paper")
+    add_box(o, (c.x - 0.045, lo.y - 0.0028, lo.z + 0.2), (c.x + 0.01, lo.y + 0.003, lo.z + 0.208), "paper")
+    for x in (lo.x, hi.x):
+        add_box(o, (x - 0.002, lo.y + 0.01, lo.z + 0.1), (x + 0.002, hi.y - 0.01, lo.z + 0.106), "gunmetal")
+
+def pre_plate(by):
+    colormap_faces(by["plate"], lambda c, z, p: "porcelain")
+
+def do_plate(by):
+    o = by["plate"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    add_torus(o, (c.x, c.y, hi.z - 0.009), 0.38, 0.007, "enamelBlue")
+    add_torus(o, (c.x, c.y, hi.z - 0.009), 0.35, 0.003, "brass")
+
+# ---- furniture, the same parts as the other kit users' versions of these models ---------------------------------
+
+def knob_in(host, c):
+    add_sphere(host, (c.x, c.y + 0.009, c.z), 0.011, "brass", 0.8)
+
+def do_pottedPlant(by):
+    pot, plant = by["pottedPlant(Clone)"], by["plant"]
+    lo, hi = world_box([pot])
+    c = (lo + hi) / 2
+    top = hi.z
+    add_cyl(pot, (c.x, c.y, top - 0.012), 0.092, 0.012, "soil")
+    add_torus(pot, (c.x, c.y, top - 0.004), 0.092, 0.006, "terracotta")
+    add_cyl(pot, (c.x, c.y, lo.z + 0.018), 0.075, 0.012, "walnutDark")
+    for k in range(4):
+        a = k * math.pi / 2 + 0.5
+        add_cyl(plant, (c.x + math.cos(a) * 0.05, c.y + math.sin(a) * 0.05, top + 0.1), 0.012, 0.2, "plant", r2=0.0, verts=6)
+
+def do_trashcan(by):
+    o = by["trashcan(Clone)"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    r = min(hi.x - lo.x, hi.y - lo.y) / 2 - 0.006
+    add_torus(o, (c.x, c.y, hi.z - 0.006), r, 0.007, "brass")
+    for f in (0.3, 0.62):
+        add_torus(o, (c.x, c.y, lo.z + (hi.z - lo.z) * f), r * 0.96, 0.005, "gunmetal")
+    add_cyl(o, (c.x, c.y, lo.z + 0.006), r * 0.9, 0.012, "gunmetal")
+
+def do_chairDesk(by):
+    chair = by["chair"]
+    lo, hi = world_box([chair])
+    lv = [z for z, a in top_levels(chair) if 0.15 < z < hi.z - 0.05]
+    seat = min(lv) if lv else lo.z + 0.2
+    for x in (lo.x + 0.012, hi.x - 0.012):
+        add_box(chair, (x - 0.008, lo.y + 0.045, seat + 0.012), (x + 0.008, hi.y - 0.045, seat + 0.026), "gunmetal")
+        add_box(chair, (x - 0.006, hi.y - 0.075, seat), (x + 0.006, hi.y - 0.063, seat + 0.026), "gunmetal")
+        add_box(chair, (x - 0.006, lo.y + 0.06, seat), (x + 0.006, lo.y + 0.072, seat + 0.026), "gunmetal")
+    c = (lo + hi) / 2
+    add_sphere(chair, (c.x, hi.y - 0.004, hi.z - 0.05), 0.009, "brass", 0.5)
+
+def do_table(by):
+    o = by["table(Clone)"]
+    lo, hi = world_box([o])
+    add_box(o, (lo.x, lo.y, hi.z - 0.012), (hi.x, hi.y, hi.z), "walnutDark")
+    add_box(o, (lo.x + 0.02, lo.y + 0.02, hi.z - 0.003), (hi.x - 0.02, hi.y - 0.02, hi.z + 0.0), "walnut")
+    for x in (lo.x + 0.02, hi.x - 0.02):
+        for y in (lo.y + 0.02, hi.y - 0.02):
+            add_cyl(o, (x, y, lo.z + 0.004), 0.012, 0.008, "brass", verts=8)
+
+def do_sideTableDrawers(by):
+    o = by["sideTableDrawers(Clone)"]
+    lo, hi = world_box([o])
+    for k in ("drawerLeft", "drawerRight"):
+        d = by[k]
+        dlo, dhi = world_box([d])
+        c = (dlo + dhi) / 2
+        knob_in(d, Vector((c.x, dlo.y, c.z)))
+        add_box(d, (dlo.x + 0.012, dlo.y - 0.001, dhi.z - 0.03), (dhi.x - 0.012, dlo.y + 0.001, dhi.z - 0.026), "brass")
+    add_box(o, (lo.x + 0.01, lo.y + 0.01, lo.z), (hi.x - 0.01, hi.y - 0.01, lo.z + 0.02), "walnutDark")
+    add_box(o, (lo.x + 0.03, lo.y + 0.06, hi.z - 0.002), (lo.x + 0.15, lo.y + 0.16, hi.z + 0.012), "red", rot=0.15)
+    add_cyl(o, (hi.x - 0.1, lo.y + 0.12, hi.z + 0.002), 0.045, 0.006, "brass")
+
+def do_bench(by):
+    o = by["bench(Clone)"]
+    lo, hi = world_box([o])
+    lv = [(a, z) for z, a in top_levels(o) if z > hi.z * 0.5]
+    seat = max(lv)[1] if lv else hi.z
+    add_box(o, (lo.x + 0.02, lo.y + 0.02, seat - 0.002), (hi.x - 0.02, hi.y - 0.02, seat + 0.012), "velvet")
+    for x in (lo.x + 0.012, hi.x - 0.012):
+        for y in (lo.y + 0.012, hi.y - 0.012):
+            add_cyl(o, (x, y, lo.z + 0.004), 0.013, 0.008, "brass", verts=8)
+    add_box(o, (lo.x + 0.02, lo.y + 0.02, seat + 0.012), (hi.x - 0.02, lo.y + 0.024, seat + 0.014), "brass")
+
+def do_computerScreen(by):
+    o = by["computerScreen(Clone)"]
+    lo, hi = world_box([o])
+    c = (lo.x + hi.x) / 2
+    z0, z1 = lo.z + 0.085, hi.z - 0.02
+    add_box(o, (lo.x + 0.02, lo.y - 0.0008, z0), (hi.x - 0.02, lo.y + 0.003, z1), "screen")
+    for i in range(5):
+        w = (hi.x - lo.x - 0.1) * (0.9 if i % 2 == 0 else 0.55)
+        z = z1 - 0.03 - i * 0.03
+        add_box(o, (lo.x + 0.05, lo.y - 0.0016, z), (lo.x + 0.05 + w, lo.y - 0.0006, z + 0.008), "glow")
+    add_box(o, (c + 0.05, lo.y - 0.0008, lo.z + 0.062), (c + 0.062, lo.y + 0.002, lo.z + 0.07), "red")
+
 MODELS = {"chair": "furniture", "books": "furniture", "cardboardBoxClosed": "furniture", "lampRoundTable": "furniture",
           "sideTable": "furniture", "bottle": "survival", "bucket": "survival", "box": "survival", "barrel": "survival",
-          "soda-can": "food"}
+          "soda-can": "food", "bottle-oil": "food", "mug": "food", "carton": "food", "carton-small": "food",
+          "plate": "food", "pottedPlant": "furniture", "trashcan": "furniture", "chairDesk": "furniture", "table": "furniture",
+          "sideTableDrawers": "furniture", "bench": "furniture", "computerScreen": "furniture"}
 BEVEL = {"bottle": 0.0015, "soda-can": 0.002, "barrel": 0.003, "bucket": 0.003, "books": 0.0025, "lampRoundTable": 0.003}
 
 def build(name):
