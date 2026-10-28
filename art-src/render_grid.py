@@ -20,7 +20,8 @@ try:
     sc.cycles.device = "GPU"
 except Exception as e:
     print("no GPU", e)
-sc.cycles.samples = 64
+sc.cycles.samples = int(os.environ.get("SAMPLES", "64"))
+sc.cycles.use_denoising = os.environ.get("SAMPLES") is None
 w = bpy.data.worlds.new("w")
 w.use_nodes = True
 w.node_tree.nodes["Background"].inputs[0].default_value = (0.62, 0.68, 0.76, 1)
