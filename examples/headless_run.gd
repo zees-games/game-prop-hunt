@@ -1,20 +1,5 @@
-extends DotGameCheckSuite
+extends "headless_run_base.gd"
 
-const PhBindings := preload("../game/ph_bindings.gd")
-const PhCatalogue := preload("../game/ph_catalogue.gd")
-const PhClient := preload("../game/ph_client.gd")
-const PhConfig := preload("../game/ph_config.gd")
-const PhController := preload("../game/ph_controller.gd")
-const PhFigure := preload("../game/ph_figure.gd")
-const PhGame := preload("../game/ph_game.gd")
-const PhInterest := preload("../game/net/ph_interest.gd")
-const PhMapDoc := preload("../game/ph_map_doc.gd")
-const PhPlayer := preload("../game/ph_player.gd")
-const PhProgress := preload("../game/ph_progress.gd")
-const PhProps := preload("../game/ph_props.gd")
-const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
-const PhSettings := preload("../game/ph_settings.gd")
-const PhEvents := preload("../game/net/ph_events.gd")
 
 ## The simulation, headless: the prop catalogue and the map documents, the draw, the hide, every
 ## part of hiding as a prop, taunts, shots at props and at the furniture, the beacon, and how a
@@ -31,19 +16,10 @@ const SECTIONS := 30
 
 const CHECKS := 174
 
-const TICK_RATE := 64
-const TICK := 1.0 / float(TICK_RATE)
 
-## The first chair round the kitchen table in the practice house: where it stands.
-const CHAIR_AT := Vector3(3.6, 0.0, 1.2)
 
-## The bookcase on the south wall of the living room, a decoy to shoot.
-const BOOKCASE_AT := Vector3(-4.0, 0.0, 7.6)
 
-var _sections_entered := 0
-var _sections_finished := 0
 
-var _worlds: Array[PhGame] = []
 
 
 func _ready() -> void:
@@ -1130,36 +1106,9 @@ func _test_hunter_weapons() -> void:
 		"a hunter's HUD has DotAmmoCounter, counting the drawn gun",
 		"%s %s, want %s" % [counter.weapon_name if counter else "-", counter.count_text() if counter else "-", expected])
 
-	var icon_script: Script = load("res://game/ph_weapon_icons.gd")
-	var icons: DotWeaponIconStyle = icon_script.get("shared")
-	var icon_rect: TextureRect = hud.get("weapon_icon")
-	var unmapped := PackedStringArray()
-	for weapon in icon_script.get("TAGS"):
-		if not icons.icon_set().has_icon(weapon):
-			unmapped.append(String(weapon))
-	_check(unmapped.is_empty() and icon_rect != null and icon_rect.visible and icon_rect.texture != null and icon_rect.texture == icons.texture(def.id),
-		"the HUD draws the held gun's sprite over the counter, and every mapped weapon has one", ", ".join(unmapped))
-	var _silhouette := icons.set_style(&"silhouette")
-	hud.call("_process", 0.0)
-	_check(icon_rect != null and not icon_rect.visible, "cl_weapon_icons silhouette hides the sprite")
-	var _pixel := icons.set_style(&"pixel")
-	hud.call("_process", 0.0)
-	_check(icon_rect != null and icon_rect.visible and icon_rect.get_global_rect().end.y <= counter.get_global_rect().position.y + 4.0,
-		"the sprite sits above the ammunition plate, not on it")
+	_check_hunter_icons(hud, counter, def)
 
-	# The hints name the keys of what is carried. They said "1-3 Weapons" after grenades went on
-	# slot five (d516aec), so a grenade taken on B was on a key nothing named. Armed: the old line
-	# fails both.
-	var hints: Label = hud.get("_hints")
-	_check(hints.text.contains("1 2 3  Weapons") and not hints.text.contains("Grenade"),
-		"a hunter's hints name keys 1 2 3 for the weapons and no grenade by default", hints.text)
-	drawn.arsenal.give(&"frag")
-	hud.call("_process", 0.0)
-	var with_grenade := hints.text
-	drawn.arsenal.take(ZeeIds.SLOT_THROWN)
-	hud.call("_process", 0.0)
-	_check(with_grenade.contains("1 2 3  Weapons   5  Grenade") and not hints.text.contains("Grenade"),
-		"and key 5 for a grenade while one is carried", with_grenade)
+	_check_hunter_hints(hud, drawn)
 
 	# Bottom right, clear of the chat box and the health plate bottom left, and of the ballot
 	# top right: the anchors put it in the bottom-right quarter at any frame size.
@@ -1200,6 +1149,40 @@ func _test_hunter_weapons() -> void:
 	client.free()
 	await get_tree().process_frame
 	_finished()
+
+
+## The HUD's weapon sprite: every mapped weapon has one, the style cvar hides it, it sits above the plate.
+func _check_hunter_icons(hud: Node, counter: DotAmmoCounter, def: DotWeaponDef) -> void:
+	var icon_script: Script = load("res://game/ph_weapon_icons.gd")
+	var icons: DotWeaponIconStyle = icon_script.get("shared")
+	var icon_rect: TextureRect = hud.get("weapon_icon")
+	var unmapped := PackedStringArray()
+	for weapon in icon_script.get("TAGS"):
+		if not icons.icon_set().has_icon(weapon):
+			unmapped.append(String(weapon))
+	_check(unmapped.is_empty() and icon_rect != null and icon_rect.visible and icon_rect.texture != null and icon_rect.texture == icons.texture(def.id),
+		"the HUD draws the held gun's sprite over the counter, and every mapped weapon has one", ", ".join(unmapped))
+	var _silhouette := icons.set_style(&"silhouette")
+	hud.call("_process", 0.0)
+	_check(icon_rect != null and not icon_rect.visible, "cl_weapon_icons silhouette hides the sprite")
+	var _pixel := icons.set_style(&"pixel")
+	hud.call("_process", 0.0)
+	_check(icon_rect != null and icon_rect.visible and icon_rect.get_global_rect().end.y <= counter.get_global_rect().position.y + 4.0,
+		"the sprite sits above the ammunition plate, not on it")
+
+
+## The hints name the keys of what is carried (they once said "1-3 Weapons" after grenades went to slot five).
+func _check_hunter_hints(hud: Node, drawn: ZeeWeaponRig) -> void:
+	var hints: Label = hud.get("_hints")
+	_check(hints.text.contains("1 2 3  Weapons") and not hints.text.contains("Grenade"),
+		"a hunter's hints name keys 1 2 3 for the weapons and no grenade by default", hints.text)
+	drawn.arsenal.give(&"frag")
+	hud.call("_process", 0.0)
+	var with_grenade := hints.text
+	drawn.arsenal.take(ZeeIds.SLOT_THROWN)
+	hud.call("_process", 0.0)
+	_check(with_grenade.contains("1 2 3  Weapons   5  Grenade") and not hints.text.contains("Grenade"),
+		"and key 5 for a grenade while one is carried", with_grenade)
 
 
 # --- Helpers --------------------------------------------------------------------
@@ -1340,14 +1323,6 @@ func _test_fall_damage() -> void:
 
 
 
-func _section(name: String) -> void:
-	_sections_entered += 1
-	print(name)
-
-
-func _finished() -> void:
-	_sections_finished += 1
-
 
 ## A death: the server picks the fall and it rides DEATH; a client lays a person down as
 ## dot-player-char's ragdoll from the figure it draws, and a disguised prop bursts into its own
@@ -1373,7 +1348,6 @@ func _test_bodies() -> void:
 
 	# A person: a stand-in not in disguise, drawn as a figure.
 	var person: PhPlayer = null
-	var prop: PhPlayer = null
 	var prop_bots: Array[PhPlayer] = []
 	for id: StringName in world.players:
 		var p: PhPlayer = world.players[id]
@@ -1413,6 +1387,19 @@ func _test_bodies() -> void:
 		for k in 3:
 			_check(false, "a stand-in drawn as a person to slay")
 
+	await _check_prop_bursts(world, ragdolls, prop_bots)
+
+	_check_death_wire()
+
+	remove_child(client)
+	client.free()
+	await get_tree().process_frame
+	_finished()
+
+
+## A found prop bursts (or topples under `prop_death` 1) and leaves no body.
+func _check_prop_bursts(world: PhGame, ragdolls: DotPlayerRagdolls, prop_bots: Array[PhPlayer]) -> void:
+	var prop: PhPlayer = null
 	# A prop, disguised and drawn as what it is wearing: found, it bursts and leaves no body.
 	var burst := false
 	var toppled := false
@@ -1449,7 +1436,9 @@ func _test_bodies() -> void:
 	_check(burst, "a found prop bursts into its own pieces, and leaves no body")
 	_check(toppled, "and under prop_death 1 it topples as the prop, one stiff piece")
 
-	# The fall rides DEATH last and optional, so a death from an older server still reads.
+
+## The fall rides DEATH last and optional; the death sounds are in the catalogue.
+func _check_death_wire() -> void:
 	var fall := DotPlayerDeath.new()
 	fall.reaction = &"face_plant"
 	fall.roll_seed = 1234
@@ -1467,166 +1456,7 @@ func _test_bodies() -> void:
 		listed = listed and catalogue.find(row["id"]) != null
 	_check(listed, "the death sounds are in the game's catalogue")
 
-	remove_child(client)
-	client.free()
-	await get_tree().process_frame
-	_finished()
 
-
-## A world on the practice house, stepped by hand. The previous one is freed first: every
-## world here shares ONE physics space, and every map is built at the origin.
-func _world(configure: Callable = Callable()) -> PhGame:
-	for old in _worlds.duplicate():
-		await _dispose(old)
-
-	var config := PhConfig.new()
-	config.warmup_seconds = 0.0
-	config.intermission_seconds = 0.0
-	config.minimum_players = 0
-	config.map_ids = PackedStringArray(["ph_practice"])
-	config.keep_progress = true
-	config.hide_seconds = 2.0
-
-	if configure.is_valid():
-		configure.call(config)
-
-	var game := PhGame.new()
-	game.name = "World%d" % _worlds.size()
-	game.config = config
-	game.tick_rate = TICK_RATE
-	game.authoritative = true
-	game.register_service = false
-	add_child(game)
-	game.set_physics_process(false)
-	_worlds.append(game)
-
-	await _physics_frame()
-	await _physics_frame()
-	return game
-
-
-## A world in the hide, with a hunter and two props.
-func _hide_round(configure: Callable = Callable()) -> PhGame:
-	var game := await _world(configure)
-	var hunter := game.add_player(&"u300", "Hunter")
-	game.wish_side(hunter.player_id, PhGame.HUNTERS)
-	for i in range(2):
-		var prop := game.add_player(StringName("u%d" % (301 + i)), "Prop%d" % i)
-		game.wish_side(prop.player_id, PhGame.PROPS)
-	game.start()
-	await _wait_for(game, PhGame.Phase.HIDE)
-	return game
-
-
-## A world where the hunters are seeking.
-func _seek_round(configure: Callable = Callable()) -> PhGame:
-	var game := await _hide_round(func(c: PhConfig) -> void:
-		c.hide_seconds = 0.25
-		if configure.is_valid():
-			configure.call(c))
-	await _wait_for(game, PhGame.Phase.SEEK)
-	return game
-
-
-func _wait_for(game: PhGame, phase: int) -> void:
-	for i in range(TICK_RATE * 20):
-		if game.phase == phase:
-			return
-		await _step(game, 1)
-
-
-## Ends the round in play (the hunters win) and waits for the next to begin.
-func _end_round(game: PhGame) -> void:
-	var number := game.round_number
-	for prop in game.players_on(PhGame.PROPS):
-		if prop.is_alive():
-			_kill(game, prop, null)
-	for i in range(TICK_RATE * 20):
-		await _step(game, 1)
-		if game.round_number > number and game.phase == PhGame.Phase.HIDE:
-			return
-
-
-func _kill(game: PhGame, victim: PhPlayer, by: PhPlayer) -> void:
-	var damage := DotDamage.make(by.entity_id if by != null else 0, victim.entity_id, 10000.0, null)
-	damage.context = {"why": PhGame.DIED_SHOT}
-	var _applied := game.combat.apply_damage(damage)
-
-
-func _step(game: PhGame, ticks: int) -> void:
-	for _i in range(ticks):
-		game.simulate(TICK)
-		await _physics_frame()
-
-
-func _physics_frame() -> void:
-	await get_tree().physics_frame
-
-
-func _dispose(game: PhGame) -> void:
-	_worlds.erase(game)
-
-	if not is_instance_valid(game):
-		return
-
-	remove_child(game)
-	game.free()
-	await get_tree().process_frame
-
-
-func _drive(player: PhPlayer, move: Vector2) -> void:
-	var command := DotFpsCommand.new()
-	command.yaw = player.controller.state.yaw
-	command.move = move
-	player.controller.apply_command(command)
-
-
-## Puts [param player] at [param at], looking at [param target].
-func _stand_facing(player: PhPlayer, at: Vector3, target: Vector3) -> void:
-	player.place_at(at, 0.0)
-	_aim(player, target)
-
-
-func _aim(player: PhPlayer, target: Vector3) -> void:
-	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
-	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
-	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
-	player.controller.state.yaw = command.yaw
-	player.controller.state.pitch = command.pitch
-	player.controller.apply_command(command)
-
-
-func _fire(player: PhPlayer, on: bool) -> void:
-	var command := player.controller.current_command
-	if command == null:
-		command = DotFpsCommand.new()
-	command.set_button(DotFpsCommand.BUTTON_USER_0, on)
-	player.controller.apply_command(command)
-
-
-func _reload(player: PhPlayer, on: bool) -> void:
-	var command := player.controller.current_command
-	if command == null:
-		command = DotFpsCommand.new()
-	command.set_button(DotFpsCommand.BUTTON_USER_2, on)
-	player.controller.apply_command(command)
-
-
-func _prop_near(game: PhGame, at: Vector3) -> int:
-	for index in range(game.map.props.size()):
-		if ((game.map.props[index] as Dictionary)["transform"] as Transform3D).origin.distance_to(at) < 0.05:
-			return index
-	return -1
-
-
-static func _spread(turns: Dictionary, ids: Array[StringName]) -> Vector2i:
-	var lo := 999
-	var hi := 0
-	for id in ids:
-		lo = mini(lo, int(turns.get(id, 0)))
-		hi = maxi(hi, int(turns.get(id, 0)))
-	return Vector2i(lo, hi)
 
 
 ## B, a hunter's loadout (dot-loadout's DotLoadoutCommand on the world's own manager, as the
