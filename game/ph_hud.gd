@@ -251,6 +251,14 @@ func _build() -> void:
 	hit_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(hit_marker)
 
+	_build_status_labels()
+
+	_crosshair = _make_crosshair()
+	_root.add_child(_crosshair)
+
+
+## The labels over the health plate and under the view: what you are, the lock, the taunt meter, and who a spectator watches.
+func _build_status_labels() -> void:
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
 	_as.offset_left = 24.0
@@ -286,9 +294,6 @@ func _build() -> void:
 	watching_label.offset_bottom = -104.0
 	watching_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	watching_label.add_theme_color_override("font_color", Color(0.80, 0.90, 1.0))
-
-	_crosshair = _make_crosshair()
-	_root.add_child(_crosshair)
 
 
 func _cover(cover_name: String, colour: Color) -> ColorRect:

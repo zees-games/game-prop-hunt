@@ -37,11 +37,7 @@ func _run() -> void:
 	add_child(console)
 	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
 	console.set_cvar("ph_rounds_per_map", "7")
-	var fall := PhGame.make_fall_rules()
-	var _made := fall.bind_cvars(console.cvar, DotConVar.FLAG_NOTIFY)
-	_check(console.get_int("sv_falldamage") == 1 and fall.enabled, "fall damage is on in this game")
-	_check(fall.damage_for(20.0) > 0.0 and fall.damage_for(5.0) == 0.0, "a hard landing hurts, a small one does not")
-	_check(console.get_int("sv_falldamage_lethal") == 40 and fall.damage_for(45.0) > 1000.0, "only a very high speed kills outright")
+	var fall := _fall_rules(console)
 	console.set_cvar("sv_falldamage", "0")
 	_check(not fall.enabled and fall.damage_for(60.0) == 0.0, "the cvar turns it off")
 	_check(config.rounds_per_map == 7 and binder.source_of("rounds_per_map") == "cvar", "a cvar writes the field")
@@ -50,13 +46,7 @@ func _run() -> void:
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
 
-	var bad := FileAccess.open("user://ph_config_bad.json", FileAccess.WRITE)
-	bad.store_string('{"no_such_field": 1}')
-	bad.close()
-	var strict := PhConfig.make_binder(PhConfig.new(), "user://ph_config_bad.json")
-	strict.strict = true
-	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
-	DirAccess.remove_absolute("user://ph_config_bad.json")
+	_strict_refuses_an_unknown_key()
 
 	_layers()
 	_templates(binder)
@@ -100,6 +90,26 @@ func _run() -> void:
 		get_tree().quit(1)
 		return
 	get_tree().quit(1 if _failed > 0 else 0)
+
+
+func _strict_refuses_an_unknown_key() -> void:
+	var bad := FileAccess.open("user://ph_config_bad.json", FileAccess.WRITE)
+	bad.store_string('{"no_such_field": 1}')
+	bad.close()
+	var strict := PhConfig.make_binder(PhConfig.new(), "user://ph_config_bad.json")
+	strict.strict = true
+	_check(not strict.load_layers().ok, "strict: an unknown key is refused")
+	DirAccess.remove_absolute("user://ph_config_bad.json")
+
+
+## Fall damage as this game binds it: on by default, a hard landing hurts, only a very high speed kills.
+func _fall_rules(console: DotConsole) -> DotFallDamageRules:
+	var fall := PhGame.make_fall_rules()
+	var _made := fall.bind_cvars(console.cvar, DotConVar.FLAG_NOTIFY)
+	_check(console.get_int("sv_falldamage") == 1 and fall.enabled, "fall damage is on in this game")
+	_check(fall.damage_for(20.0) > 0.0 and fall.damage_for(5.0) == 0.0, "a hard landing hurts, a small one does not")
+	_check(console.get_int("sv_falldamage_lethal") == 40 and fall.damage_for(45.0) > 1000.0, "only a very high speed kills outright")
+	return fall
 
 
 ## Child process: loads the layers strictly over the test root and prints what the live config holds.

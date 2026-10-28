@@ -719,17 +719,8 @@ func _hide_with(side: int) -> void:
 	await _steps(8)
 
 
-## sv_workbench_remote over the real frames, in the order PhModule and PhClient register them: an admin gets a
-## panel and an edit that applies and replicates; a guest, a non-admin, a revoked admin and the cvar off are refused.
-func _test_the_remote_workbench() -> void:
-	_section("[a flagged admin edits the server's profiles, and nobody else can]")
-	if not DotGameWorkbench.available():
-		print("  dot-workbench is not linked: skipped")
-		_passed += 16
-		_finished()
-		return
-	var flags := {"boss": ["cvar", "root"], "plain": []}
-	var state := {"on": false, "uid": "", "now": 100000}
+## Both ends of sv_workbench_remote up and linked, as PhModule and PhClient register them; the nets, links and workbenches to free are in the result.
+func _workbench_up(flags: Dictionary, state: Dictionary) -> Dictionary:
 	var snet := _make_manager(true, &"wbserver", 1, self, SERVER_TICK_RATE)
 	var cnet := _make_manager(false, &"wbclient", 5, self, SERVER_TICK_RATE)
 	var sconfig := PhConfig.new()
@@ -786,6 +777,22 @@ func _test_the_remote_workbench() -> void:
 	var kind: String = set.rel_path
 	var edit := {"op": "set", "kind": kind, "id": sbinder.profile_id, "key": "hide_seconds", "value": 45.0}
 	var srt := swb.api.runtime as DotProfileRuntime
+	return {"snet": snet, "cnet": cnet, "sconfig": sconfig, "sbinder": sbinder, "swb": swb, "cwb": cwb,
+		"slink": slink, "clink": clink, "cremote": cremote, "crt": crt, "remote": remote, "edit": edit,
+		"kind": kind, "srt": srt}
+
+
+## The admin's requests and what the server answers, in order; each refusal leaves the live config as it was.
+func _workbench_asks(w: Dictionary, flags: Dictionary, state: Dictionary) -> void:
+	var sconfig: PhConfig = w["sconfig"]
+	var sbinder: Variant = w["sbinder"]
+	var cremote: DotGameWorkbenchRemoteClient = w["cremote"]
+	var cwb: DotGameWorkbench = w["cwb"]
+	var crt: DotProfileRuntime = w["crt"]
+	var srt: DotProfileRuntime = w["srt"]
+	var remote: Variant = w["remote"]
+	var edit: Dictionary = w["edit"]
+	var kind: String = w["kind"]
 
 	state["uid"] = "boss"
 	cremote.ask()
@@ -829,12 +836,25 @@ func _test_the_remote_workbench() -> void:
 	var _q5 := cremote.request(back)
 	_check(sconfig.hide_seconds == 45.0, "switching the cvar off refuses a restored admin too")
 	_check(not remote.permit_actor("remote:boss", "cvar"), "and revokes the server-made actors")
-	slink.release()
-	clink.release()
-	swb.queue_free()
-	cwb.queue_free()
-	snet.queue_free()
-	cnet.queue_free()
+
+
+## sv_workbench_remote over the real frames, in the order PhModule and PhClient register them: an admin gets a
+## panel and an edit that applies and replicates; a guest, a non-admin, a revoked admin and the cvar off are refused.
+func _test_the_remote_workbench() -> void:
+	_section("[a flagged admin edits the server's profiles, and nobody else can]")
+	if not DotGameWorkbench.available():
+		print("  dot-workbench is not linked: skipped")
+		_passed += 16
+		_finished()
+		return
+	var flags := {"boss": ["cvar", "root"], "plain": []}
+	var state := {"on": false, "uid": "", "now": 100000}
+	var w := _workbench_up(flags, state)
+	_workbench_asks(w, flags, state)
+	for key: String in ["slink", "clink"]:
+		w[key].release()
+	for key: String in ["swb", "cwb", "snet", "cnet"]:
+		w[key].queue_free()
 	_finished()
 
 
