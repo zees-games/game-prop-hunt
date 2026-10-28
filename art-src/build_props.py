@@ -917,5 +917,88 @@ def build(name):
     bpy.ops.export_scene.gltf(filepath=os.path.join(outdir, kit, name + ".glb"), export_format="GLB", export_yup=True,
                               export_apply=False, export_cameras=False, export_lights=False)
 
+# ---- pass 8 -------------------------------------------------------------------------------------------------
+
+def pre_boxlarge(by):
+    colormap_faces(by["box-large"], lambda c, z, p: "crateDark" if c[0] > 0.86 else "crate")
+
+def do_boxlarge(by):
+    o = by["box-large"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    s = 0.04
+    for sx in (lo.x, hi.x - s):
+        for sy in (lo.y, hi.y - s):
+            for z in (lo.z, hi.z - s):
+                add_box(o, (sx - 0.001 * (sx == lo.x), sy - 0.001 * (sy == lo.y), z - 0.001 * (z == lo.z)),
+                        (sx + s + 0.001 * (sx != lo.x), sy + s + 0.001 * (sy != lo.y), z + s + 0.001 * (z != lo.z)), "gunmetal")
+    add_box(o, (lo.x + s, lo.y - 0.002, c.z - 0.05), (hi.x - s, lo.y + 0.001, c.z - 0.035), "hazard")
+    add_box(o, (c.x - 0.06, lo.y - 0.003, c.z - 0.02), (c.x + 0.06, lo.y + 0.001, c.z + 0.06), "paper")
+    add_box(o, (c.x - 0.045, lo.y - 0.004, c.z + 0.03), (c.x + 0.045, lo.y + 0.001, c.z + 0.04), "red")
+
+def do_potlarge(by):
+    o = by["pot_large"]
+    lo, hi = world_box([o])
+    rx, ry = band_xy(o, hi.z - 0.05, hi.z)
+    add_torus(o, (0, 0, hi.z - 0.014), rx - 0.012, 0.014, "terracotta", sy=ry / rx)
+    rx2, ry2 = band_xy(o, lo.z + 0.1, lo.z + 0.15)
+    add_torus(o, (0, 0, lo.z + 0.125), rx2 - 0.002, 0.008, "terracottaDark", sy=ry2 / rx2)
+    add_cyl(o, (0, 0, hi.z - 0.03), rx - 0.02, 0.012, "soil", verts=20, sy=ry / rx)
+
+def do_bookcaseOpen(by):
+    o = by["bookcaseOpen(Clone)"]
+    lo, hi = world_box([o])
+    lv = [z for z, a in top_levels(o, 0.004) if z < hi.z - 0.02]
+    add_box(o, (lo.x, lo.y, hi.z - 0.002), (hi.x, hi.y, hi.z + 0.006), "walnutDark")
+    add_box(o, (lo.x + 0.01, lo.y, lo.z), (hi.x - 0.01, hi.y, lo.z + 0.02), "walnutDark")
+    for i, z in enumerate(lv[:4]):
+        books_on(o, z, lo.x + 0.02, hi.x - 0.02, lo.y, hi.y, seed=11 + i, gap=((lv + [hi.z])[i + 1] - z) - 0.02)
+
+def do_toiletSquare(by):
+    o = by["toiletSquare(Clone)"]
+    lo, hi = world_box([o, by["Group"]])
+    c = (lo + hi) / 2
+    add_cyl(o, (c.x, hi.y - 0.05, hi.z + 0.002), 0.016, 0.012, "steel", verts=12)
+
+def do_cardboardBoxOpen(by):
+    o = by["cardboardBoxOpen(Clone)"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    add_box(o, (c.x - 0.04, lo.y - 0.002, lo.z + 0.05), (c.x + 0.04, lo.y + 0.001, lo.z + 0.12), "paper")
+    add_box(o, (c.x - 0.03, lo.y - 0.003, lo.z + 0.1), (c.x + 0.03, lo.y + 0.001, lo.z + 0.106), "red")
+
+def pre_bowl(by):
+    colormap_faces(by["bowl"], lambda c, z, p: "porcelain" if lum(c) > 0.55 else "enamelBlue")
+
+def do_bowl(by):
+    o = by["bowl"]
+    lo, hi = world_box([o])
+    rx, ry = band_xy(o, hi.z - 0.03, hi.z)
+    add_torus(o, (0, 0, hi.z - 0.008), rx - 0.006, 0.008, "enamelBlue", sy=ry / rx)
+    rx, ry = band_xy(o, lo.z, lo.z + 0.02)
+    add_torus(o, (0, 0, lo.z + 0.008), rx, 0.008, "walnutDark", sy=ry / rx)
+
+def pre_apple(by):
+    colormap_faces(by["apple"], lambda c, z, p: "plant" if (c[1] > c[0] and c[1] > c[2]) else ("enamel" if reddish(c) else "walnutDark"))
+
+def do_apple(by):
+    o = by["apple"]
+    lo, hi = world_box([o])
+    add_cyl(o, (0, 0, hi.z - 0.02), 0.006, 0.05, "walnutDark", verts=6)
+    add_sphere(o, (0.018, 0, hi.z - 0.01), 0.016, "plant", 0.3)
+
+def do_cropmelon(by):
+    o = by["crop_melon"]
+    lo, hi = world_box([o])
+    add_cyl(o, (0, 0, hi.z - 0.01), 0.012, 0.03, "walnutDark", verts=6)
+
+MODELS.update({"box-large": "survival", "pot_large": "nature", "bookcaseOpen": "furniture", "toiletSquare": "furniture",
+               "cardboardBoxOpen": "furniture", "bowl": "food", "apple": "food", "crop_melon": "nature"})
+OVERRIDES.update({"pot_large": {"wood": "terracotta", "woodBarkDark": "soil", "_defaultMat": "walnutDark"},
+                  "toiletSquare": {"carpetWhite": "porcelain", "metalLight": "steel"},
+                  "cardboardBoxOpen": {"wood": "kraft", "woodDark": "kraftDark"},
+                  "crop_melon": {"grass": "olive", "leafsDark": "plant", "dirt": "soil"}})
+BEVEL.update({"apple": 0.002, "bowl": 0.003})
+
 for n in (names or list(MODELS)):
     build(n)
