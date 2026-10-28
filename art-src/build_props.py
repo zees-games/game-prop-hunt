@@ -1000,5 +1000,104 @@ OVERRIDES.update({"pot_large": {"wood": "terracotta", "woodBarkDark": "soil", "_
                   "crop_melon": {"grass": "olive", "leafsDark": "plant", "dirt": "soil"}})
 BEVEL.update({"apple": 0.002, "bowl": 0.003})
 
+# ---- pass 9: bottles, mill, stew pot, banana -------------------------------------------------------------
+
+def label_band(o, z0, z1, key, grow=0.0008, verts=16):
+    """A cylinder hugging the model between two heights (an oval when the model is), for labels and bands."""
+    pts = [o.matrix_world @ v.co for v in o.data.vertices]
+    zc = (z0 + z1) / 2
+    zn = min(pts, key=lambda w: abs(w.z - zc)).z
+    ps = [w for w in pts if z0 <= w.z <= z1] or [w for w in pts if abs(w.z - zn) < 0.0015]
+    rx, ry = max(abs(w.x) for w in ps), max(abs(w.y) for w in ps)
+    add_cyl(o, (0, 0, zc), rx + grow, z1 - z0, key, verts=verts, sy=ry / rx)
+
+def pre_bottleketchup(by):
+    colormap_faces(by["bottle-ketchup"], lambda c, z, p: "paper" if z > 0.29 else "enamel")
+
+def do_bottleketchup(by):
+    o = by["bottle-ketchup"]
+    label_band(o, 0.1, 0.22, "paper")
+    label_band(o, 0.14, 0.18, "red", grow=0.0016)
+    lo, hi = world_box([o])
+    add_torus(o, (0, 0, 0.292), 0.04, 0.005, "paper")
+    add_cyl(o, (0, 0, hi.z - 0.002), 0.012, 0.01, "red", verts=8)
+
+def pre_bottlemusterd(by):
+    colormap_faces(by["bottle-musterd"], lambda c, z, p: "red" if z > 0.29 else "hazard")
+
+def do_bottlemusterd(by):
+    o = by["bottle-musterd"]
+    label_band(o, 0.1, 0.22, "paper")
+    label_band(o, 0.19, 0.21, "ochre", grow=0.0016)
+    label_band(o, 0.11, 0.13, "ochre", grow=0.0016)
+    add_torus(o, (0, 0, 0.292), 0.04, 0.005, "red")
+
+def pre_winered(by):
+    colormap_faces(by["wine-red"], lambda c, z, p: "wax" if z > 0.54 else "oilglass")
+
+def do_winered(by):
+    o = by["wine-red"]
+    label_band(o, 0.17, 0.31, "paper", grow=0.0016)
+    label_band(o, 0.22, 0.26, "wax", grow=0.0026)
+    label_band(o, 0.19, 0.2, "brass", grow=0.0026)
+    label_band(o, 0.285, 0.295, "brass", grow=0.0026)
+    add_torus(o, (0, 0, 0.545), 0.026, 0.005, "brass")
+
+def pre_sodabottle(by):
+    colormap_faces(by["soda-bottle"], lambda c, z, p: "red" if z > 0.545 else "water")
+
+def do_sodabottle(by):
+    o = by["soda-bottle"]
+    label_band(o, 0.18, 0.34, "red")
+    label_band(o, 0.24, 0.28, "paper", grow=0.0016)
+    add_torus(o, (0, 0, 0.5), 0.032, 0.004, "water")
+    add_torus(o, (0, 0, 0.535), 0.032, 0.004, "water")
+
+def pre_peppermill(by):
+    colormap_faces(by["pepper-mill"], lambda c, z, p: "brass" if z > 0.49 else ("walnutDark" if z < 0.04 else "walnut"))
+
+def do_peppermill(by):
+    o = by["pepper-mill"]
+    lo, hi = world_box([o])
+    for z in (0.3, 0.46):
+        add_torus(o, (0, 0, z), radius_at(o, z - 0.02, z + 0.02, max) + 0.001, 0.007, "brass")
+    add_sphere(o, (0, 0, hi.z - 0.006), 0.03, "brass", 0.5)
+    add_cyl(o, (0, 0, lo.z + 0.015), radius_at(o, lo.z, lo.z + 0.04, max) + 0.002, 0.012, "brass", verts=16)
+
+def pre_potstew(by):
+    def f(c, z, p):
+        if z < 0.03 or lum(c) < 0.38:
+            return "gunmetalDark"
+        if c[0] > 0.95 or (c[0] > 0.7 and c[2] < 0.45):
+            return "terracotta"
+        if lum(c) > 0.75:
+            return "alu"
+        return "enamelBlue"
+    colormap_faces(by["pot-stew"], f)
+
+def do_potstew(by):
+    o = by["pot-stew"]
+    lo, hi = world_box([o])
+    rx, ry = 0.3, 0.3
+    print("stewband", rx, ry, hi.z)
+    add_torus(o, (0, 0, lo.z + 0.12), rx * 0.78 + 0.002, 0.01, "steel", sy=1.0)
+    for sx in (-1, 1):
+        add_cyl(o, (sx * 0.2, 0, 0.33), 0.03, 0.012, "brass", verts=8)
+
+def do_banana(by):
+    o = by["banana"]
+    lo, hi = world_box([o])
+    rnd = random.Random(2)
+    pts = [o.matrix_world @ v.co for v in o.data.vertices if (o.matrix_world @ v.co).z > hi.z * 0.7]
+    for w in rnd.sample(pts, min(8, len(pts))):
+        add_sphere(o, (w.x * 0.95, w.y, w.z - 0.003), 0.007, "walnutDark", 0.4)
+
+def pre_banana(by):
+    colormap_faces(by["banana"], lambda c, z, p: "walnutDark" if c[2] > 0.18 and c[0] < 0.7 else "hazard")
+
+MODELS.update({"bottle-ketchup": "food", "bottle-musterd": "food", "wine-red": "food", "soda-bottle": "food",
+               "pepper-mill": "food", "pot-stew": "food", "banana": "food"})
+BEVEL.update({"bottle-ketchup": 0.0015, "bottle-musterd": 0.0015, "wine-red": 0.0015, "soda-bottle": 0.0015, "pepper-mill": 0.002, "banana": 0.002})
+
 for n in (names or list(MODELS)):
     build(n)
