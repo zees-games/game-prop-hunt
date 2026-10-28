@@ -379,6 +379,15 @@ func _run() -> void:
 				Engine.time_scale = 0.08
 				_client.set("_firing", true)
 				await _frames(_fire_frames)
+		"crosshair":
+			# Alive saves to --out; then the same frame dead, to <out>_dead.png (the dot must be gone).
+			await _seconds_of(_seconds)
+			await _frames(3)
+			await RenderingServer.frame_post_draw
+			var _alive_saved := get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(_out))
+			_client.get("player").health.alive = false
+			await _seconds_of(0.5)
+			_out = _out.get_basename() + "_dead.png"
 		_:
 			await _seconds_of(_seconds)
 

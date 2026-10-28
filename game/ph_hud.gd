@@ -116,7 +116,7 @@ var _meter_back: ColorRect = null
 var _meter_fill: ColorRect = null
 var _meter_label: Label = null
 var _blindfold_label: Label = null
-var _crosshair: ColorRect = null
+var _crosshair: Control = null
 ## Through a scoped gun at full aim: zee's circle and reticle (the gun is not drawn then).
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
@@ -287,15 +287,7 @@ func _build() -> void:
 	watching_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	watching_label.add_theme_color_override("font_color", Color(0.80, 0.90, 1.0))
 
-	_crosshair = ColorRect.new()
-	_crosshair.name = "Crosshair"
-	_crosshair.color = Color(1.0, 1.0, 1.0, 0.75)
-	_crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	_crosshair.offset_left = -3.0
-	_crosshair.offset_top = -3.0
-	_crosshair.offset_right = 3.0
-	_crosshair.offset_bottom = 3.0
-	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crosshair = _make_crosshair()
 	_root.add_child(_crosshair)
 
 
@@ -587,6 +579,35 @@ func crosshair_opacity(fraction: float) -> float:
 	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
 	var crosshair: Variant = DotCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
+
+
+## dot-ui's DotCrosshair as a plain dot (API 14; aim fade and scope stay on `modulate`), else the old square.
+func _make_crosshair() -> Control:
+	if DotAddonApi.build_level("dot_ui") >= 14:
+		var shape: Variant = DotCrosshair
+		var cross := (shape as GDScript).new() as Control
+		cross.name = "Crosshair"
+		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cross.set(&"length", 0.0)
+		cross.set(&"base_gap", 0.0)
+		cross.set(&"dot_radius", 3.0)
+		cross.set(&"colour", Color(1.0, 1.0, 1.0, 0.75))
+		cross.set(&"outline", false)
+		cross.set(&"dynamic", false)
+		cross.set(&"alive_source", func() -> bool: return player != null and is_instance_valid(player) and player.is_alive())
+		return cross
+
+	var dot := ColorRect.new()
+	dot.name = "Crosshair"
+	dot.color = Color(1.0, 1.0, 1.0, 0.75)
+	dot.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	dot.offset_left = -3.0
+	dot.offset_top = -3.0
+	dot.offset_right = 3.0
+	dot.offset_bottom = 3.0
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return dot
 
 
 func is_blind() -> bool:
