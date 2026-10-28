@@ -257,8 +257,8 @@ func _run() -> void:
 	_report_sections(_entered, _completed, SECTIONS)
 
 
-## One round on [param map_id]: eight stand-ins from a fresh world, played to its end.
-func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
+## The round's config: a seed per index, and the server's ceilings when a measurement asks.
+func _round_config(map_id: String, index: int) -> PhConfig:
 	var config := PhConfig.new()
 	config.warmup_seconds = 0.0
 	config.intermission_seconds = 0.0
@@ -267,11 +267,33 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	config.bot_nav = nav_on
 	config.map_ids = PackedStringArray([map_id])
 	config.seed_value = 20261012 + index * 7919
-	# For a measurement: the server's ceilings (a map asks for less on its own).
+	# A map asks for less on its own.
 	if OS.has_environment("PH_ROUND_SECONDS"):
 		config.round_seconds = float(OS.get_environment("PH_ROUND_SECONDS"))
 	if OS.has_environment("PH_HIDE_SECONDS"):
 		config.hide_seconds = float(OS.get_environment("PH_HIDE_SECONDS"))
+	return config
+
+
+## The cover-trace lines: how the hunters' paths reach the best places, and the ones missed.
+func _trace_cover(game: PhGame, top: PackedVector3Array, props: Array[StringName], visited: Dictionary, closest: Dictionary) -> void:
+	if game.bots.nav.is_ready() and top.size() > 0:
+		var hs := game.bots.nav.closest((game.map.spawn("hunters", 0) as Array)[0])
+		var sum := 0.0
+		for n in range(top.size()):
+			sum += game.bots.nav.path_length(hs, top[n])
+		print("    cover geometry: %d hunters, mean path to the %d best places %.1f m" % [BOTS - props.size(), top.size(), sum / float(top.size())])
+	for n in range(top.size()):
+		if not visited.has(n):
+			var path := INF
+			if game.bots.nav.is_ready():
+				path = game.bots.nav.path_length(game.bots.nav.closest((game.map.spawn("hunters", 0) as Array)[0]), top[n])
+			print("    cover missed: %s closest hunter eye %.1f m, path from hunter spawn %.1f m" % [top[n].snapped(Vector3.ONE * 0.1), float(closest.get(n, INF)), path])
+
+
+## One round on [param map_id]: eight stand-ins from a fresh world, played to its end.
+func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
+	var config := _round_config(map_id, index)
 
 	var game := PhGame.new()
 	game.name = "Bots_%d" % index
@@ -401,19 +423,8 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 					str(Vector2(p.controller.state.position.x, p.controller.state.position.z).snapped(Vector2.ONE))]
 			print(line)
 
-	if trace and game.bots.nav.is_ready() and top.size() > 0:
-		var hs := game.bots.nav.closest((game.map.spawn("hunters", 0) as Array)[0])
-		var sum := 0.0
-		for n in range(top.size()):
-			sum += game.bots.nav.path_length(hs, top[n])
-		print("    cover geometry: %d hunters, mean path to the %d best places %.1f m" % [BOTS - props.size(), top.size(), sum / float(top.size())])
 	if trace:
-		for n in range(top.size()):
-			if not visited.has(n):
-				var path := INF
-				if game.bots.nav.is_ready():
-					path = game.bots.nav.path_length(game.bots.nav.closest((game.map.spawn("hunters", 0) as Array)[0]), top[n])
-				print("    cover missed: %s closest hunter eye %.1f m, path from hunter spawn %.1f m" % [top[n].snapped(Vector3.ONE * 0.1), float(closest.get(n, INF)), path])
+		_trace_cover(game, top, props, visited, closest)
 
 	var sum_last := 0.0
 	var found := 0
