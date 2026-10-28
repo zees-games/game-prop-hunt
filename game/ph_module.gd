@@ -1,12 +1,8 @@
-extends DotGameModule
-
-const PhNetBridge := preload("net/ph_net_bridge.gd")
-const PhServices := preload("ph_services.gd")
+extends "ph_module_commands.gd"
 
 const PhAmbience := preload("ph_ambience.gd")
 ## The workbench kind of the ambience cvar set (saved to cfg/.../ambience/server.yml).
 const AMBIENT_KIND := "ambience"
-const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhAvatars := preload("ph_avatars.gd")
 const PhVote := preload("ph_vote.gd")
@@ -220,31 +216,7 @@ func _game_load() -> DotResult:
 	if world.loadout_command != null:
 		world.loadout_command.call(&"bind", self)
 
-	# sv_falldamage and its tunables: dot-combat's, on by default in this game. Server-side
-	# only, so no REPLICATED: the damage is the server's and arrives as health.
-	var _fall := world.fall_rules.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
-
-	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
-	# held. REPLICATED, because each client places its own camera under it.
-	var _views := world.view_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's reaction
-	# from them; REPLICATED, because the clients draw the bodies (see the client's netcode).
-	var _ragdolls := world.ragdoll_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
-	# server took away.
-	var _toys := world.toy_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
-	)
-
-	# ph_ambient*: REPLICATED, because each client plays its own ambience under the server's intent; the directory cvar stays local.
-	var _ambient := world.ambient_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
-	)
+	_bind_rule_cvars(world)
 	_bind_config(world)
 
 	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
@@ -288,6 +260,35 @@ func _game_load() -> DotResult:
 
 	log_info("the map is up", world.describe())
 	return DotResult.success(null)
+
+
+## The rule sets of the player, body and ambience addons, each as cvars: server-side only, or REPLICATED where a client draws or predicts under it.
+func _bind_rule_cvars(world: PhGame) -> void:
+	# sv_falldamage and its tunables: dot-combat's, on by default in this game. Server-side
+	# only, so no REPLICATED: the damage is the server's and arrives as health.
+	var _fall := world.fall_rules.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
+
+	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
+	# held. REPLICATED, because each client places its own camera under it.
+	var _views := world.view_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's reaction
+	# from them; REPLICATED, because the clients draw the bodies (see the client's netcode).
+	var _ragdolls := world.ragdoll_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
+	# server took away.
+	var _toys := world.toy_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+	)
+
+	# ph_ambient*: REPLICATED, because each client plays its own ambience under the server's intent; the directory cvar stays local.
+	var _ambient := world.ambient_rules.bind_cvars(
+		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+	)
 
 
 ## The maps the SERVER names for this game, fetched and added to the catalogue. Returns how
@@ -651,19 +652,8 @@ func _wire_chat() -> void:
 	services.connect("command_entered", _on_chat_command)
 
 
-## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
-##
-## [b]Opened [member PhVote.open_after_sec] into the last round on a map and applied when that
-## round ends[/b]; see [code]game/ph_vote.gd[/code]. A server owner turns it off or reshapes it
-## in `user://cfg/prophunt_vote.json` or `game.yml`'s `metadata: map_vote:`, keyed as dot-vote's
-## [DotVoteRules]. A vote that cannot be built is a WARN and the rotation alone, never a server
-## that will not start.
-func _build_vote(world: PhGame) -> void:
-	if world.catalogue == null:
-		return
-
-	vote = PhVote.new()
-	vote.name = "MapVote"
+## What the ballot asks the game: the maps, the voters, who may change the map and where a ballot goes.
+func _set_vote_hooks(world: PhGame) -> void:
 	vote.commands_spec_fn = world.rotation_commands
 	vote.in_rotation_fn = func(id: StringName) -> bool: return world.catalogue.in_rotation(id)
 	vote.rotation_order_fn = func() -> Array: return world.catalogue.rotation_order
@@ -732,6 +722,22 @@ func _build_vote(world: PhGame) -> void:
 	# "cannot tell", which holds as before.
 	vote.round_in_progress_fn = func() -> bool:
 		return world.match_node == null or world.match_node.is_live()
+
+
+## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
+##
+## [b]Opened [member PhVote.open_after_sec] into the last round on a map and applied when that
+## round ends[/b]; see [code]game/ph_vote.gd[/code]. A server owner turns it off or reshapes it
+## in `user://cfg/prophunt_vote.json` or `game.yml`'s `metadata: map_vote:`, keyed as dot-vote's
+## [DotVoteRules]. A vote that cannot be built is a WARN and the rotation alone, never a server
+## that will not start.
+func _build_vote(world: PhGame) -> void:
+	if world.catalogue == null:
+		return
+
+	vote = PhVote.new()
+	vote.name = "MapVote"
+	_set_vote_hooks(world)
 
 	add_child(vote)
 	var ready := vote.setup()
@@ -852,103 +858,6 @@ func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) ->
 		session.uid(), command, args, DotCmdContext.Source.CHAT
 	):
 		bridge.call("notice", peer_id, reply)
-
-
-func _cmd_wish(ctx: DotCmdContext, side: int) -> void:
-	var world := game as PhGame
-	if world == null or ctx.session == null:
-		ctx.reply("Only a player can choose a side.")
-		return
-	if not world.config.allow_side_choice:
-		ctx.reply("Sides are drawn on this server.")
-		return
-	world.wish_side(PhNetBridge.player_key(ctx.session.userid), side)
-	ctx.reply(
-		"You will be picked to hunt first." if side == PhGame.HUNTERS
-		else ("You will only hunt if nobody else can." if side == PhGame.PROPS else "Either side.")
-	)
-
-
-func _cmd_say(ctx: DotCmdContext) -> void:
-	var text := ctx.rest()
-
-	if text.strip_edges() == "":
-		ctx.reply("Say what?")
-		return
-
-	if services == null or services.get("chat") == null:
-		ctx.reply("This server has no chat.")
-		return
-
-	var announced: Variant = services.get("chat").call("announce", text, PhServices.CH_ALL)
-
-	if announced is DotResult and not (announced as DotResult).ok:
-		ctx.reply_error(announced)
-		return
-
-	ctx.reply("Said: %s" % text)
-
-
-func _cmd_status(ctx: DotCmdContext) -> void:
-	var world := game as PhGame
-
-	if world == null:
-		ctx.reply("No world.")
-		return
-
-	ctx.reply_lines(world.describe_lines())
-
-
-func _cmd_net(ctx: DotCmdContext) -> void:
-	if bridge == null:
-		ctx.reply("No bridge; this server is not replicating anything.")
-		return
-
-	ctx.reply_lines(bridge.call("describe_lines"))
-
-	if services != null:
-		ctx.reply_lines(services.call("describe_lines"))
-
-
-func _cmd_maps(ctx: DotCmdContext) -> void:
-	var world := game as PhGame
-
-	if world == null or world.catalogue == null:
-		ctx.reply("No world.")
-		return
-
-	ctx.reply_lines(world.catalogue.describe_lines())
-	ctx.reply("playing: %s" % str(world.map_doc.get("id", "-")))
-
-
-func _cmd_map(ctx: DotCmdContext) -> void:
-	var world := game as PhGame
-	var id := StringName(ctx.arg(0)) if ctx.argc() > 0 else &""
-
-	if world == null or world.catalogue == null:
-		ctx.reply("No world.")
-		return
-
-	if id == &"" or not world.catalogue.playable(world.config.map_ids).has(id):
-		ctx.reply("Which map? %s" % ", ".join(world.catalogue.playable(world.config.map_ids)))
-		return
-
-	world.next_map_id = id
-	ctx.reply("%s is next, from the end of this round." % String(id))
-
-
-func _cmd_taunts(ctx: DotCmdContext) -> void:
-	var world := game as PhGame
-
-	if world == null or world.taunts == null:
-		ctx.reply("No world.")
-		return
-
-	for id in world.taunt_ids():
-		var entry := world.taunts.entry(id)
-		ctx.reply("  %-18s %-20s %.1f s" % [String(id), str(entry.get("title", "")), float(entry.get("seconds", 0.0))])
-
-	ctx.reply(str(world.taunts.describe()))
 
 
 func _cmd_reload(ctx: DotCmdContext) -> void:
