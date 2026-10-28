@@ -19,10 +19,9 @@ var _rot_catalogue: DotMapCatalogue = null
 var _rot: DotMapRotation = null
 
 
-## Reads maps.yml (the game's shipped `res://maps.yml` under the server's
-## [member PhConfig.map_rotation_file], looked for in the `--config` directory too) and applies
-## it. A file that is present and unreadable is an ERROR and changes nothing: rotating every map
-## is a better failure than rotating none.
+## Reads maps.yml (`res://maps.yml` under [member PhConfig.map_rotation_file], or the `--config`
+## directory) and applies it. A present but unreadable file is an ERROR and changes nothing:
+## rotating every map is a better failure than rotating none.
 func load_rotation() -> DotResult:
 	var stem := config.map_rotation_file if config != null else ""
 	var dir := DotMapRotationFile.config_dir_arg()
@@ -86,17 +85,29 @@ func apply_rotation() -> void:
 
 	_rot = DotMapRotation.of(_rot_catalogue)
 	# An empty rotation plays every installed map: the same set as having no file.
-	rotation_file.fallback_in = func(_map: DotMapDef) -> bool: return true
+	rotation_file.fallback_in = _rotation_fallback
 	var _applied := rotation_file.apply(_rot)
-	var marks := {}
+	_rotation_marks = {}
 
 	for def in _rot_catalogue.maps:
-		marks[def.id] = def.in_rotation
+		_rotation_marks[def.id] = def.in_rotation
 
 	# Ids the mirror has not seen (a pack map subscribed since) are out of a file's rotation
 	# unless it matches them, which needs a re-apply; the next apply_rotation does that.
-	catalogue.in_rotation_fn = func(id: StringName) -> bool: return bool(marks.get(id, true))
+	catalogue.in_rotation_fn = _mark_in_rotation
 	catalogue.rotation_order = _rot.order.duplicate()
+
+
+## The marks [method apply_rotation] last computed, read through a method Callable: a lambda stored on the catalogue would retain this path-based script.
+var _rotation_marks := {}
+
+
+func _rotation_fallback(_map: DotMapDef) -> bool:
+	return true
+
+
+func _mark_in_rotation(id: StringName) -> bool:
+	return bool(_rotation_marks.get(id, true))
 
 
 ## Whether maps.yml's active rotation plays [param id]. A map the catalogue lacks is not.
