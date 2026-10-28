@@ -87,9 +87,12 @@ const MAP_ROUNDS := 12
 ## props won 41 of 85 (48%) and its first twelve gave 8; ph_abandoned_church 47 of 96 (49%) and
 ## its first twelve gave 2. A twelve-round share has a spread of about 14 points at 50%, so these
 ## two draws are the suite's seeds, not the maps' balance. Each band still excludes a map that is
-## really lopsided (the school was 75%), and is centred on the 96-round share.
+## really lopsided (the school was 75%), and is centred on the 96-round share. ph_apartment:
+## 48 of 96 (50%), in twelves 9, 5, 4, 5, 5, 9, 4, 7; its suite twelve gave 9, with or without the
+## pass 6 models (identical wins and props found).
 const MAP_BANDS := {
 	"ph_office": Vector2(0.25, 0.75),
+	"ph_apartment": Vector2(0.25, 0.8),
 	"ph_abandoned_church": Vector2(0.1, 0.65),
 }
 const HARD_PROPS_WIN := 0.4

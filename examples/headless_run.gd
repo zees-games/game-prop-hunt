@@ -1394,12 +1394,20 @@ func _test_bodies() -> void:
 		var bodies := ragdolls.live()
 		_check(bodies.size() == 1 and not person.figure.visible,
 			"and the client laid the body down from the figure, which is hidden", str(bodies.size()))
-		for i in 90:
-			await get_tree().physics_frame
+		# The reaction is seeded by the world's tick, which depends on how many physics frames the
+		# process frames above spanned, so a launch may still be airborne at 1.5 s: wait up to 6 s
+		# for the body to lie down rather than assume which fall was picked.
 		var down := bodies.size() == 1 and is_instance_valid(bodies[0])
 		var floor_y := person.controller.state.position.y
-		_check(down and bodies[0].centre().y < floor_y + 0.8 and bodies[0].lowest_point() > floor_y - 0.25,
-			"a second and a half on, the body lies on the floor: not standing, not through it",
+		var lies := false
+		for i in 360:
+			await get_tree().physics_frame
+			down = bodies.size() == 1 and is_instance_valid(bodies[0])
+			lies = down and bodies[0].centre().y < floor_y + 0.8 and bodies[0].lowest_point() > floor_y - 0.25
+			if i >= 89 and lies:
+				break
+		_check(lies,
+			"within six seconds the body lies on the floor: not standing, not through it",
 			str(bodies[0].describe()) if down else "gone")
 	else:
 		for k in 3:
