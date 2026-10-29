@@ -17,7 +17,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## nothing but the stand-ins the module seats itself.
 
 const SECTIONS := 14
-const CHECKS := 106
+const CHECKS := 107
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -275,9 +275,8 @@ func _test_a_round_runs() -> void:
 	var rounds: Array = []
 	game.round_over.connect(func(n: int, winner: int, why: String) -> void: rounds.append([n, winner, why]))
 
-	# Real time: the server ticks itself. The module tops the server up every two seconds. A
-	# round is three seconds of hiding and at most forty-five of seeking here: the stand-in
-	# hunter finds a prop or the clock gives it to the props.
+	# Real time: the server ticks itself and the module tops it up every two seconds; a round is
+	# three seconds of hiding and at most forty-five of seeking.
 	var until := Time.get_ticks_msec() + 75000
 
 	while Time.get_ticks_msec() < until and rounds.is_empty():
@@ -289,14 +288,14 @@ func _test_a_round_runs() -> void:
 		if (game.players[id] as PhPlayer).is_bot:
 			bots += 1
 
+	var landed := await _until(func() -> bool: return game.bots.nav.is_ready() and not game.bots.nav.is_baking(), 20.0)
+	_check(landed, "the async nav bake landed and the stand-ins have a mesh", "baking=%s" % game.bots.nav.is_baking())
 	_check(bots == game.config.minimum_players, "the module seated stand-ins up to the minimum", "%d" % bots)
 	_check(game.players_on(PhGame.HUNTERS).size() == 1, "and drew one of them to hunt")
 	_check(not rounds.is_empty(), "and a round was decided", str(rounds))
 	_check(not rounds.is_empty() and str(rounds[0][2]) != "", "with a sentence saying why", str(rounds))
-	# [b]A person takes a stand-in's place, and leaving gives it back[/b]: DotBotQuota's fill
-	# mode, the family's default. Driven by calling the roster check rather than waiting for
-	# its interval, with a person added through the bridge the way a test's player is (peer
-	# zero, not a stand-in), so the count is exact and nothing else moves under it.
+	# A person takes a stand-in's place and leaving gives it back (DotBotQuota fill mode). The
+	# roster check is called directly, with a person added through the bridge (peer zero).
 	var quota_module := _module()
 	var quota_bridge: Object = quota_module.get("bridge") if quota_module != null else null
 	_check(server.console.find_cvar("bot_quota") != null and server.console.find_cvar("bot_quota_mode") != null,

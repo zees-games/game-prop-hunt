@@ -145,6 +145,8 @@ func prepare_ahead() -> void:
 
 func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	_baked = key
+	_job = null
+	annotations = null
 	spots.clear()
 	_places.clear()
 	_nav_places = false
@@ -155,6 +157,7 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	var live := (game as Node).is_physics_processing()
 	if live:
 		var started := nav.bake_in_background(map, agent, 0, still, failed)
+		# Parse failures never reach `done`; _bake_failed ignores a failure it already logged.
 		if not started.ok:
 			failed.call(started)
 	else:
@@ -163,9 +166,14 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 
 
 func _bake_failed(res: DotResult, key: String, map_id: String) -> void:
-	if not res.ok and _baked == key:
+	if not res.ok and _baked == key and _surveyed != key:
 		_surveyed = key
 		DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": map_id, "why": res.error.message})
+
+
+## Drops a bake still in flight, so it cannot land on a map that has been freed.
+func release() -> void:
+	nav.clear()
 
 
 ## The survey comes a quarter second of game time after the first round tick, always the same tick.

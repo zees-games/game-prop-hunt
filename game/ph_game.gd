@@ -312,11 +312,10 @@ static func solo_map_dirs(subdir: String) -> PackedStringArray:
 
 
 func _exit_tree() -> void:
+	bots.release()
 	if register_service:
 		DotRegistry.unregister_instance(SERVICE, self)
 
-
-# --- Building ---------------------------------------------------------------
 
 ## Three layers: the building, the people, and the furniture.
 ##
