@@ -411,8 +411,8 @@ func _hear_the_world() -> void:
 	game.phase_changed.connect(_on_phase)
 	game.round_began.connect(func(n: int, _map: StringName) -> void: _on_round(n, true, 0))
 	game.round_over.connect(func(n: int, winner: int, why: String) -> void: _on_round(n, false, winner, why))
-	game.player_died.connect(func(id: StringName, by: StringName, why: StringName) -> void:
-		_on_death(_session(id), _session(by) if by != &"" else 0, why))
+	game.player_died.connect(func(id: StringName, by: StringName, why: StringName, weapon_id: StringName) -> void:
+		_on_death(_session(id), _session(by) if by != &"" else 0, why, weapon_id))
 	game.disguise_changed.connect(func(id: StringName) -> void:
 		var who: PhPlayer = game.players.get(id)
 		_on_disguise(_session(id), who != null and who.set_aside != null and not who.is_disguised()))
@@ -533,12 +533,12 @@ func _on_round(number: int, began: bool, winner: int, why: String = "") -> void:
 		chat.say_locally(why, Color(0.98, 0.86, 0.40))
 
 
-func _on_death(session_id: int, by: int, why: StringName) -> void:
+func _on_death(session_id: int, by: int, why: StringName, weapon_id: StringName = &"") -> void:
 	var who := _player_of(session_id)
 	var mine := session_id == _watch_id
 	var was_hunter := who != null and game.team_of(who.player_id) == PhGame.HUNTERS
 
-	_note_death(who, _player_of(by) if by != 0 else null)
+	_note_death(who, _player_of(by) if by != 0 else null, weapon_id)
 
 	if audio != null and who != null:
 		var _heard := audio.on_death(who.global_position, mine, was_hunter)
@@ -1400,7 +1400,7 @@ func _present_aim() -> void:
 			and player.is_alive() and not blind)
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
-		hud.set_aim(hands.aim_fraction() if hands != null else 0.0, hands != null and hands.is_scoped())
+		hud.follow_hands(hands)
 
 
 ## The last seconds of the hide, beeped.

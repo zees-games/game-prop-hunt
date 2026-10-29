@@ -313,7 +313,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	var died_at := {}
 	var decoy := {"hp": 0.0, "deaths": 0}
 	var board := {"ok": true}
-	game.player_died.connect(func(id: StringName, _by: StringName, why: StringName) -> void:
+	game.player_died.connect(func(id: StringName, _by: StringName, why: StringName, _weapon: StringName) -> void:
 		if OS.has_environment("PH_BOTS_TRACE"):
 			print("    died %s at %.1f s by %s (%s): %s" % [id, game.seek_elapsed, _by, why, (game.bots._state.get(_by, {}) as Dictionary).get("why", "")])
 		if game.team_of(id) == PhGame.PROPS:

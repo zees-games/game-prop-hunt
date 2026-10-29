@@ -43,7 +43,7 @@ signal round_changed(number: int, began: bool, winner: int, why: String)
 signal phase_received(phase: int)
 
 ## Somebody died, and what did it.
-signal death_received(player_id: int, by: int, why: StringName)
+signal death_received(player_id: int, by: int, why: StringName, weapon_id: StringName)
 
 ## Somebody was handed, or picked up, a weapon. The HUD names it.
 signal armed_received(player_id: int, weapon_id: StringName)
@@ -590,11 +590,11 @@ func _tell_every_disguise(peer_id: int) -> void:
 			_tell(peer_id, PhEvents.Kind.DISGUISE, _disguise_body(id))
 
 
-func _on_player_died(player_id: StringName, by: StringName, why: StringName) -> void:
+func _on_player_died(player_id: StringName, by: StringName, why: StringName, weapon_id: StringName) -> void:
 	var who: PhPlayer = game.players.get(player_id) if game != null else null
 	_broadcast(PhEvents.Kind.DEATH, PhEvents.write_death(
 		session_of(player_id), session_of(by) if by != &"" else 0, why,
-		who.death if who != null else null
+		who.death if who != null else null, weapon_id
 	))
 
 
@@ -1142,7 +1142,7 @@ func _on_event(message: DotNetMessage) -> void:
 				if fell != null and death.has("death"):
 					fell.death = death["death"]
 				death_received.emit(
-					int(death["player_id"]), int(death["by"]), death["why"]
+					int(death["player_id"]), int(death["by"]), death["why"], death["weapon_id"]
 				)
 		PhEvents.Kind.LAUNCH:
 			var launch := PhEvents.read_launch(reader)

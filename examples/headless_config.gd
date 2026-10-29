@@ -6,9 +6,10 @@ extends DotGameCheckSuite
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhEvents := preload("../game/net/ph_events.gd")
+const PhKillcam := preload("../game/ph_killcam.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
-const CHECKS := 36
+const CHECKS := 40
 
 
 func _ready() -> void:
@@ -50,6 +51,7 @@ func _run() -> void:
 
 	_layers()
 	_templates(binder)
+	_killcam_icon()
 
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
@@ -170,3 +172,22 @@ func _templates(binder: DotGameConfigBinder) -> void:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
 			stale.append(path)
 	_check(stale.is_empty(), "the shipped files match the config (run addons/dot_game/qa/dot_game_cfg_templates.gd)", ",".join(stale))
+
+
+## The killcam banner's weapon icon: DEATH carries the id, the moment keeps it, the banner draws it.
+func _killcam_icon() -> void:
+	var fatal := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, null, &"pistol")))
+	_check(bool(fatal["ok"]) and fatal.get("weapon_id", &"") == &"pistol", "a DEATH carries the weapon id")
+	var kc := PhKillcam.new()
+	add_child(kc)
+	kc.note_moment(&"a", "found", "Bo", &"pistol")
+	var moment := kc.buffer.last_event(&"moment")
+	_check(moment["data"].get("weapon_id", "") == "pistol", "the moment keeps the weapon id")
+	_check(kc.killcam.icon_provider.is_valid(), "the killcam has an icon provider")
+	var banner := DotKillcamBanner.new()
+	banner.icon_provider = kc.killcam.icon_provider
+	add_child(banner)
+	banner.present({"killer": "A", "weapon": "found", "weapon_id": "pistol"})
+	_check(banner.icon_rect.visible and banner.icon_rect.texture != null, "the banner shows the pistol's picture")
+	banner.free()
+	kc.free()

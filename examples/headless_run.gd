@@ -480,7 +480,7 @@ func _test_shots() -> void:
 	_stand_facing(hunter, Vector3(-6.0, 0.05, -2.0), Vector3(-6.0, 0.6, 2.0))
 
 	var died: Array = []
-	game.player_died.connect(func(id: StringName, by: StringName, why: StringName) -> void: died.append([id, by, why]))
+	game.player_died.connect(func(id: StringName, by: StringName, why: StringName, _weapon: StringName) -> void: died.append([id, by, why]))
 	var points := hunter.points
 	var hurt_before := prop.health.health
 
@@ -559,7 +559,7 @@ func _test_decoys() -> void:
 	var cost: Array = []
 	game.decoy_hit.connect(func(id: StringName, amount: float) -> void: cost.append(amount))
 	var died: Array = []
-	game.player_died.connect(func(id: StringName, by: StringName, why: StringName) -> void: died.append([id, why]))
+	game.player_died.connect(func(id: StringName, by: StringName, why: StringName, _weapon: StringName) -> void: died.append([id, why]))
 	var start := hunter.health.health
 
 	for i in range(TICK_RATE * 6):

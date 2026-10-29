@@ -138,11 +138,11 @@ func _portrait(atlas: String) -> Texture2D:
 
 ## A hider found is the moment, seen from the hunter who found them; anything else from the
 ## victim's own eyes.
-func _note_death(victim: PhPlayer, by: PhPlayer) -> void:
+func _note_death(victim: PhPlayer, by: PhPlayer, weapon_id: StringName = &"") -> void:
 	if killcam == null or victim == null:
 		return
 	if by != null and by != victim:
-		killcam.note_moment(by.player_id, "found", victim.display_name)
+		killcam.note_moment(by.player_id, "found", victim.display_name, weapon_id)
 	else:
 		killcam.note_moment(victim.player_id, "out")
 

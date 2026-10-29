@@ -84,7 +84,7 @@ signal world_rebuilt()
 signal round_over(number: int, winner: int, winner_name: String)
 signal phase_changed(phase: int)
 signal side_changed(player_id: StringName, side: int)
-signal player_died(player_id: StringName, by: StringName, why: StringName)
+signal player_died(player_id: StringName, by: StringName, why: StringName, weapon_id: StringName)
 
 ## Somebody's disguise changed: a new prop, their own face, a turn, a lock.
 signal disguise_changed(player_id: StringName)
@@ -2157,7 +2157,7 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	# How the body falls, picked once, here, and carried on DEATH to every client.
 	player.death = decide_death(player, damage)
 
-	player_died.emit(player.player_id, by, why)
+	player_died.emit(player.player_id, by, why, damage.weapon_id)
 	DotLog.debug(CHANNEL, "player died", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 

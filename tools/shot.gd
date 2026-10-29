@@ -282,6 +282,7 @@ func _view_killcam(game: PhGame, local: PhPlayer) -> void:
 	var _dressed := game.disguise_as(prey.player_id, _as)
 	await _seconds_of(4.0)
 	var found := DotDamage.make(local.entity_id, prey.entity_id, prey.health.max_health * 10.0, null)
+	found.weapon_id = &"pistol"
 	found.tick = game._tick
 	var _hit: Variant = game.combat.apply_damage(found)
 	game._decide(PhGame.HUNTERS, "the hunters found every prop")
