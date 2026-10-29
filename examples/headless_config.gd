@@ -7,9 +7,10 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhEvents := preload("../game/net/ph_events.gd")
 const PhKillcam := preload("../game/ph_killcam.gd")
+const _SUBJECT := preload("res://examples/killcam_subject.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
-const CHECKS := 40
+const CHECKS := 41
 
 
 func _ready() -> void:
@@ -183,11 +184,20 @@ func _killcam_icon() -> void:
 	kc.note_moment(&"a", "found", "Bo", &"pistol")
 	var moment := kc.buffer.last_event(&"moment")
 	_check(moment["data"].get("weapon_id", "") == "pistol", "the moment keeps the weapon id")
-	_check(kc.killcam.icon_provider.is_valid(), "the killcam has an icon provider")
-	var banner := DotKillcamBanner.new()
-	banner.icon_provider = kc.killcam.icon_provider
-	add_child(banner)
-	banner.present({"killer": "A", "weapon": "found", "weapon_id": "pistol"})
-	_check(banner.icon_rect.visible and banner.icon_rect.texture != null, "the banner shows the pistol's picture")
-	banner.free()
+	var provider: Callable = kc.killcam.icon_provider
+	_check(provider.call("pistol") != null and provider.call("") == null and provider.call("no_such_weapon") == null, "the icon provider gives a picture for a known weapon and none for \"\" or an unknown one")
+	var seen: Array[String] = []
+	kc.killcam.icon_provider = func(id: String) -> Texture2D:
+		seen.append(id)
+		return provider.call(id)
+	var subject := Node.new()
+	subject.set_script(_SUBJECT)
+	kc.now_fn = func() -> float: return 10.0
+	kc.player_for_fn = func(_key: StringName) -> Node: return subject
+	kc.buffer.clear()
+	kc.buffer.push_frame(5.0, {})
+	kc.note_moment(&"a", "found", "Bo", &"pistol")
+	_check(kc.round_ended() and kc.killcam.banner != null, "round_ended starts the killcam from the noted moment")
+	_check(seen == ["pistol"] and kc.killcam.banner.icon_rect.visible and kc.killcam.banner.icon_rect.texture != null, "round_ended hands the moment's weapon id to the banner, which shows its picture", str(seen))
+	subject.free()
 	kc.free()
