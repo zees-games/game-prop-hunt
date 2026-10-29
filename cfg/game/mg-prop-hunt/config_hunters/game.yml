@@ -2,9 +2,9 @@
 # an operator overrides in cfg/server/game/mg-prop-hunt/config_hunters/game.yml. Layers: defaults < this < env < argv.
 
 # --- Hunters
-# The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first.
+# The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first. One per slot: a weapo...
 # hunter_weapons: ["smg", "pistol", "hatchet"]
-# What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the grenades (`ph_loa...
+# What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the optional grenade ...
 # hunter_choices: ["smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol", "frag", "sticky"]
 # Whether a shot hurts a player of the shooter's own side (hunters shooting hunters, props shooting props).
 # friendly_fire: false

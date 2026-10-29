@@ -3,30 +3,9 @@ extends DotNetBehaviour
 const PhNetCommand := preload("ph_net_command.gd")
 const PhPlayer := preload("../ph_player.gd")
 
-## What a networked player replicates: the movement state, their health, their weapons, and
-## the numbers a hiding prop needs about itself.
-##
-## [b]The movement half is dot-player-controller's own table and is not written here.[/b]
-## [DotFpsNetSync.state_specs] is what the controller says its state is, in the
-## quantisation it says it wants; a game that listed the fields itself would be a second
-## copy to drift — and the type names in that table are STRINGS precisely so the addon can
-## describe a dot-net layout without naming dot-net.
-##
-## [b]The game fields are not derivable from the movement.[/b] Health decides whether a body
-## is drawn at all; sitting a round out and being given away by the beacon are the server's
-## decisions about a player, and a client that worked them out for itself would be running a
-## second copy of the rules.
-##
-## [b]What somebody is hiding as is deliberately NOT here either.[/b] It changes when a prop
-## decides, a few times a round, and travels as a reliable `DISGUISE` event that also changes
-## the hull; a per-tick field would be sent thirty times a second to carry it, and a lost
-## snapshot would leave a client sweeping last disguise's capsule.
-##
-## [b]Which side somebody is on is deliberately NOT here.[/b] It changes once a round at
-## most, and a per-tick field for it would send the same three bits sixty-four times a
-## second for ever to carry a fact that arrives reliably in a JOIN and a TEAM. The rule this
-## game follows: a per-tick property for what changes per tick, an event for what changes on
-## a decision.
+## What a networked player replicates: the movement state, health, weapons, and the numbers a hiding prop needs about itself.
+## The movement half is dot-player-controller's [DotFpsNetSync.state_specs], not copied here; its type names are strings so the addon can describe a layout without naming dot-net.
+## Disguise and side are NOT per-tick fields: they change a few times a round and travel as reliable `DISGUISE`, JOIN and TEAM events (a lost snapshot would leave a client sweeping the old capsule).
 
 ## Somebody this client is watching used their weapon, [param times] times since the last
 ## snapshot. What a game draws a muzzle flash from.
@@ -44,11 +23,7 @@ var net_flags: int = 0
 var net_modifiers: int = 0
 
 ## Hit points, and the one field with a hard cap on the wire.
-##
-## [b]Sent against 0..1000 rather than against the player's own maximum.[/b] A server that
-## raised `player_health` mid-round would otherwise change what every previously sent number
-## MEANT, which is the quantisation version of the map-size bug: the value does not get less
-## precise, it becomes a different value.
+## Sent against 0..1000 rather than the player's own maximum: raising `player_health` mid-round would otherwise change what every earlier number MEANT.
 var net_health: float = 100.0
 
 ## What full health is: a person's, or the prop they are. For the HUD, which shows how much a
@@ -69,18 +44,9 @@ var net_reveal_wait: int = 0
 ## Sitting this round out, having joined after it started.
 var net_watching: bool = false
 
-# --- The weapons, which only hunters have -----------------------------------
 #
-# [b]Seven fields, and the pack's own `all_specs()` names all of them.[/b] GDScript has no
-# dynamic properties, so a spec table that says what to send needs a variable per entry
-# declared by hand — and the one call a game should make is `ZeeWeaponNet.all_specs()`,
-# because concatenating dot-weapon's three with the pack's four by hand is the same work
-# and one more place to forget the second half. Forgetting it presents as weapons that are
-# silent for everybody except the person holding them, which is what game-playground
-# shipped.
-#
-# The magazine and the reserve are `owner_only`: exact ammunition is information an opponent
-# should not have, and dot-combat makes the same decision about the same two numbers.
+# Seven fields, and the call a game should make is the pack's `ZeeWeaponNet.all_specs()`; concatenating by hand and forgetting the pack's half
+# presents as weapons silent for everybody but the holder. Magazine and reserve are `owner_only`: exact ammunition is information an opponent should not have.
 
 var net_slot: int = 0
 var net_magazine: int = 0
@@ -90,7 +56,6 @@ var net_fire_kind: int = 0
 var net_reloading: bool = false
 var net_switching: bool = false
 
-# --- An administrator's marks, from the live tools ---------------------------
 
 ## `PhPlayer.blinded`. Owner only: see [method _register_net_vars].
 var net_blind: bool = false
@@ -158,20 +123,9 @@ func _register_net_vars() -> void:
 		if bool(spec["owner_only"]):
 			var _owner := declaration.to_owner_only()
 
-	# [b]Per-player state rather than an event, and that is what makes both of these survive
-	# what an event does not.[/b] A client that joins after the admin typed `beacon`, a
-	# snapshot lost on the way, a field re-laid at the top of a round: each is a baseline the
-	# next snapshot corrects, where an event sent once is simply missed. Two bits, and nothing
-	# at all on a tick where neither changed.
-	#
-	# The blind goes to its owner alone. Nobody else's screen changes, and an opponent who
-	# received it would know the moment somebody could not see — the same reason the magazine
-	# and the reserve above are the owner's.
-	#
-	# [b]No relevance change for a beacon, where game-arena makes one.[/b] Every player here
-	# is already always relevant (`PhNetBridge`: a map is a few rooms), so a beacon reaches
-	# every client however far away they are without asking — and a beacon turned OFF that
-	# set `always_relevant` back to false would take the player out of everybody's snapshot.
+		# Per-player state rather than an event, so a late joiner, a lost snapshot or a re-laid field is corrected by the next snapshot where an event is missed.
+		# The blind goes to its owner alone: an opponent who received it would know the moment somebody could not see.
+		# No relevance change for a beacon: every player is already always relevant (`PhNetBridge`), and turning `always_relevant` off would drop the player from snapshots.
 	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only()
 	replicate(&"net_beacon", DotNetVar.Type.BOOL)
 	replicate(&"net_marked", DotNetVar.Type.BOOL)
@@ -189,10 +143,8 @@ func _net_apply_input(input: DotNetInput, _tick: int) -> void:
 			player.wanted_slot = command.slot
 
 
-## On the authority the whole game ticks as one — every player moves, then the shots, the
-## taunts and the round are decided — so the first behaviour through drives the whole world and
-## the rest find it done. On a predicting client there is one predicted player, and simulating
-## it is the whole of what a client may compute.
+## On the authority the whole game ticks as one, so the first behaviour through drives the world and the rest find it done.
+## On a predicting client only the one predicted player is simulated, which is all a client may compute.
 func _net_simulate(tick: int, delta: float) -> void:
 	if player == null:
 		return
@@ -249,32 +201,15 @@ func _net_state_applied(tick: int) -> void:
 	DotFpsNetSync.push(self, player.controller.state)
 	_adopt()
 
-	# NOT the node, on a predicted entity: `receive_snapshot` calls this BEFORE the
-	# predictor reconciles, and reconcile's first act is to read the node as "what the
-	# client is showing". Moving it here makes the measured error the whole replay distance,
-	# and the correction rate then reads as if every snapshot snapped. Two games in this
-	# family shipped that line.
-	#
+		# NOT the node, on a predicted entity: `receive_snapshot` runs BEFORE the predictor reconciles, which reads the node as "what the client is showing".
+		# Moving it here makes the measured error the whole replay distance, so every snapshot reads as a snap.
 	if identity == null or not identity.is_predicted():
 		player.global_position = player.controller.state.position
 
 
 ## A teleport is not a movement, so the interpolator must not draw one.
-##
-## [b]A round start moves everybody across the map in one tick, and a watcher saw them
-## fly there.[/b] mg-smash-copter's finding. The interpolator blends between the two snapshots
-## either side of the render time, and when those are "where they were found" and "at the
-## start" the blend is a body sweeping across the map for a snapshot interval.
-##
-## So the server counts the times it PUT this player somewhere (`PhPlayer.place_at`), the
-## count replicates, and a mirror that sees it change drops the interpolator's track for this
-## entity before the new snapshot is added to it. A track with one sample answers with that
-## sample, so the body appears in its corner, one render delay early, rather than crossing
-## the sky to get there. Here, before the push, because this hook runs inside the snapshot
-## read and the manager adds the snapshot's values to the track just after it.
-##
-## Not on the predicted entity: nothing interpolates that, and its own camera is moved by
-## the prediction's rewind.
+## The server counts the times it PUT this player somewhere (`PhPlayer.place_at`); a mirror seeing it change drops the interpolator's track before the new snapshot is added,
+## or a round start would show a body sweeping across the map. Not on the predicted entity: nothing interpolates that.
 func _forget_the_path() -> void:
 	if identity == null or identity.is_authoritative or identity.is_predicted():
 		_seen_warp = net_warp
@@ -324,19 +259,8 @@ func _adopt() -> void:
 
 
 ## What a watcher does with somebody else's weapon state.
-##
-## [b]A counter, never an event per shot.[/b] An RPC per shot needs a reliable channel for
-## something worthless if it arrives late, costs a packet per shot per watcher, and
-## desynchronises from the state it belongs with — so a watcher can see the muzzle flash of
-## a weapon the same snapshot says has been holstered. A four-bit counter inside the
-## snapshot cannot do any of those: a watcher who missed a snapshot sees it jump by two and
-## plays one flash instead of two, which is the correct amount of wrong.
-##
-## [b]No world model is handed to `ZeeWeaponNet.apply`[/b], because the hand it would hang
-## from belongs to the figure, which is built lazily, rebuilt on a side change and absent on
-## a server. The answer is written onto the player instead — the slot, the switch and the
-## uses since the figure last looked — and `PhPlayer.present_body` hands it to the figure on
-## the frame it is drawn. The same counter also says `weapon_used`, which is the report.
+## A four-bit counter in the snapshot, never an event per shot: an RPC per shot costs a packet each and desynchronises from the state it belongs with, and a missed snapshot plays one flash instead of two.
+## No world model goes to `ZeeWeaponNet.apply` (the figure is built lazily and absent on a server); the answer is written onto the player and `PhPlayer.present_body` hands it over.
 func _apply_weapons() -> void:
 	var answer := ZeeWeaponNet.apply(self, null, _seen_fire_seq)
 	_seen_fire_seq = int(answer["seq"])

@@ -1,20 +1,9 @@
 extends DotConfig
 
-## Every number this game has, layered like every other [DotConfig] in the family:
-## [code]exported defaults < JSON file < environment < command line[/code].
-##
-## [b]Metres and seconds.[/b] The maps are documents in the same units (see [PhMapDoc]), so a
-## length a mapper writes and a length this file tunes against are the same number.
-##
-## [b]Every rule the brief named is here, and its default is the brief's.[/b] Which side a
-## player is on and how hunters are chosen, how long the props get to hide, what showing your
-## face pays, when a taunt is forced, when the last props are given away, what shooting the
-## furniture costs a hunter: a server owner changes any of them in `cfg/game/mg-prop-hunt/config_<round|props|hunters|maps>/game.yml`
-## (or `cfg/server/...`), `user://cfg/prophunt.json`, an environment variable (`PH_HIDE_SECONDS`), a
-## flag (`--ph-hide-seconds`), the `ph_<field>` cvar or the workbench. All of that is
-## [DotGameConfigBinder]; every field here is reachable and an unknown key stops a dedicated boot.
+## Every number this game has, layered like every [DotConfig]: [code]exported defaults < JSON file < environment < command line[/code].
+## Metres and seconds, the units the maps use (see [PhMapDoc]); every field is a `ph_<field>` cvar, `PH_*` variable, `--ph-*` flag and workbench setting.
+## All of that is [DotGameConfigBinder], and an unknown key stops a dedicated boot.
 
-# --- The round -------------------------------------------------------------
 
 @export_group("The round")
 
@@ -41,7 +30,6 @@ extends DotConfig
 ## [b]The props, because surviving the clock is their whole objective.[/b]
 @export_enum("draw", "props", "hunters") var timeout_winner: int = 1
 
-# --- The sides -------------------------------------------------------------
 
 @export_group("The sides")
 
@@ -60,7 +48,6 @@ extends DotConfig
 ## first, and those who asked to stay a prop only to fill the round.
 @export var allow_side_choice: bool = true
 
-# --- Hiding ----------------------------------------------------------------
 
 @export_group("Hiding")
 
@@ -91,7 +78,6 @@ extends DotConfig
 ## bottle). The hull is the leant box's, so it never goes under the floor.
 @export_range(0.0, 180.0, 1.0) var max_tilt: float = 180.0
 
-# --- Taunts ----------------------------------------------------------------
 
 @export_group("Taunts")
 
@@ -118,41 +104,30 @@ extends DotConfig
 ## Metres a taunt carries.
 @export_range(5.0, 300.0, 1.0) var taunt_range: float = 60.0
 
-# --- Giving the last props away ---------------------------------------------
 
 @export_group("The beacon")
 
 ## Every prop still alive is beaconed once this few are left. 0 never.
 @export_range(0, 32, 1) var beacon_props_left: int = 1
 
-## Every prop still alive is beaconed once this few seconds are left. 0 never, the default:
-## with it at 30 the stand-in props won 4 rounds in 20 at medium (94 of 100 found), and with it
-## off 11 in 24, because every hunter there is by then walks to every prop still in, and a
-## round the props had held for four and a half minutes was lost in the last half minute (as
-## game-hide-n-seek found). The last prop's beacon ([member beacon_props_left]) is what ends a
-## round nobody can find anybody in.
+## Every prop still alive is beaconed once this few seconds are left; 0 never, the default.
+## At 30 the stand-in props won 4 rounds in 20, and off 11 in 24, because by then every hunter walks to every prop still in.
+## The last prop's beacon ([member beacon_props_left]) is what ends a round nobody can find anybody in.
 @export_range(0.0, 600.0, 1.0) var beacon_seconds_left: float = 0.0
 
 ## Seconds between a beacon's pings.
 @export_range(0.25, 10.0, 0.25) var beacon_period: float = 2.0
 
-# --- Hunters ---------------------------------------------------------------
 
 @export_group("Hunters")
 
 ## The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first.
-##
-## [b]One per slot.[/b] A weapon takes the slot its document names and a second one in that slot
-## replaces the first: the old default ("smg", "shotgun", "hatchet") put the SMG and the shotgun
-## both in slot 3, so a hunter carried a shotgun and a hatchet and keys 1-3 had one empty. The
-## defaults are the hatchet (1), the pistol (2) and the SMG (3), the keys' order; the shotgun is
-## a primary, so it replaces the SMG, not joins it. `PhGame._arm_hunters` warns of a clash.
+## One per slot: a weapon takes the slot its document names and a second in that slot replaces the first, so the defaults
+## are the hatchet (1), pistol (2) and SMG (3), the keys' order. `PhGame._arm_hunters` warns of a clash.
 @export var hunter_weapons: PackedStringArray = PackedStringArray(["smg", "pistol", "hatchet"])
 
-## What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the
-## grenades (`ph_loadout.gd`: the grenade slot is optional and empty by default);
-## [member hunter_weapons]' primary and sidearm are the defaults and are always offered. An owner
-## narrows or locks it with dot-loadout's `mp_loadout_*` cvars.
+## What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the optional grenade (`ph_loadout.gd`).
+## [member hunter_weapons]' primary and sidearm are the defaults and always offered; an owner narrows or locks it with `mp_loadout_*`.
 @export var hunter_choices: PackedStringArray = PackedStringArray([
 	"smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol", "frag", "sticky",
 ])
@@ -176,7 +151,6 @@ extends DotConfig
 ## vanishes. A person's body (a hunter, a prop out of disguise) is a ragdoll either way.
 @export_enum("burst", "topple", "vanish") var prop_death: int = 0
 
-# --- Points ----------------------------------------------------------------
 
 @export_group("Points")
 
@@ -189,7 +163,6 @@ extends DotConfig
 ## Points to every prop still alive when the round ends.
 @export_range(0, 100, 1) var survive_points: int = 5
 
-# --- The players -----------------------------------------------------------
 
 @export_group("The players")
 
@@ -209,7 +182,6 @@ extends DotConfig
 @export_range(0.0, 20.0, 0.1) var stop_speed: float = 2.5
 @export_range(0.1, 1.0, 0.01) var crouch_speed_scale: float = 0.45
 
-# --- The maps --------------------------------------------------------------
 
 @export_group("The maps")
 
@@ -225,17 +197,13 @@ extends DotConfig
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
-## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the game's own
-## shipped `res://maps.yml` (dot-map's `DotMapRotationFile`: named rotations, `random` or
-## `cycle`, wildcards, command names). Empty, or no such file, rotates every map. A map the
-## active rotation leaves out stays installed (`ph_map <id>` queues it); it is only never drawn
-## or balloted. `sv_map_rotation_file`.
+## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (dot-map's `DotMapRotationFile`).
+## Empty, or no such file, rotates every map; one the rotation leaves out stays installed (`ph_map <id>` queues it) but is never drawn or balloted. `sv_map_rotation_file`.
 @export var map_rotation_file: String = "cfg/maps.yml"
 
 ## Seed every random choice is drawn from: the map, the hunters, the bots.
 @export var seed_value: int = 20261009
 
-# --- Bots ------------------------------------------------------------------
 
 @export_group("Bots")
 
@@ -245,10 +213,8 @@ extends DotConfig
 # How a stand-in hunter turns, aims and how quickly it fires are dot-bot's `bot_*` settings,
 # shared by every game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...).
 
-## How much a stand-in hunter doubts a piece of furniture it has no other reason to doubt, in
-## hundredths: the base its suspicion grows from (a piece alone of its kind, one it remembers
-## was not there, one tilted, one near a taunt add to it). 0 tests nothing without a reason;
-## more tests more furniture and pays more decoy penalty. See `ph_bots.gd`.
+## How much a stand-in hunter doubts a piece of furniture it has no other reason to doubt, in hundredths: the base its suspicion grows from.
+## 0 tests nothing without a reason; more tests more furniture and pays more decoy penalty. See `ph_bots.gd`.
 @export_range(0.0, 100.0, 1.0) var bot_suspicion: float = 12.0
 
 ## Seconds into the hide before a stand-in prop puts its disguise on (the piece it is walking to
@@ -263,10 +229,8 @@ extends DotConfig
 ## Metres a stand-in prop's move to another place may reach.
 @export_range(2.0, 60.0, 0.5) var bot_relocate_range: float = 12.0
 
-## Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints):
-## props hide beside furniture of their size where it is tucked in and out of sight, hunters
-## sweep the best spots and the chokepoints. Off is the first way: a place beside each piece of
-## furniture, scored by sight lines alone. See `ph_bots.gd`.
+## Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints) to hide and sweep.
+## Off scores a place beside each piece of furniture by sight lines alone. See `ph_bots.gd`.
 @export var bot_nav: bool = true
 
 ## With `bot_nav`: how much of the annotated map a stand-in hunter knows, 0..1 (at least its own
@@ -277,14 +241,12 @@ extends DotConfig
 ## Metres from a piece of furniture a spot may be and still be "beside" it, for a stand-in prop.
 @export_range(0.3, 4.0, 0.1) var bot_beside: float = 1.3
 
-# --- Watching --------------------------------------------------------------
 
 @export_group("Watching")
 
 ## Who somebody who is out may watch: 0 anybody, 1 their own side, 2 nobody.
 @export_enum("anybody", "own side", "nobody") var spectate_camera: int = 0
 
-# --- Progress --------------------------------------------------------------
 
 @export_group("Progress")
 

@@ -4,27 +4,14 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhMapDoc := preload("../game/ph_map_doc.gd")
 
-## Every map the game can be sent, built the way a server builds it and looked over for the
-## mistakes a map document makes without any error: a spawn inside a wall or over nothing, a
-## prop the catalogue does not have (built as nothing), a prop sunk into a wall or floating
-## over the floor, too few things to hide as, and a document too big to send.
-##
-## [b]Why this exists apart from `headless_run`.[/b] The maps are generated in
-## mg-prop-hunt-maps by `tools/build_maps.py`, a few hundred boxes and props each, and none of
-## those mistakes stops a round: a prop floating a hand's width over a table is a prop every
-## hunter shoots first, and a spawn inside a locker is a player stuck for the round. The
-## renders find the ugly ones; this finds the rest, on every map, every time.
-##
-## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
-## Adding a map adds a section and CHECKS_PER_MAP checks.
+## Every map the game can be sent, built as a server builds it and checked for what a map document gets wrong without any error: a spawn inside a wall or over nothing, an unknown prop (built as nothing), a prop sunk or floating, too few things to hide as, a document too big to send.
+## Apart from `headless_run` because none of those stops a round (a prop floating over a table is the one every hunter shoots first). Sections and checks are both counted; a map adds a section and CHECKS_PER_MAP checks.
 
 const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church", "ph_abandoned_hotel", "ph_elementary_school", "ph_autumngetaway", "ph_bank", "ph_volcano", "ph_westerncity", "ph_gas_station", "ph_bikinibottom", "ph_swimmingpool", "ph_restaurant_os", "ph_oceanwaves", "ph_midwestapartment", "ph_cyber_dinner", "ph_islandhouse"]
 const CHECKS_PER_MAP := 11
 
-## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not
-## linked in (CI, which clones this repository alone). As mg-deathrun's headless_courses
-## does: the delivered maps are checked wherever they are present, which is every machine
-## that has run dot-bootstrap. Sections and checks are counted against this list.
+## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not linked in (CI clones this repository alone).
+## Sections and checks are counted against this list.
 var _maps: Array = []
 
 ## A person's capsule, for "is this spawn clear".
@@ -266,10 +253,8 @@ func _world(id: StringName, drawn := false) -> PhGame:
 	return game
 
 
-## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing in
-## `Drawn` (batched into chunks) and its shapes in `Solid` and `Furniture`, so the audit is the
-## lenient one (a mesh that merely touches a shape passes); [method _partly_covered] is the
-## stricter half for furniture, which a hunter or a disguised prop walks into.
+## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing in `Drawn` and its shapes in `Solid` and `Furniture`,
+## so the audit is the lenient one (a touching mesh passes); [method _partly_covered] is the stricter half for furniture a hunter or disguised prop walks into.
 func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	var drawn := await _world(id, true)
 	var res := DotCollisionAudit.audit(drawn.map, true)

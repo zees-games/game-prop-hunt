@@ -2,30 +2,16 @@ extends RefCounted
 
 const PhPaths := preload("ph_paths.gd")
 
-## The props a map is furnished with and a player may hide as: the catalogue that
-## `tools/measure_props.gd` measured out of the vendored models.
-##
-## [b]A size per prop, read from a file, on every machine.[/b] A disguise's hull, its health
-## and its hitbox are all functions of the prop's size (see [DotPropDisguise]), and two ends
-## computing them from two different measurements would be a predicting client sweeping a
-## capsule the server does not have. The server cannot measure anything — a headless process
-## has the meshes but no reason to load them — so the size is measured once, offline, into
-## `props/catalogue.json`, and everybody reads the number.
-##
-## [b]Drawn as parts, not as scenes.[/b] A map holds hundreds of props and nearly every one
-## is one of a few dozen models, so a client asks [method parts] for a model's meshes and
-## their transforms and the map draws each one with a [MultiMeshInstance3D]: a few dozen draw
-## calls for a whole school rather than one per chair. A disguised player is drawn with
-## [method instance], one scene, because it moves.
+## The props a map is furnished with and a player may hide as: the catalogue `tools/measure_props.gd` measured out of the vendored models.
+## One size per prop, read from `props/catalogue.json` on every machine: hull, health and hitbox derive from it ([DotPropDisguise]), and a headless server cannot measure meshes.
+## Drawn as parts, not scenes: [method parts] gives a model's meshes for a [MultiMeshInstance3D] per mesh (a few dozen draw calls per school); a disguised player uses [method instance] because it moves.
 
 const CHANNEL := "ph.props"
 
 const CATALOGUE := "res://props/catalogue.json"
 
-## The part-shaped collision `tools/measure_props.gd` cuts out of the models with dot-props'
-## [DotPropPieces]: a tree as a trunk, branches and leaf clumps, a table as a top and legs. A
-## map prop not in it collides as its box. A disguise never uses these: its hull and hitbox are
-## functions of the size.
+## The part-shaped collision `tools/measure_props.gd` cuts with dot-props' [DotPropPieces]: a tree as trunk, branches and leaf clumps, a table as top and legs.
+## A map prop not in it collides as its box; a disguise never uses these, its hull and hitbox being functions of the size.
 const PIECES := "res://props/pieces.json"
 
 ## id -> `{id, title, kit, model, scale, size: Vector3, offset: Vector3, disguise, pieces}`.

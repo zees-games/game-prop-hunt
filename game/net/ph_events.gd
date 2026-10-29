@@ -3,17 +3,8 @@ extends RefCounted
 const PhGame := preload("../ph_game.gd")
 
 ## The wire format for everything that is not a snapshot or an input.
-##
-## Encoders and decoders in pairs, and nothing checks that they are inverses for you —
-## `headless_net` round-trips every one of them, because this family has already shipped a
-## serialisation whose two ends never met: dot-moderation wrote `"voice muted"` and read
-## back a warning, and the one thing that addon existed for silently did nothing.
-##
-## [b]The map is a document, and it travels whole.[/b] `MAP` carries the normalised document
-## a server built (see [PhMapDoc]), deflated: a client builds the identical map from it and
-## needs no map files of its own. After that what changes about the world is who is hiding as
-## what — `DISGUISE`, a player and the disguise as a small dictionary — and a taunt. What a
-## snapshot carries is players.
+## Encoders and decoders in pairs that nothing checks are inverses: `headless_net` round-trips every one, as a serialisation whose ends never met has shipped before.
+## `MAP` carries the normalised document whole, deflated (see [PhMapDoc]); after that only `DISGUISE` and taunts change the world, and a snapshot carries players.
 
 enum Kind {
 	## Who you are, how fast the server ticks, and how long each part of a round is.
@@ -78,11 +69,7 @@ enum Ask {
 }
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.
-##
-## [b]A reader past its end returns plausible zeros rather than failing.[/b] dot-net shipped
-## with exhaustion that was not sticky, so a decoder that skipped this check got a
-## believable value for the field AFTER the overrun — and a truncated packet decodes as a
-## valid message about nothing.
+## A reader past its end returns plausible zeros, so a decoder skipping the check gets a believable value after the overrun and a truncated packet decodes as a valid message about nothing.
 const NAME_BYTES := 64
 const ID_BYTES := 64
 const TEXT_BYTES := 256
@@ -99,11 +86,7 @@ const DISGUISE_BYTES := 256
 const AVATAR_BYTES := 1024
 
 ## Where a body may be, in metres, on the wire.
-##
-## [b]Read from [PhGame], not written here.[/b] A quantised position is decoded against this
-## range, so two files holding two numbers do not lose precision — they put the thing
-## somewhere else. game-arena had exactly this, 256 against 128, in two files that each
-## looked right on its own.
+## Read from [PhGame], not written here: a quantised position decodes against this range, and two files holding two numbers put the thing somewhere else.
 const WORLD_EXTENT := PhGame.NET_WORLD_EXTENT
 const POS_BITS := 24
 
@@ -136,7 +119,6 @@ static func _w() -> DotNetWriter:
 ## How many movement floats the HELLO carries (PhConfig.movement_floats).
 const MOVE_COUNT := 9
 
-# --- Hello -----------------------------------------------------------------
 
 static func write_hello(
 	player_id: int,
@@ -190,13 +172,8 @@ static func read_hello(r: DotNetReader) -> Dictionary:
 	}
 
 
-# --- The map -----------------------------------------------------------------
-
 ## The map: [PhMapDoc.encode]'s bytes, as they are.
-##
-## [b]Opaque here, and checked at the other end.[/b] The client decodes and VALIDATES what it
-## is sent, so a document this build cannot read is refused with a sentence rather than half
-## built; this layer only has to carry bytes without cutting them.
+## Opaque here; the client decodes and VALIDATES it, so an unreadable document is refused with a sentence rather than half built.
 static func write_toys(map_id: StringName, net_ids: PackedInt64Array) -> PackedByteArray:
 	var w := _w()
 	w.write_string(String(map_id), ID_BYTES)
@@ -228,15 +205,9 @@ static func read_map(r: DotNetReader) -> Dictionary:
 	return {"encoded": encoded, "ok": r.ok() and not encoded.is_empty()}
 
 
-# --- Players ---------------------------------------------------------------
-
 ## A join, or a change to who somebody is: their name, their side, their avatar.
-##
-## [b]The avatar is the document, not the skin it picks[/b] — as JSON, capped at
-## [constant AVATAR_BYTES], and empty for the stock person. A skin index would be smaller,
-## and would make every client's reading of a document the server's, so a slot this game
-## adds later would need a new wire. [b]Appended, never inserted[/b]: a field before it
-## would move the team for every reader of the old layout.
+## The avatar is the document (JSON, capped at [constant AVATAR_BYTES], empty for the stock person), not a skin index, so a slot added later needs no new wire.
+## Appended, never inserted: a field before it would move the team for every reader of the old layout.
 static func write_join(
 	player_id: int, net_id: int, display_name: String, team: int,
 	avatar: DotAvatar = null
@@ -343,12 +314,8 @@ static func read_armed(r: DotNetReader) -> Dictionary:
 	return {"player_id": player_id, "weapon_id": StringName(weapon_id), "ok": r.ok()}
 
 
-# --- The round -------------------------------------------------------------
-
 ## The clock, and the numbers a client cannot count for itself.
-##
-## [b]`seek_elapsed` is the hunters' clock[/b], which a client shows; the phase's own clock
-## restarts at every phase.
+## `seek_elapsed` is the hunters' clock, which a client shows; the phase's own clock restarts at every phase.
 static func write_clock(
 	round_number: int,
 	elapsed: float,
@@ -419,17 +386,9 @@ static func read_phase(r: DotNetReader) -> Dictionary:
 	return {"phase": phase, "ok": r.ok()}
 
 
-# --- Watching --------------------------------------------------------------
-
 ## A view dot-spectate decided, for the one player it belongs to.
-##
-## [b]The death position travels.[/b] `DotSpectatorView.to_wire` did not carry it until
-## 2026-09-25, and a mirror without it puts every death camera at the world origin, which on
-## most maps is under the floor. This event stays the game's own: bit-packed and keyed
-## by session, where dot-spectate's is a dictionary keyed by string. Everything else a mirror needs to
-## draw the camera it already has: the players are in its world.
-##
-## Sessions rather than keys, as everywhere on this wire; zero is nobody.
+## The death position travels: a mirror without it puts every death camera at the world origin, under the floor. Bit-packed and keyed by session (zero is nobody),
+## where dot-spectate's is a string-keyed dictionary; everything else a mirror needs it already has in its world.
 static func write_spectate(
 	viewer: int, mode: int, target: int, killer: int, death_at: Vector3
 ) -> PackedByteArray:
@@ -473,8 +432,6 @@ static func read_ask_spectate(r: DotNetReader) -> Dictionary:
 	var raw := r.read_uint(2)
 	return {"direction": clampi(raw, 0, 2) - 1, "roam": raw == 3, "ok": r.ok()}
 
-
-# --- Hiding ----------------------------------------------------------------
 
 ## What [param player_id] is hiding as now: [method DotPropDisguise.to_wire], or empty for their
 ## own body. [param revealed] says they took a prop off to show their face, so a client can
@@ -577,8 +534,6 @@ static func read_ask_taunt(r: DotNetReader) -> Dictionary:
 	return {"taunt_id": StringName(taunt_id), "ok": r.ok()}
 
 
-# --- Chat ------------------------------------------------------------------
-
 ## A chat line's own field widths. Wider than the rules allow, so a rule can be raised
 ## without the wire silently truncating what it lets through.
 const CHAT_BYTES := 200
@@ -594,12 +549,8 @@ static func chat_kinds_fit() -> bool:
 
 
 ## One routed line, in [DotChatMessage]'s own wire shape.
-##
-## [b]Field by field rather than `var_to_bytes`, like every other message here.[/b] A
-## dictionary serialised whole is a dictionary whose contents are whatever the sender put
-## in it — including keys a client will happily read — and the widths below are the
-## validation. `x.p` is the one meta field this game carries: the speaker's session id, so
-## a client can colour a line by whose it is.
+## Field by field, not `var_to_bytes`: a whole dictionary holds whatever the sender put in it, and the widths below are the validation.
+## `x.p` is the one meta field this game carries: the speaker's session id, so a client can colour a line by whose it is.
 static func write_chat(wire: Dictionary) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(int(wire.get("n", 0)))
@@ -651,11 +602,7 @@ static func read_chat(r: DotNetReader) -> Dictionary:
 
 
 ## What a client sends when somebody presses Enter: a channel and a line, and nothing else.
-##
-## [b]No speaker, no time, no colour.[/b] Everything about what a line MEANS is decided on
-## the server — who said it, whether they are gagged, whether they are talking too fast,
-## which channel they may use and who can hear it. A client that sent any of that would be
-## a client that could claim it.
+## No speaker, time or colour: everything about what a line MEANS is decided on the server, and a client sending any of it could claim it.
 static func write_say(channel_id: StringName, text: String) -> PackedByteArray:
 	var w := _w()
 	w.write_string(String(channel_id), CHAT_CHANNEL_BYTES)
@@ -683,8 +630,6 @@ static func read_notice(r: DotNetReader) -> Dictionary:
 	return {"text": text, "ok": r.ok()}
 
 
-# --- A hit ----------------------------------------------------------------------
-
 static func write_hit(point: Vector3, killed: bool, headshot: bool) -> PackedByteArray:
 	var w := _w()
 	w.write_float32(point.x)
@@ -702,16 +647,11 @@ static func read_hit(r: DotNetReader) -> Dictionary:
 	return {"point": point if point.is_finite() else Vector3.ZERO, "killed": killed, "headshot": headshot, "ok": r.ok()}
 
 
-# --- A grenade thrown -----------------------------------------------------------
-
 ## A weapon id is a short name; this is far more than any of the pack's.
 const WEAPON_ID_BYTES := 32
 
-## Everything a client needs to fly the same grenade: one event per throw, nothing per tick,
-## because the flight is a pure function of its start (`PhProjectiles`). Position and velocity
-## as full floats, so the copy starts exactly where the server's did. [param thrower] is the
-## thrower's session id, not the server's entity id: a client numbers its entities itself, and
-## its copy leaves out the thrower's own hitboxes by its own number for them.
+## Everything a client needs to fly the same grenade: one event per throw, nothing per tick, since the flight is a pure function of its start (`PhProjectiles`).
+## Full floats so the copy starts where the server's did; [param thrower] is the session id, as a client numbers its own entities and leaves out the thrower's hitboxes by that.
 static func write_launch(id: int, spawn: DotWeaponSpawn, thrower: int) -> PackedByteArray:
 	var w := _w()
 	w.write_varint(maxi(0, id))

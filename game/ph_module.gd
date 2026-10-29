@@ -7,43 +7,18 @@ const PhPlayer := preload("ph_player.gd")
 const PhAvatars := preload("ph_avatars.gd")
 const PhVote := preload("ph_vote.gd")
 
-## This game, as a module a dedicated server loads.
-##
-## [b]A hundred and forty lines, against the five hand-written modules' 837 to 1,816.[/b]
-## [DotGameModule] holds the netcode and its four load-bearing constants, the bridge, the
-## message seal, the identity layer, the roster, the authoritative tick and a teardown in
-## the reverse order. Two of those five hand-written copies had the same line wrong and
-## nobody could ever join those servers. What is left here is what is actually this game's:
-## the cvars an operator turns between rounds, the console commands, the map vote, and the rule
-## that keeps enough people in a round for one to happen.
-##
-## [b]No `class_name`, and that is a requirement rather than a style.[/b]
-## [method DotModuleHost.load_module] takes a PATH and constructs the module itself — it
-## must, because that is the shape that lets an operator name one in a config file — and a
-## module delivered inside a dot-cloud pack cannot have a `class_name` at all: a mounted
-## pack's globals are not registered in the host.
-##
-## [codeblock]
-## server.modules.load_module("res://game/ph_module.gd")
-## [/codeblock]
+## This game as a module a dedicated server loads; [DotGameModule] holds the netcode, bridge, roster and tick.
+## No `class_name`: [method DotModuleHost.load_module] takes a path, and a pack's globals are not registered in the host.
 
-# [b]No `const CHANNEL` here, and its absence is the point.[/b] [DotGameModule] already
-# declares one and GDScript refuses to let a subclass redeclare it — which is the right
-# refusal: a module logs through [method DotModule.log_info], which stamps the module's own
-# name, so a second channel would split one module's records across two places an operator
-# has to know to turn up separately.
+# No `const CHANNEL`: [DotGameModule] declares one and a subclass cannot redeclare it, and a second
+# channel would split one module's records across two places an operator must turn up separately.
 
 ## Seconds between checks of how many people are in the round.
 const ROSTER_INTERVAL := 2.0
 
-## Where the services keep punishments. Empty is [DotGameServices]'s own default,
-## `user://prophunt_punishments.json` — the store a real server enforces.
-##
-## [b]Static, because nothing holds this module before it exists[/b]: dot-server constructs
-## it from a path inside `load_module`, so there is no instance for a host to set a field on
-## first. `examples/dedicated.tscn` points it at a directory of its own; before it could,
-## every run appended the live tools' audit warnings to the real store, 106 of them by the
-## time anybody counted.
+## Where the services keep punishments; empty is [DotGameServices]'s default, the real store.
+## Static because dot-server constructs the module from a path, so no instance exists to set a field on;
+## `examples/dedicated.tscn` points it elsewhere so a run does not append to the real store.
 static var punishments_file: String = ""
 
 ## The `ph_bots` cvar, held so the tick does not look it up sixty times a second.
@@ -104,24 +79,17 @@ func _game_missing_hint() -> String:
 	)
 
 
-## The netcode's numbers, which are the game's and not the addon's.
-##
-## Tick rate from the world, so `sv_tickrate` reaches it: the server sets the engine's
-## physics rate from that cvar at boot, the world is built after the server and reads it,
-## and this reads the world. A number written here instead would be a netcode running at a
-## rate the operator did not choose, silently.
+## The netcode's numbers. Tick rate comes from the world so `sv_tickrate` reaches it; a number written
+## here would run the netcode at a rate the operator did not choose.
 func _net_config() -> DotNetConfig:
 	var config := DotNetConfig.new()
 	config.tick_rate = (game as PhGame).tick_rate
 	config.snapshot_rate = PhGame.NET_SNAPSHOT_RATE
 	config.world_extent = PhGame.NET_WORLD_EXTENT
 	config.enable_prediction = true
-	# [b]On, and the two callables that make it real are wired by the bridge.[/b] It was off
-	# for as long as they were not: a flag reported as enabled with nothing behind it is
-	# worse than one that is off, because the first reader to trust it loses an afternoon.
-	# See [method PhNetBridge._wire_lag_compensation].
-	#
-	# A hunter shooting a prop that is running across a room is the ordinary reason to want it.
+	# On, and the bridge wires the two callables that make it real ([method PhNetBridge._wire_lag_compensation]);
+	# a flag reported enabled with nothing behind it misleads the first reader who trusts it.
+	# A hunter shooting a prop running across a room is the ordinary reason to want it.
 	config.enable_lag_compensation = true
 	# Everybody playing, and nothing else: the furniture is the map document, not entities, so
 	# a snapshot is a full server's players and room to spare.
@@ -134,12 +102,8 @@ func _make_bridge() -> Node:
 
 
 ## Chat, voice and moderation, over [DotGameServices].
-##
-## [b]The bridge is handed over as the link, and that is the whole of the wiring.[/b] A chat
-## line goes out through `send_chat` and a voice frame through `send_voice`, both on this
-## game's own wire. [DotGameModule] does the rest: it assigns the bridge's `voice_relay_fn`,
-## checks `check_admission` before seating anybody, and tells the roster to follow this layer
-## so a leaver is forgotten by the rate limiter and the voice router together.
+## The bridge is the link (`send_chat`, `send_voice`); [DotGameModule] assigns `voice_relay_fn`, checks
+## `check_admission` and has the roster follow this layer so a leaver is forgotten everywhere.
 func _make_services() -> Node:
 	var services := PhServices.new()
 	services.bridge = bridge
@@ -147,15 +111,9 @@ func _make_services() -> Node:
 	return services
 
 
-## Profiles, avatars and admission: dot-platform's [DotPlatformIdentity] over this game's
-## one-slot schema. [DotGameModule] builds it before the services and loads dot-platform's
-## own module beside it.
-##
-## [b]Authentication is not here and was never this game's.[/b] Whether a player is proven
-## to be somebody is the host's `dot_auth_server`, the same for every game it runs; what
-## this layer does is everything after — a scoped profile, the name on it, and a face.
-## With authentication off everybody is a guest with a profile of their own, which is what
-## a LAN server is.
+## Profiles, avatars and admission: [DotPlatformIdentity] over this game's one-slot schema.
+## Authentication is the host's `dot_auth_server`, not this layer's; with it off everybody is a guest
+## with a profile of their own, which is what a LAN server is.
 func _make_identity() -> Node:
 	var identity_layer := DotPlatformIdentity.new()
 	identity_layer.avatar_schema = PhAvatars.schema()
@@ -199,12 +157,9 @@ func _game_load() -> DotResult:
 	_wire_progress(world)
 	_add_tunables(world)
 
-	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a team-mate
-	# holding the muzzle (the default), 2 every team-mate in the line. dot-combat's cvar,
-	# defined there once for every game; live from the next shot, and a value the operator set
-	# first (argv, content.yml) is read back. NOTIFY, because players should know; REPLICATED,
-	# because every client's own manager predicts its tracers under it (the client follows it
-	# through its link, see the client's _build_netcode).
+	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a muzzle-holder (default),
+	# 2 every team-mate in the line; dot-combat's cvar. NOTIFY so players know; REPLICATED because every
+	# client's manager predicts its tracers under it (the client follows it through its link).
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
@@ -234,19 +189,13 @@ func _game_load() -> DotResult:
 		"Automatic stand-ins: 1 keeps as many as bot_quota and bot_quota_mode say, 0 none at all."
 	)
 
-	# [b]How many is dot-server's [DotBotQuota], so `bot_quota` and `bot_quota_mode` mean the
-	# same thing on every server in the family.[/b] The default is this game's own minimum
-	# (`minimum_players`, from the config file) in fill mode, which is the rule it ran before
-	# the policy was shared: stand-ins top the round up to that many players, a person who
-	# joins takes a stand-in's place, and the stand-in comes back when they leave. `ph_bots`
-	# stays the switch it always was, so a server config that sets it means what it meant.
+	# `bot_quota` and `bot_quota_mode` are dot-server's [DotBotQuota], so they mean the same on every server.
+	# The default is this game's `minimum_players` in fill mode: stand-ins top the round up, a person who
+	# joins takes a stand-in's place. `ph_bots` stays the switch it always was.
 	_quota = DotBotQuota.install(self, world.config.minimum_players)
 
-	# [b]Started here and not in the world's own `_ready`.[/b] `start()` builds the map and puts
-	# everybody on it, and a world that did that before the bridge existed would have built a
-	# map with nothing listening to `world_rebuilt` — one the server knows about and no client
-	# is ever told about. Invisible floors: a player stands on nothing and the server says they
-	# are fine.
+	# Started here, not in the world's `_ready`: `start()` builds the map, and doing that before the bridge
+	# exists leaves nothing listening to `world_rebuilt`, so players stand on floors no client was told about.
 	var _delivered: int = await _add_delivered_maps(world)
 	# A rotation file's wildcards match what is installed, so match again with the delivered maps.
 	world.apply_rotation()
@@ -291,24 +240,9 @@ func _bind_rule_cvars(world: PhGame) -> void:
 	)
 
 
-## The maps the SERVER names for this game, fetched and added to the catalogue. Returns how
-## many documents they held.
-##
-## [b]The server's list, not this game's.[/b] A map pack used to be a `server_dependencies`
-## entry in `game.yml`, which travels in this game's own pack — so a new map meant a release
-## of the game, and a server owner could not choose which maps to run. The owner names them
-## now in their deployment's map config (dot-server-deploy's `cfg/content.yml`, which fills
-## [member DotGameDescriptor.maps]); [DotGameContent] fetches each pack and hands back its
-## `maps/` directory. A server that still names one under `server_dependencies` keeps working,
-## because DotGameContent reads those too.
-##
-## [b]Still server-only.[/b] The server sends the map it is playing in MAP, so a client never
-## needs a map file and none of these is in a client's content sync. With nothing named, this
-## game plays its built-in map.
-##
-## [b]Called after EVERY catalogue load[/b], not only the first: `load_from` forgets everything
-## read before, and a reload that did not come back here dropped every delivered map — which
-## is what mg-wipeout and mg-deathrun did until the three were moved onto DotGameContent.
+## The maps the SERVER names for this game, fetched and added to the catalogue; returns how many documents.
+## The owner names them in the deployment's map config (`cfg/content.yml`, [member DotGameDescriptor.maps]),
+## and [DotGameContent] fetches each pack. Called after EVERY catalogue load: `load_from` forgets what was read before.
 func _add_delivered_maps(world: PhGame) -> int:
 	if server == null or world.catalogue == null:
 		return 0
@@ -336,12 +270,8 @@ func _wire_identity() -> void:
 
 
 ## What a session looks like: what dot-platform resolved for them, or the stock person.
-##
-## [b]Through the platform module's `player_for`, and never the hub by a key made here.[/b]
-## The hub keys a player by their scoped profile key, which only admission knows; a lookup
-## by `u<session>` finds nobody, every time, and falls through to stock — which reads as
-## "this player has no avatar" rather than as a wrong key. Duck-typed, because a server
-## without dot-platform is a configuration.
+## Through the platform module's `player_for`, never the hub by a key made here: the hub keys by scoped
+## profile key, so a `u<session>` lookup finds nobody and reads as "no avatar". Duck-typed; no platform is a configuration.
 func _avatar_for(session_id: int) -> DotAvatar:
 	var session := server.session_by_userid(session_id) if server != null else null
 	var platform: Object = server.modules.get_module("platform") \
@@ -508,12 +438,8 @@ func _noblock_side(id: Variant) -> Variant:
 
 
 ## A number as an operator would type it: `34`, not `34.000000`.
-##
-## [b]Not `%g`, which GDScript's format strings do not have.[/b] It is accepted by the parser
-## and fails at RUNTIME with "unsupported format character" — inside `_game_load`, which is
-## the one place in the module sequence that unwinds everything above it. The symptom in
-## game-buses-from-hell was a server whose netcode came up, logged that it was ready, and
-## then reported that the game would not load.
+## Not `%g`: the parser accepts it but it fails at RUNTIME ("unsupported format character"), inside `_game_load`,
+## which unwinds the module sequence above it.
 static func _number(value: float) -> String:
 	return "%d" % int(round(value)) if is_equal_approx(value, round(value)) else "%.3f" % value
 
@@ -522,11 +448,8 @@ static func _number(value: float) -> String:
 var _force_camera_cvar: DotConVar = null
 
 
-## [b]Nothing to undo.[/b] The commands are the module's own and [DotModule] removes them;
-## the netcode, the bridge and the roster are [DotGameModule]'s and it tears them down in
-## the reverse order it built them. The world is NOT this module's to free: it was in the
-## tree before the module loaded, and a server can unload and reload a game module without
-## the map going away, which is what `module reload` is for.
+## Nothing to undo: [DotModule] removes the commands and [DotGameModule] tears down the netcode, bridge and
+## roster in reverse. The world is NOT freed here; it predates the module and `module reload` keeps the map.
 func _game_unload() -> void:
 	if workbench != null:
 		workbench.queue_free()
@@ -549,14 +472,8 @@ func _game_hibernation(hibernating: bool) -> void:
 
 
 ## Keeps enough people in the round for there to be one.
-##
-## [b]A hunter and a prop, or nothing happens at all.[/b] A round ends the moment a side has
-## nobody alive, and a side with nobody AT ALL satisfies that on the first tick — so a server
-## with one person on it would start a round, end it and start another for as long as nobody
-## else joined. Every one of those rounds is decided correctly, which is why nothing errors.
-##
-## A stand-in is removed the moment a person takes their place. They are here to make the
-## game exist, not to take the fun half from the people who came to play it.
+## A hunter and a prop, or nothing: a round ends when a side has nobody alive, and an empty side satisfies that
+## on the first tick, so one person would see rounds start and end forever with no error.
 func _game_tick(_tick: int, delta: float) -> void:
 	if vote != null:
 		vote.advance(delta)
@@ -588,10 +505,8 @@ func _keep_the_round_full() -> void:
 	if world == null or bridge == null or _quota == null:
 		return
 
-	# People only. A stand-in is not one, and neither is a bot somebody put in by hand through
-	# the bridge (a test, an admin): those are never in `_bot_ids` either, so they are left
-	# alone and outside the count. A leaver is gone from `players` the moment the bridge
-	# removes them, so nobody half-disconnected is counted.
+	# People only: a stand-in is not one, nor is a bot added by hand (never in `_bot_ids`). A leaver
+	# leaves `players` the moment the bridge removes them, so nobody half-disconnected is counted.
 	var humans := 0
 
 	for id: StringName in world.players:
@@ -638,12 +553,8 @@ static func _bot_name(world: PhGame) -> String:
 
 
 ## Joins the bridge's chat seam to the services layer's router.
-##
-## [b]Here rather than in either of them, because this is the only object that holds
-## both.[/b] The bridge knows what arrived on the wire and nothing about what a line means;
-## the services layer knows the rules and nothing about the wire. That separation is why a
-## client cannot send a line with somebody else's name on it: what crosses is a channel id
-## and a string, and everything else is decided on this side.
+## Here because this is the only object holding both: only a channel id and a string cross the wire, so a
+## client cannot send a line with somebody else's name on it.
 func _wire_chat() -> void:
 	if bridge == null or services == null:
 		return
@@ -725,12 +636,8 @@ func _set_vote_hooks(world: PhGame) -> void:
 
 
 ## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
-##
-## [b]Opened [member PhVote.open_after_sec] into the last round on a map and applied when that
-## round ends[/b]; see [code]game/ph_vote.gd[/code]. A server owner turns it off or reshapes it
-## in `user://cfg/prophunt_vote.json` or `game.yml`'s `metadata: map_vote:`, keyed as dot-vote's
-## [DotVoteRules]. A vote that cannot be built is a WARN and the rotation alone, never a server
-## that will not start.
+## Opened [member PhVote.open_after_sec] into the last round and applied when it ends; configured in
+## `user://cfg/prophunt_vote.json` or `game.yml`. A vote that cannot be built is a WARN, never a server that won't start.
 func _build_vote(world: PhGame) -> void:
 	if world.catalogue == null:
 		return
@@ -797,11 +704,8 @@ func _wire_map(world: PhGame) -> void:
 	)
 
 
-## An achievement is told to the one person who earned it.
-##
-## [b]As a notice, which a client already draws in its chat box[/b], rather than a new event
-## kind: an unlock is text for one player, which is exactly what a notice is — and a stand-in
-## never earns one, because [PhProgress] does not count them.
+## An achievement is told to the one person who earned it, as a notice (text for one player, which a client
+## already draws in chat); a stand-in never earns one, as [PhProgress] does not count them.
 func _wire_progress(world: PhGame) -> void:
 	if bridge == null:
 		return
@@ -840,11 +744,8 @@ func _on_say_requested(peer_id: int, channel_id: StringName, text: String) -> vo
 	bridge.call("notice", peer_id, said.error.message)
 
 
-## A `!command` typed into chat. Run through the console as the person who typed it.
-##
-## [b]As THEM, not as the server.[/b] `run_command_as_uid` builds a context with that
-## player's own flags, so `!kick` from somebody without the flag is refused by the same file
-## that refuses it at the console — rather than by this function having an opinion.
+## A `!command` typed into chat, run through the console as the person who typed it: `run_command_as_uid`
+## uses that player's own flags, so `!kick` is refused by the same file that refuses it at the console.
 func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) -> void:
 	if server == null:
 		return

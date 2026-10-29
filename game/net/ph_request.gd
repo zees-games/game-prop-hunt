@@ -3,12 +3,8 @@ extends DotNetMessage
 const PhEvents := preload("ph_events.gd")
 
 ## Anything a client asks the authority for. Reliable, rare, to the server only.
-##
-## [b]None of these is a per-tick intent.[/b] Firing is a BUTTON, because it has to be
-## ordered against the movement it was made with; this is for the other kind — "my world
-## exists", "make me that lamp", "taunt", "I want to watch somebody else" — each of which
-## happens once and must not be lost. A disguise is the server's look, not the client's: the
-## request carries no prop, and the server casts the ray from where it has the player's eyes.
+## None is a per-tick intent (firing is a BUTTON, ordered against its movement); these happen once and must not be lost.
+## A disguise carries no prop: the server casts the ray from where it has the player's eyes.
 
 const NAME := &"ph.request"
 const KIND_BITS := 4
@@ -18,13 +14,9 @@ var kind: int = 0
 var body: PackedByteArray = PackedByteArray()
 
 
-## [b]Built with [code]new(kind, body)[/code], and this file does not preload itself.[/b]
-## It used to, for a typed [code]static func of() -> PhRequest[/code] factory. A script that
-## [code]extends DotNetMessage[/code] and preloads ITSELF, first loaded from a module a
-## running [DotServer] loads at runtime — which is how every deployed server loads this
-## game — leaks the whole script graph at exit on Godot 4.7.2. Measured in
-## mg-buses-from-hell (8ed866c) with a two-line reproduction. The registry decodes with a
-## bare [code]new()[/code], which is why both arguments default.
+## Built with [code]new(kind, body)[/code]; this file does not preload itself.
+## A script that extends DotNetMessage and preloads ITSELF, loaded from a module a running [DotServer] loads, leaks the whole script graph at exit on Godot 4.7.2.
+## The registry decodes with a bare `new()`, which is why both arguments default.
 func _init(p_kind: int = 0, p_body: PackedByteArray = PackedByteArray()) -> void:
 	kind = p_kind
 	body = p_body

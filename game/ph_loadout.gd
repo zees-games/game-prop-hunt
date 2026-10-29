@@ -1,20 +1,8 @@
 extends RefCounted
 
-## A hunter's loadout, as dot-loadout data: what B offers and what `PhGame._arm_hunters` hands
-## out. Data only; the manager and the command live on [code]PhGame[/code].
-##
-## [b]Three slots: primary and secondary from what the game hands hunters, and a grenade.[/b]
-## The defaults are the config's `hunter_weapons` (the SMG and the pistol, so a hunter who never
-## presses B plays as before); the alternatives are `hunter_choices`. The melee weapon is not a
-## choice: every hunter carries the config's (the hatchet), because a hunter without one has no
-## quiet way to test a suspicious chair.
-##
-## [b]The grenade is optional and empty by default[/b] (`thrown`: a frag or a sticky from
-## `hunter_choices`), so the stand-ins and a hunter who never presses B carry none. A blast that
-## finds nobody next to the furniture costs as a decoy does (`PhGame.blast_cost`, docs/design.md).
-##
-## [b]No points budget.[/b] Every primary costs the same and every sidearm the same; the choice
-## is how a hunter likes to search (spray, a close shotgun, a careful carbine), not a trade.
+## A hunter's loadout, as dot-loadout data: what B offers and what `PhGame._arm_hunters` hands out. Data only; the manager and command live on [code]PhGame[/code].
+## Three slots: primary and secondary from the config's `hunter_weapons` (defaults) and `hunter_choices`, and an optional grenade (`thrown`, empty by default).
+## Melee is not a choice: every hunter carries the hatchet, their quiet way to test a chair. No points budget; the choice is how a hunter likes to search. A blast that finds nobody costs as a decoy (`PhGame.blast_cost`).
 
 const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 

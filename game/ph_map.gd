@@ -4,29 +4,9 @@ const PhMapDoc := preload("ph_map_doc.gd")
 const PhMaterials := preload("ph_materials.gd")
 const PhProps := preload("ph_props.gd")
 
-## A map document, built: the building, the furniture, the lights and the sky.
-##
-## [b]The same document on every machine, and a server builds only what collides.[/b] Boxes
-## become one static body of box shapes on the world layer; props become one static body of
-## box shapes on the prop layer, each shape knowing which prop it is. A client also draws them.
-## A server draws nothing, so a dedicated server holds a few thousand shapes and no meshes.
-##
-## [b]Boxes are drawn batched, by material and by twelve-metre chunk.[/b] A school is a
-## thousand boxes, and a mesh per box is a thousand draw calls, which a browser does not give
-## you. One mesh per material is the other extreme and is wrong for a reason only the renderer
-## knows: the compatibility renderer the shell uses lights each mesh with at most eight omni
-## lights, so one floor mesh for the whole school would be lit by eight of its forty lamps and
-## every other room would be dark. A chunk is about a room, which is about a lamp.
-##
-## [b]Props are drawn as [MultiMeshInstance3D]s, one per model mesh.[/b] Two hundred chairs are
-## one draw call per chair mesh, not two hundred. They never move: a prop a player is hiding AS
-## is the player, drawn by [PhPlayer]; the props here are the room.
-##
-## [b]A prop's collision is its catalogue pieces (or its box), turned the way the map turns
-## it.[/b] A tree is its trunk, branch stubs and leaf clumps, a table its top and legs (dot-props'
-## [DotPropPieces], measured offline into `props/pieces.json`). What a hunter's shot stops on and
-## what a player walks into are the same shapes, so the two can never disagree about where the
-## sofa is; what a disguise copies is still the prop's size.
+## A map document, built: the building, the furniture, the lights and the sky; the same on every machine, and a server builds only what collides.
+## Boxes are batched by material and twelve-metre chunk: a mesh per box is a thousand draw calls, and one per material is lit by only eight of the forty lamps in the Compatibility renderer.
+## Props are [MultiMeshInstance3D]s, one per model mesh, that never move; a collision is the catalogue pieces turned as the map turns it, so shots and walking agree (a disguise still copies the size).
 
 const CHANNEL := "ph.map"
 
@@ -180,8 +160,6 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 		DotLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
 
 
-# --- Building --------------------------------------------------------------
-
 func _build_boxes() -> void:
 	var batches := {}
 	var any := false
@@ -240,12 +218,8 @@ func _build_boxes() -> void:
 		_drawn.add_child(mesh)
 
 
-## Whether map furniture [param prop_id] casts a contact shade: only a furniture-kit block (a
-## cabinet, a counter, a fridge, a bookcase, a washer) that collides as its box, never breaks and
-## stands upright. Its box is then its shape, so the shade is where its foot is, and the shade can
-## never outlive it. A piece-built prop (a chair, a table, a tree) is open underneath and its
-## box would shade floor that is lit; a breakable one would leave its shade behind when it broke
-## (the shade is one mesh, built at load). See docs/drawing.md#contact-shade.
+## Whether map furniture [param prop_id] casts a contact shade: only a furniture-kit block that collides as its box, never breaks and stands upright.
+## A piece-built prop is open underneath and a breakable one would leave its shade behind (one mesh, built at load). See docs/drawing.md#contact-shade.
 func _shades_floor(prop_id: StringName, raw: Dictionary) -> bool:
 	if catalogue == null or not catalogue.pieces_of(prop_id).is_empty() or catalogue.breaks(prop_id) > 0.0:
 		return false
@@ -254,10 +228,8 @@ func _shades_floor(prop_id: StringName, raw: Dictionary) -> bool:
 	return is_zero_approx(float(raw.get("pitch", 0.0))) and is_zero_approx(float(raw.get("roll", 0.0)))
 
 
-## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the
-## Compatibility renderer has no ambient occlusion, and a counter or a wall met the floor with
-## no shade at its foot. Glass and water neither cast nor take one. By path, behind the level,
-## so a client shell older than the helper still runs the map without it.
+## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the Compatibility renderer has no ambient occlusion.
+## Glass and water neither cast nor take one. By path, behind the level, so an older client shell still runs the map without it.
 func _add_contact_shade(boxes: Array) -> void:
 	if boxes.is_empty() or DotAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
 		return
@@ -288,10 +260,8 @@ static func _add_box(tool: SurfaceTool, frame: Transform3D, size: Vector3) -> vo
 		var c: Vector3 = frame * (face[3] as Vector3)
 		var d: Vector3 = frame * (face[4] as Vector3)
 
-		# Godot's front face winds so that (b - a) x (c - a) points AGAINST the normal (measured
-		# against BoxMesh's own arrays). The corners above go round the other way, so each
-		# triangle is emitted reversed; the other order is a map drawn inside out, every wall
-		# invisible from the room it bounds.
+				# Godot's front face winds so (b - a) x (c - a) points AGAINST the normal (measured against BoxMesh's arrays).
+				# The corners above go the other way, so each triangle is emitted reversed or the map is drawn inside out.
 		for v: Vector3 in [a, c, b, a, d, c]:
 			tool.set_normal(normal)
 			tool.add_vertex(v)
@@ -386,11 +356,8 @@ func _build_lights() -> void:
 		_drawn.add_child(omni)
 
 
-## The sky and the sun: a dot-lighting document made from the map's `environment`
-## ([method light_document]), so every map has the family's light (game-arena's built-in maps:
-## a warm sun with soft shadows, a pale cool fill, filmic tone map, glow) while keeping its
-## own sun angle, sun colour and sky: the woods are still golden hour and the office still
-## late afternoon.
+## The sky and the sun: a dot-lighting document made from the map's `environment` ([method light_document]), so every map has the family's light
+## while keeping its own sun angle, colour and sky.
 func _build_environment() -> void:
 	var env_doc: Dictionary = doc["environment"]
 	var lighting := Node3D.new()
@@ -419,25 +386,16 @@ func _build_environment() -> void:
 			_environment = node as WorldEnvironment
 			var sky := (node as WorldEnvironment).environment.sky
 			if sky != null and sky.sky_material is ProceduralSkyMaterial:
-				# The map's blue at the zenith (the rig draws it in the ambient colour, a grey
-				# chosen for the shade) and again under the horizon, where an overview used to
-				# see a dark void round the map.
+								# The map's blue at the zenith (the rig draws it in the ambient grey chosen for the shade) and again under the horizon,
+								# so an overview does not see a dark void round the map.
 				var material := sky.sky_material as ProceduralSkyMaterial
 				material.sky_top_color = PhMapDoc.colour(env_doc["sky_top"])
 				material.ground_bottom_color = material.sky_top_color
 
 
 ## The dot-lighting document a map's `environment` describes.
-##
-## Brightness is 380 (game-arena's daylight) times the square of the map's `sun_energy`, so a
-## map that asked for a dimmer sun still gets one. The ambient is the light in the shade, a
-## near-neutral pale grey whatever the map, at the map's strength ([method light_profile]):
-## game-arena's pale cool fill turned every room, which is lit mostly by the fill, a cold
-## lavender; the map's own `ambient` colour is mixed in a quarter of the way, so a map lit by a
-## blue sky is a little cooler in its shade and one lit by a night is not grey. The fog is the
-## map's own when it has `fog_end` (colour, start and end in metres, a density cap), else its
-## horizon from 120 m out (source units, metres / 0.01905), so it hazes the distance and never
-## a room; the map's old `fog` density is no longer read.
+## Brightness is 380 times the square of `sun_energy`; the ambient is a near-neutral pale grey at the map's strength ([method light_profile]) with the map's `ambient` mixed in a quarter, so a cold fill does not turn every room lavender.
+## The fog is the map's own when it has `fog_end`, else its horizon from 120 m out (source units, metres / 0.01905), so it hazes the distance and never a room.
 static func light_document(env_doc: Dictionary) -> Dictionary:
 	var sun := PhMapDoc.colour(env_doc["sun_colour"])
 	var horizon := PhMapDoc.colour(env_doc["sky_horizon"])
@@ -473,20 +431,8 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 
 
 ## What this machine draws of a map's light: dot-lighting's `painted()`, with the map's fill.
-##
-## [b]Shadows stay on in the browser[/b], unlike dot-lighting's `web()`: a prop's shadow is
-## part of what a hunter reads, and the boxes are batched into a few dozen meshes.
-## `painted()` is the family's profile for flat-painted worlds (dot-lighting API 3): its light
-## is matched to the renderer (the Compatibility renderer this game and the client shell use
-## clips a sunlit pastel to white at Forward+'s numbers), with a lower exposure, a grade, and
-## a shadowless fill from the side the sun is not on. That fill has no shadow, so it reaches
-## into rooms as the ambient does, but from one side: a room's walls are different shades
-## instead of one even haze, which is where a prop hides.
-##
-## [b]The ambient is the map's `ambient_energy` times 4 of `painted()`'s, the fill times
-## 2.8[/b] (2 and 1.4 at the stock 0.5): a room is lit by the fill and its lamps, not the
-## sun, and these keep a room as light as it was before `painted()` (a school corridor's
-## median 0.63 -> 0.62) while the yard outside loses its glare.
+## Shadows stay on in the browser, unlike `web()`: a prop's shadow is part of what a hunter reads, and the boxes are batched into a few dozen meshes.
+## Ambient is the map's `ambient_energy` times 4 of `painted()`'s and the fill times 2.8, keeping a room (lit by fill and lamps, not sun) as light as before while the yard loses its glare.
 static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
 	var p := DotLightProfile.painted()
 	p.sun_shadows = true
@@ -501,8 +447,6 @@ static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
 	p.glow_threshold = 1.0
 	return p
 
-
-# --- Asking ----------------------------------------------------------------
 
 ## Where seat [param seat] of [param of] on [param side] (`"props"` or `"hunters"`) starts:
 ## `[position, yaw]`. More people than spawns stand in rings round them, a metre and a bit

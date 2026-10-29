@@ -3,48 +3,19 @@ extends Node
 const PhPlayer := preload("ph_player.gd")
 
 ## Where somebody who is out looks, and what the server lets them see.
-##
-## [b]Most of a server is out before a round ends.[/b] A prop that is found stays out until the
-## next round, so by the end of one most of the props are watching the last few hide — the
-## people with the most reason to see whether they get away with it. A joiner mid-round
-## watches too.
-##
-## [b]The camera part is four lines; who decides is the part that matters.[/b] dot-spectate
-## computes a transform and touches no camera, and the policy — may this person watch, whom,
-## through which camera — is the server's, so a client that decided for itself what it may
-## look at would be a client that may look at anything. On a server this runs an
-## authoritative [DotSpectatorManager]; on a connected client it runs a MIRROR that is told
-## each view change in a `SPECTATE` event and computes the camera itself from the players it
-## already draws. That split is what keeps the wire to one small event per decision rather
-## than a camera transform per frame.
-##
-## [b]No delay, and it would protect nothing here.[/b] dot-spectate's delay exists because a
-## spectator watching live is a live intelligence feed — but every player in this game is
-## always relevant (a map is a few rooms), so every client already receives every player's
-## live position in its snapshots. A delayed spectator camera would hide nothing that the
-## same client's own world is not already drawing. `delay_ticks` stays 0 and a mirror never
-## needs the history a delay samples, which is also why the mirror's `advance` records none.
-##
-## [b]No `class_name`, like everything in this game.[/b] Reached by preload from [PhGame].
-## It does not preload [PhGame] back: the world hands it the two dictionaries it reads and a
-## callable for the phase, which is a smaller contract than the world and no cycle.
+## Most of a server is out before a round ends, and the policy (may this person watch, whom, through which camera) is the server's: on a server this runs an authoritative [DotSpectatorManager], on a client a MIRROR told each change in a `SPECTATE` event.
+## No delay: every client already receives every player's live position, so one would hide nothing. No `class_name`; reached by preload from [PhGame], which hands it two dictionaries and a phase callable so there is no cycle.
 
 const CHANNEL := "ph.spectate"
 
-## Seconds the death camera holds before handing over.
-##
-## [b]A second and a half, and it is not a killcam.[/b] What the moment is for is seeing who
-## found you, before the camera moves to somebody still in it.
+## Seconds the death camera holds before handing over; not a killcam, only long enough to see who found you.
 const DEATH_CAM_SECONDS := 1.5
 
 ## Seconds the freeze camera holds on whoever put you out.
 const FREEZE_CAM_SECONDS := 1.5
 
 ## How far above the floor a faller's death camera hangs, looking straight down the drop.
-##
-## [b]Not where they died, which is the floor.[/b] A fall is recorded at the kill height —
-## the one place in the map nothing is worth seeing from — so the camera goes back up to
-## the field over the point they left it by and looks down the forty metres instead.
+## A fall is recorded at the kill height, where nothing is worth seeing, so the camera goes back up over the point they left.
 const DROP_CAM_RISE := 6.0
 
 ## The overview camera, and a second slot this game fills with the same view. See
@@ -118,13 +89,9 @@ func setup(p_authoritative: bool, tick_rate: int, force_camera: int) -> DotResul
 static func rules_for(tick_rate: int, force_camera: int) -> DotSpectatorRules:
 	var rules := DotSpectatorRules.new()
 	rules.force_camera = clampi(force_camera, 0, 2)
-	# Free roam is the family default (allow_roaming stays true) and follows the cvars:
-	# `mp_freeroam` switches it off, and `mp_forcecamera` 1 or 2 restricts the camera and
-	# switches it off with it, since a camera over the map sees what "own side" forbids.
-	# Hardcoding it off here would be overwritten by the cvar's default the moment the module
-	# bound it, and say nothing about it.
-	# Dead players stay dead until the next round, so a list that included them would be
-	# a list of bodies at the kill height.
+		# Free roam is the family default and follows the cvars: `mp_freeroam` 0, or `mp_forcecamera` 1 or 2, switches it off.
+		# Hardcoding it off here would be overwritten by the cvar's default once the module bound it.
+		# Dead players stay dead until the next round, so a list including them would be bodies at the kill height.
 	rules.cycle_includes_dead = false
 	rules.death_cam_ticks = int(DEATH_CAM_SECONDS * float(maxi(tick_rate, 1)))
 	rules.freeze_cam_ticks = int(FREEZE_CAM_SECONDS * float(maxi(tick_rate, 1)))
@@ -174,10 +141,7 @@ func can_roam(player_id: StringName) -> bool:
 
 
 ## Where nobody-left-to-watch looks from: over the map. Two slots, both the same view here.
-##
-## [b]Two, because the round is in two places.[/b] A viewer whose whole side is out has
-## nobody the "own side" rule lets them follow, and dot-spectate falls back to a fixed
-## camera.
+## A viewer whose whole side is out has nobody the "own side" rule lets them follow, and dot-spectate falls back to a fixed camera.
 func set_overviews(field: Transform3D, showdown: Transform3D) -> void:
 	if manager == null:
 		return
@@ -186,12 +150,8 @@ func set_overviews(field: Transform3D, showdown: Transform3D) -> void:
 	manager.fixed_cameras = cameras
 
 
-# --- What the world reports -------------------------------------------------
-
 ## Somebody is out. Starts the death camera; the server's tick hands it over.
-##
-## [param at] is where they died. A fall is recorded at the kill height, so the death camera
-## is moved back up over the point they went down — see [constant DROP_CAM_RISE].
+## [param at] is where they died; a fall is recorded at the kill height, so the camera is moved back up ([constant DROP_CAM_RISE]).
 func on_died(
 	player_id: StringName, by: StringName, fell: bool, at: Vector3, deck_height: float, tick: int
 ) -> void:
@@ -236,13 +196,8 @@ func advance(tick: int) -> void:
 		manager.advance(tick)
 
 
-# --- What a viewer asks for -------------------------------------------------
-
 ## The next or the previous person this viewer may watch, or 0 for the other camera.
-##
-## [b]Asked of the server and answered by it.[/b] On a connected client this arrives as a
-## request, and a refusal goes back as a notice; the list is the server's own
-## `targets_for`, so a client can never step onto somebody the policy forbids.
+## Asked of the server and answered by it (a refusal goes back as a notice), so a client can never step onto somebody the policy forbids.
 func step(player_id: StringName, direction: int) -> DotResult:
 	if manager == null:
 		return DotResult.fail(DotError.CODE_STATE, "Spectating is not set up.")
@@ -301,16 +256,12 @@ func apply_view(
 	view.mode = clampi(mode, 0, DotSpectatorView.Mode.size() - 1) as DotSpectatorView.Mode
 	view.target = String(target)
 	view.killer = String(killer)
-	# [b]Carried by this game's own event.[/b] dot-spectate's wire had no death position
-	# until 2026-09-25 (it is `"d"` now), and a mirror without one puts every death camera
-	# at the world origin — which on a map is under the floor. The event stays this
-	# game's own because it is bit-packed and session-keyed, which the dictionary is not.
+		# Carried by this game's own event: dot-spectate's wire now has a death position (`"d"`), but this event is bit-packed and session-keyed.
+		# A mirror without one puts every death camera at the world origin, under the floor.
 	view.death_position = death_at
 	view.until_tick = -1
 	view_changed.emit(player_id)
 
-
-# --- What is drawn ----------------------------------------------------------
 
 func is_spectating(player_id: StringName) -> bool:
 	return manager != null and manager.is_spectating(String(player_id))
@@ -329,11 +280,7 @@ func watching(player_id: StringName) -> StringName:
 
 
 ## Where [param player_id]'s camera goes this frame. Identity when they are playing.
-##
-## [b]The fixed camera is chosen by the phase, here, on both ends.[/b] dot-spectate keeps a
-## per-view index into its fixed cameras; this game has exactly two and which one is right
-## is a fact about the round rather than about the viewer, so it is read from the phase a
-## client already has rather than sent.
+## The fixed camera is chosen by the phase on both ends: this game has two and which is right is a fact about the round, so it is read from the phase a client already has rather than sent.
 func camera_for(player_id: StringName) -> Transform3D:
 	if manager == null:
 		return Transform3D.IDENTITY
@@ -389,8 +336,6 @@ func _name_of(player_id: StringName) -> String:
 	return body.display_name if body != null else String(player_id)
 
 
-# --- The manager's callables ------------------------------------------------
-
 func _participants() -> PackedStringArray:
 	var out := PackedStringArray()
 
@@ -408,13 +353,8 @@ func _alive(key: String) -> bool:
 
 
 ## Where somebody's eyes are, from where this process DRAWS them.
-##
-## [b]The drawn position and not the node, on a world that simulates.[/b] A node here moves
-## once a tick, so a camera hung on it advances in steps — the jitter this game measured
-## at 160 frames still in 288 and fixed for the player's own camera by drawing from
-## `render_state`. The same blend serves the spectator camera. A mirror's remote players
-## are written once a frame by the interpolator, so there the node is already right, and a
-## rider's controller is not simulated at all.
+## The drawn position, not the node, on a world that simulates: a node moves once a tick, so a camera hung on it jitters (fixed for the player's own camera via `render_state`).
+## A mirror's remote players are written every frame by the interpolator, so there the node is right, and a rider's controller is not simulated.
 func _pose_of(key: String) -> Transform3D:
 	var body: PhPlayer = players.get(StringName(key))
 
@@ -434,8 +374,6 @@ func _pose_of(key: String) -> Transform3D:
 	return Transform3D(basis, at + eye)
 
 
-# --- Team-mates first -------------------------------------------------------
-
 func _on_view_changed(key: String, mode: int, target: String) -> void:
 	_prefer_side(key, mode, target)
 	view_changed.emit(StringName(key))
@@ -447,13 +385,8 @@ func _on_retargeted(key: String, _from: String, to: String, _reason: StringName)
 
 
 ## When the server picks somebody for a viewer, it picks a team-mate if there is one.
-##
-## [b]dot-spectate chooses the first allowed name in key order, and here that is a
-## stranger.[/b] Under "own side" it can only be a team-mate anyway; under "anybody" it is
-## whoever sorts first, and somebody who has just fallen off wants to see how their own side
-## is doing. So an AUTOMATIC choice
-## is moved to the first living team-mate the policy allows. A viewer stepping through the
-## list themselves is left exactly where they asked to be.
+## dot-spectate chooses the first allowed name in key order, which under "anybody" is a stranger, so an AUTOMATIC choice moves to the first living team-mate the policy allows.
+## A viewer stepping through the list themselves is left where they asked to be.
 func _prefer_side(key: String, mode: int, target: String) -> void:
 	if not authoritative or _stepping or _preferring or target == "":
 		return

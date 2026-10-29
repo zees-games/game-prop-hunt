@@ -1,19 +1,8 @@
 extends SceneTree
 
-## Measures every model a kit in `props/kits.json` names and writes `props/catalogue.json`:
-## each prop's id, title, model, scale, its size in metres and the offset that stands it on
-## the floor with its footprint centred.
-##
-## [codeblock]
-## godot --headless --path . --script tools/measure_props.gd           # write it
-## godot --headless --path . --script tools/measure_props.gd -- --check # fail if it is stale
-## [/codeblock]
-##
-## [b]Measured, never typed.[/b] A disguise's health, its hull and its hitbox all come from the
-## size, and a size somebody typed is a sofa whose hitbox is a metre off its picture. The
-## catalogue is what a server reads, because a headless server can measure nothing it has not
-## imported; the tool runs where the models are imported, and `headless_run` checks the file
-## agrees with the models.
+## Measures every model a kit in `props/kits.json` names and writes `props/catalogue.json`: id, title, model, scale, size in metres and the floor offset.
+## Measured, never typed: hull, health and hitbox come from the size, and a headless server can measure nothing it has not imported. `headless_run` checks the file agrees with the models.
+##   godot --headless --path . --script tools/measure_props.gd [-- --check]   # write it, or fail if stale
 
 const KITS := "res://props/kits.json"
 const OUT := "res://props/catalogue.json"
@@ -144,11 +133,8 @@ func _initialize() -> void:
 	quit(0)
 
 
-## The part-shaped collision (dot-props' DotPropPieces), one prop a line so a re-measure's diff
-## reads by prop: `pieces` is `{id: [[x, y, z, ...] per convex piece]}` in the prop's frame, and
-## `tops` is `{id: [TOPS x TOPS heights]}`, where something set down on the prop rests across
-## its footprint (x across, then z; null where nothing is), for a maps builder that stacks props
-## and has no hull maths. A prop not listed collides as its catalogue box.
+## The part-shaped collision (dot-props' DotPropPieces), one prop a line so a re-measure's diff reads by prop: `pieces` is `{id: [[x, y, z, ...] per convex piece]}` in the prop's frame.
+## `tops` is `{id: [TOPS x TOPS heights]}` (x across, then z; null where nothing is) for a maps builder that stacks props; a prop not listed collides as its catalogue box.
 static func _pieces_text(shaped: Dictionary, tops: Dictionary) -> String:
 	var ids := shaped.keys()
 	ids.sort()

@@ -3,15 +3,8 @@ extends DotNetInput
 const PhNetCommand := preload("ph_net_command.gd")
 
 ## One tick of a player's intent, on the wire: a movement command and a weapon slot.
-##
-## [b]The three game buttons ride in [member DotFpsCommand.buttons] for the reason a jump
-## does:[/b] they are per-tick, they are held rather than pressed once, and they have to be
-## ordered against the movement they were aimed with. A shot sent as a reliable request
-## would arrive a round trip later and be resolved against a position the player has
-## already left.
-##
-## The slot is the exception and is a field of its own, because [DotFpsCommand] has eight
-## buttons and no room for a number — see [member PhPlayer.wanted_slot].
+## The three game buttons ride in [member DotFpsCommand.buttons] like a jump: per-tick, held, and ordered against the movement they were aimed with,
+## where a reliable request would arrive a round trip later against a position already left. The slot is its own field ([DotFpsCommand] has eight buttons; see [member PhPlayer.wanted_slot]).
 
 ## Fire. `BUTTON_USER_0`, which dot-player-controller reserves.
 const BUTTON_FIRE := DotFpsCommand.BUTTON_USER_0

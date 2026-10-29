@@ -5,12 +5,7 @@ const PhGame := preload("../game/ph_game.gd")
 
 ## Bakes a map's bot navigation the way a round does and says where it is cut in pieces:
 ##   godot --headless --path . res://tools/nav_islands.tscn -- --map ph_frontyard [--dir=/folder/of/map/documents] [--dump=/path/mesh.json]
-##
-## Each island is a set of polygons a body can walk between; a hiding place on an island the props'
-## start is not on is "cut off" (headless_bots fails the map for it). The islands print biggest
-## first with their bounds, the props' start island, and how many hiding places each holds; --dump
-## writes the mesh (vertices and polygons) for plotting. Importers and builders use it to see WHY a
-## map is cut: a ladder, a step above a body's climb, a doorway under 0.7 m, a pit.
+## Islands print biggest first with bounds, the props' start island and hiding places each (headless_bots fails a map whose hiding place is cut off); --dump writes the mesh for plotting.
 
 func _ready() -> void:
 	var map_id := ""

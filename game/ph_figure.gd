@@ -2,36 +2,9 @@ extends Node3D
 
 const PhPaths := preload("ph_paths.gd")
 
-## What somebody ELSE looks like: a Kenney blocky character, scaled to the player's hull,
-## wearing their side's colour on the torso and turned to where they are looking. Client
-## side only; a server never builds one.
-##
-## [b]This game drew no person at all until 2026-09-24.[/b] Every player's own view was
-## first person, and third person showed the platform rather than the player — so nobody had
-## needed a body until a networked client, whose other players were drawn as nothing. Their
-## node moved, their beacon marked them, and a platform leaned toward a patch of empty deck.
-## See `PhPlayer.present_body` for when one is shown.
-##
-## [b]Top level, and placed by its caller every frame.[/b] The player node is the
-## simulation's: on a remote player it is written by the interpolator once a frame, but on
-## the local player and on every offline stand-in it moves once a TICK, and a body hung off
-## it would step at the tick rate while the camera beside it is blended between ticks. So
-## `PhClient.present_frame` hands every body the position this frame draws — the node for a
-## remote player, `render_state()` for one this process simulates — and nothing here
-## computes one.
-##
-## [b]One of the family's people[/b] (dot-player-char's `DotHumanoidFigure`: animated, on the
-## rig every game's players, bots and NPCs share, the same style as the zombies of the family's
-## zombie game), because a player is somebody to see coming and a capsule does not say which way
-## somebody is facing from forty metres. Which person a player is still comes from the blocky
-## kit's atlas their avatar names ([constant ATLASES]): the atlas letter is a look
-## (`DotHumanoidLook.from_letter`), so every avatar document written before the people arrived
-## dresses the same person on every client. [b]The side is on the top[/b], [constant TEAM_TINT] of
-## the way: the first thing anybody needs to read off a body is whose side it is on.
-##
-## [b]The weapon is in the person's own hand[/b] (`DotHumanoidFigure.attachment`, the gun hand of
-## the kit's clips), so it moves with the gun clips and a melee swing; the legs keep walking under
-## a swing because the figure plays it on the upper body only.
+## What somebody ELSE looks like: a Kenney blocky character (dot-player-char's `DotHumanoidFigure`) scaled to the hull, in their side's [constant TEAM_TINT] on the torso. Client side only.
+## Top level and placed by its caller every frame (`PhClient.present_frame`): a node moving once a TICK would step while the camera is blended between ticks. See `PhPlayer.present_body`.
+## The atlas letter is a look (`DotHumanoidLook.from_letter`), so old avatar documents dress the same person everywhere; the weapon is in the figure's own hand and legs keep walking under an upper-body swing.
 
 const CHANNEL := "ph.figure"
 
@@ -130,11 +103,8 @@ func pose(at: Vector3, yaw_radians: float, speed: float) -> void:
 	clip = person.clip
 
 
-## Draws [param id] in the right hand, or nothing for an empty id. [param switching] hides
-## it mid-switch, the way [ZeeWorldModel] does.
-##
-## [b]Asked every frame and cheap when nothing changed[/b]: the model is only re-equipped
-## when the id differs from what is drawn.
+## Draws [param id] in the right hand, or nothing for an empty id; [param switching] hides it mid-switch, as [ZeeWorldModel] does.
+## Asked every frame and cheap: the model is only re-equipped when the id differs from what is drawn.
 func hold(id: StringName, switching: bool) -> void:
 	holding = id
 

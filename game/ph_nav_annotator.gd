@@ -1,17 +1,8 @@
 extends DotNpcAiNavAnnotator
 
-## dot-npc-ai's map annotator, told what a prop-hunt hiding place is: a place beside a piece of
-## floor furniture a prop may become, among others of its kind, out of sight and tucked in.
-##
-## [b]Why override the score, not filter afterwards.[/b] The base score (out of sight first,
-## then tucked in) puts a prop in an empty corner: nothing to be, so a person in the open, which
-## is the one thing a hunter is glad of. The annotator picks its hiding places as the better
-## third by this score and keeps them apart, so a score that does not know about furniture picks
-## the wrong third and the right places never reach the list. Each spot is stamped here with the
-## piece a prop would copy there (`prop`, `kind`, `yaw`, `kin`), which is also how the bots
-## read it afterwards.
-##
-## No `class_name`: a mounted pack cannot register one.
+## dot-npc-ai's map annotator, told what a prop-hunt hiding place is: beside floor furniture a prop may become, among others of its kind, out of sight and tucked in.
+## The score is overridden rather than filtered afterwards: the base score puts a prop in an empty corner (nothing to be) and the annotator keeps only the better third, so the right places never reach the list.
+## Each spot is stamped with the piece a prop would copy (`prop`, `kind`, `yaw`, `kin`), which the bots read. No `class_name`: a mounted pack cannot register one.
 
 ## Metres from a piece's box a spot may be and still count as beside it ([code]ph_bot_beside[/code]).
 var beside: float = 1.3

@@ -1,14 +1,7 @@
 extends Node3D
 
-## A piece of furniture shot to bits: its own meshes as loose pieces, and a handful of chips in
-## its colour, thrown away from the shot and gone after a few seconds. Drawn only (a client),
-## never on a server.
-##
-## [b]Its own meshes, not a generic burst.[/b] A bottle's pieces are a bottle's glass and label;
-## a lamp's its shade and stand. Kenney's models are a few meshes each, which is a few pieces.
-## [b]They collide with the building and nothing else[/b] (the world layer only): a piece a
-## player could stand on or push about would be a piece the server does not know of, and the
-## decoy check reads the furniture the server built, never this.
+## A piece of furniture shot to bits: its own meshes as loose pieces plus a few chips in its colour, thrown from the shot and gone after seconds. Drawn only (a client).
+## They collide with the building and nothing else (world layer): a piece a player could stand on would be one the server does not know of, and the decoy check reads the furniture the server built.
 
 const LIFETIME := 4.0
 const CHIPS := 7

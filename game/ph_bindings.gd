@@ -1,25 +1,8 @@
 extends RefCounted
 
-## Every key this game reads, as one [DotMenuBindings] table: the action, the setting that
-## stores it, the words a player sees, the default, and the card it goes on.
-##
-## [b]A table, because four things read it:[/b] the client matches events against the actions,
-## the settings document stores one binding per row, the menu's Controls page draws a key per
-## row, and the help screen lists them with the key each is on now.
-##
-## [b]A prop's keys and a hunter's never share a default.[/b] Reload is R for a hunter, so the
-## prop's rotation lock is C; a player who is a prop this round and a hunter the next must not
-## find that the key they reloaded with now does something else in the same round.
-##
-## [b]H is help, in every game of the family[/b] (dot-menu adds the row), so nothing here
-## may default to it.
-##
-## [b]The right mouse button aims[/b] (zee's `ZeeViewModel.aim`), as in the arena; it was zee's
-## quick melee until 2026-10-12, which moved to F. [b]B is the hunter's loadout[/b] (dot-menu).
-##
-## [b]Chat is two rows[/b] on dot-ui's chat window's own actions (Y to all, U to your side), so
-## the help screen lists them and the Controls page moves them; until 2026-10-12 they were the
-## window's defaults, on no page.
+## Every key this game reads, as one [DotMenuBindings] table (action, setting, words, default, card) that the client, settings, Controls page and help screen all read.
+## A prop's keys and a hunter's never share a default (reload is R, so the rotation lock is C), and nothing defaults to H, which is help in every game.
+## Right mouse aims (`ZeeViewModel.aim`); B is the hunter's loadout; chat is two rows on dot-ui's chat actions (Y to all, U to your side) so the Controls page moves them.
 
 const DISGUISE := &"ph_disguise"
 const REVEAL := &"ph_reveal"
@@ -44,8 +27,7 @@ const SCOREBOARD := &"ph_scoreboard"
 ## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
 const CHAT := &"chat_open"
 const CHAT_TEAM := &"chat_open_team"
-## A hunter's weapon slots, 1 to 5. Rows, read through their actions, so the Controls page can
-## move them and the help screen lists them; they were keycodes in the client until 2026-10-11.
+## A hunter's weapon slots, 1 to 5, as rows read through their actions so the Controls page can move them and the help screen lists them.
 const SLOTS: Array[StringName] = [&"ph_slot_1", &"ph_slot_2", &"ph_slot_3", &"ph_slot_4", &"ph_slot_5"]
 
 

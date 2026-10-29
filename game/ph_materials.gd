@@ -1,38 +1,8 @@
 extends RefCounted
 
-## What a map's surfaces are made of: a wood floor, a tiled corridor, a carpet, a painted
-## wall, brick, grass, asphalt, glass. Generated here, once per process, as small tiling
-## textures; never a file.
-##
-## [b]Generated, not vendored, and the reason is the delivered pack.[/b] A texture a game
-## ships is a file inside a mount whose path the imported material recorded at the AUTHORED
-## location, which is the family's delivery bug in its sixth form; a texture made in code has
-## no path to be wrong. They are also tiny: twenty-odd 128-pixel images, generated in about a
-## third of a second on a client and never on a server, which draws nothing.
-##
-## [b]Mapped in world space (triplanar), so a box needs no UVs.[/b] A map is hundreds of boxes
-## of every size, and per-box UVs would stretch a plank across a two-metre wall and a
-## twenty-metre one alike. In world space a plank is the same width on every wall, which is
-## what makes a room read as a room rather than as a box with a picture on it.
-##
-## [b]A surface has a tint.[/b] A map document names a surface and may tint it, so one carpet
-## is a blue classroom and a red library without a second texture.
-##
-## [b]The building is drawn in the family's look[/b] (game-arena's built-in maps): every
-## surface a room is built of (floors, walls, ceilings, roofs, the ground outside) is
-## Kenney's light prototype grid, or his tiles on a floor, under a pastel that says what it
-## is ([constant PASTELS]: peach wood, periwinkle carpet, coral brick, mint grass). The map's
-## tint still multiplies it, paled halfway to white, so a mapper's red library is a pink one.
-## The furniture is Kenney's and keeps its own colours, which is the point: against pale
-## rooms a chair that is a player is a coloured thing among coloured things, not a model
-## against a photograph. Surfaces that are things rather than rooms (glass, water, court
-## lines, boards, lockers, metal, fabric, lamps) keep their generated look.
-##
-## [b]The two textures are files, and the reason the rest are not does not bite them[/b]:
-## they are loaded by a path through [code]PhPaths.rebase[/code] (as the furniture models
-## are), never referenced by an imported material, and a checkout without them falls back
-## to the generated look rather than failing. Kenney's Prototype Textures 1.0, CC0;
-## `assets/kenney/prototype/License.txt` is his, unchanged.
+## What a map's surfaces are made of, generated once per process as small tiling textures; never a file, since an imported material recorded the AUTHORED path in a delivered pack.
+## Mapped in world space (triplanar) so a box needs no UVs. The building is Kenney's light prototype grid (tiles on a floor) under a pastel ([constant PASTELS]) so coloured furniture reads against pale rooms.
+## The two textures are files loaded through `PhPaths.rebase` and never an imported material; a checkout without them falls back to generated. Kenney's Prototype Textures 1.0, CC0 (`assets/kenney/prototype/License.txt`).
 
 const PhPaths := preload("ph_paths.gd")
 
@@ -46,13 +16,9 @@ const TILES_PATH := "res://assets/kenney/prototype/tiles.png"
 ## one 0.5 m, as on game-arena's maps.
 const GRID_METRES := 4.0
 
-## surface id -> `[pastel, floor]`: the colour of a building surface on the grid, and whether
-## it is a floor (Kenney's tiles) or a wall (the grid). A surface not here keeps its
-## generated pattern. Each pastel is light enough that a sunlit face does not clip and
-## distinct enough that "the coral wall", "the blue carpet" can be called out. The ground
-## outside (grass, concrete, sidewalk, tiles, dirt, sand, asphalt) is a step deeper than the
-## walls: it is half of every outdoor frame, and at the old near-white values the sunlit
-## yard rendered at 0.9 luminance and over under Compatibility, with nothing to read against.
+## surface id -> `[pastel, floor]`: the colour of a building surface on the grid, and whether it is a floor (Kenney's tiles) or a wall (the grid).
+## A surface not here keeps its generated pattern. Pastels are light enough that a sunlit face does not clip; the outdoor ground is a step deeper because
+## it is half of every outdoor frame and near-white rendered at 0.9 luminance under Compatibility with nothing to read against.
 const PASTELS := {
 	"wood_floor": [Color(0.98, 0.84, 0.70), true],
 	"parquet": [Color(0.98, 0.86, 0.72), true],

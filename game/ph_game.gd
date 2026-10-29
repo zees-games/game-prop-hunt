@@ -15,20 +15,9 @@ const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
 const PhProjectiles := preload("ph_projectiles.gd")
 
-## The simulation. Headless, authoritative, and the only thing that decides anything.
-##
-## [b]A round is hiding and then seeking.[/b] At the top of each round some players are drawn
-## as hunters and everybody else is a prop. For [member PhConfig.hide_seconds] the props run off
-## and turn into furniture while the hunters stand blindfolded and held where they started.
-## Then the hunters are let go, armed, to find them: every prop shot is out, and so is any
-## hunter who shoots enough of the real furniture. Every prop found is the hunters' round; any
-## prop still standing when the clock runs out is the props'.
-##
-## [b]What it owns and what it borrows.[/b] The round, the sides and the scoreboard are
-## dot-match's (decided through [PhRules]); who becomes a hunter is dot-team's
-## [DotTeamRotation]; what a disguise is and what it costs is dot-props' [DotPropDisguise] and
-## its taunts are [DotPropTaunts]; health and shots are dot-combat's; the weapons are
-## zee-dot-weapons'. The map, the furniture and the rules of this game are its own.
+## The simulation: headless, authoritative, and the only thing that decides anything.
+## A round is hiding then seeking: hunters stand blindfolded for [member PhConfig.hide_seconds] while props turn into furniture, then hunt.
+## The round and sides are dot-match's (via [PhRules]), hunters come from [DotTeamRotation], disguises from dot-props; the map and rules are this game's.
 
 
 ## Where this world publishes itself, so a module can find it. A registry name and not an
@@ -124,10 +113,9 @@ signal blast_drawn(at: Vector3, weapon_id: StringName)
 var map: PhMap = null
 var props_catalogue: PhProps = null
 var combat: DotCombatManager = null
-## Whether a player may be hurt or eliminated now: `func(player_id: StringName) -> bool`, assigned
-## by the module (dot-game's "still loading": a seat behind its client's cover cannot see and is
-## frozen by its own client, so a shot, a decoy charge or a fall must not end it). Unset offline,
-## and bots are never loading, so offline rounds are unchanged.
+## Whether a player may be hurt or eliminated now: `func(player_id: StringName) -> bool`, assigned by the module.
+## A seat behind its client's loading cover is frozen by that client, so a shot or fall must not end it.
+## Unset offline, where bots are never loading.
 var harm_gate: Callable = Callable()
 ## The hunters' grenades in flight (`ph_projectiles.gd`): flown on the server and solo, and as
 ## copies on a client from the LAUNCH events (`PhNetBridge`), which decide nothing.
@@ -145,26 +133,19 @@ var rules: DotPropDisguiseRules = null
 ## by [method storage_key]. Null on a world that keeps none.
 var loadouts: DotLoadoutManager = null
 
-## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its
-## `loadout_menu` notice and the owner's `mp_loadout_*` cvars, which the module binds. Solo the
-## client asks it directly. Untyped and loaded by path because a host whose dot-loadout predates
-## API 2 has no such class; null there, and B is not offered.
+## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
+## Untyped and loaded by path because a host whose dot-loadout predates API 2 has no such class; null there, and B is not offered.
 var loadout_command: Object = null
 
 ## player id -> PhPlayer.
 var players: Dictionary = {}
 
-## dot-player-controller's `mp_forceview`: whether a player may switch views (0), or is held
-## in first (1) or third person (2); a prop and a hunter start in their side's view either
-## way. Bound by the module (REPLICATED) and followed by a client through its link. (No
-## `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's
-## standing hull would be the wrong one.)
+## dot-player-controller's `mp_forceview`: views switchable (0), held first person (1) or third (2); module-bound (REPLICATED), client-followed.
+## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 
-## What a dead body does, and which death reactions the server allows: dot-player-char's
-## `sv_ragdoll*` cvars, bound by the module (REPLICATED) and followed by a client through its
-## link, because the client draws the bodies. A person's body only: a disguised prop that dies
-## is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
+## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED) and client-followed because the client draws bodies.
+## A person's body only; a disguised prop that dies is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
@@ -298,12 +279,9 @@ func _ready() -> void:
 	DotLog.info(CHANNEL, "world ready", config.describe())
 
 
-## The `<pack>/<subdir>` directories of the map packs a host running this game with no server
-## has mounted for it: the client shell's Solo play, which fetches the packs a server owner
-## would name (dot-server-deploy's `client/solo.json`) because a tab has no server to name
-## them. Read the way the module reads its server's ([DotGameContent]). Empty everywhere else:
-## a server, a suite, a run from the repository. Looked up by name and duck-typed, because a
-## delivered game may not name a host's class.
+## The `<pack>/<subdir>` map-pack directories mounted for a host running this game with no server (the client shell's Solo play).
+## Read the way the module reads its server's ([DotGameContent]); empty on a server, in a suite or from the repository.
+## Duck-typed, because a delivered game may not name a host's class.
 static func solo_map_dirs(subdir: String) -> PackedStringArray:
 	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
 	if host == null or not host.has_method(&"map_dirs"):
@@ -318,11 +296,8 @@ func _exit_tree() -> void:
 
 
 ## Three layers: the building, the people, and the furniture.
-##
-## [b]People do not collide with people.[/b] Two players shoving is a race decided by who
-## walked into whom, drawn in the past on every client; a hunter walks through a prop who is
-## another player, which is a tell the genre has always had in one form or another, and a far
-## smaller one than a hunter stuck against an invisible sofa they cannot see is a person.
+## People do not collide with people: shoving is a race decided by who walked into whom, drawn in the past on every client.
+## A hunter walking through a prop is a far smaller tell than one stuck against an invisible sofa.
 func _build_physics() -> void:
 	physics = DotPhysicsLayout.custom(&"prophunt", [&"world", &"player", &"prop", &"toy", &"footprint"])
 
@@ -607,8 +582,6 @@ func taunt_ids() -> Array[StringName]:
 	return taunts.order if taunts != null else ([] as Array[StringName])
 
 
-# --- Players ----------------------------------------------------------------
-
 static func make_fall_rules() -> DotFallDamageRules:
 	var rules := DotFallDamageRules.new()
 	rules.enabled = true
@@ -696,10 +669,8 @@ func add_player(
 
 
 ## Puts one player somewhere they can be, for the phase it is.
-##
-## [b]A joiner while the hunters are seeking watches the round out.[/b] A prop dropped into
-## a round that is half over has had no time to hide, and a hunter dropped in arrives armed
-## among props who planned around how many there were.
+## A joiner while the hunters are seeking watches the round out: a prop dropped in half over has had no time to hide,
+## and a hunter dropped in arrives armed among props who planned around how many there were.
 func place_one(player: PhPlayer) -> void:
 	if map == null or map.doc.is_empty():
 		return
@@ -821,8 +792,6 @@ func sides_are_playable() -> bool:
 
 	return players.size() >= 2
 
-
-# --- The round --------------------------------------------------------------
 
 func start() -> void:
 	if not authoritative:
@@ -969,10 +938,8 @@ static func _names(of: Array[PhPlayer]) -> PackedStringArray:
 	return out
 
 
-## The next map, built.
-## Every map this server plays, as the map menu (M) lists them: `{id, name, detail, current}`,
-## the blurb under the name. Solo the client's list, online the server's (the module hands it
-## to dot-vote's map menu), so both say the same.
+## The next map, built; also every map this server plays, as the map menu (M) lists them: `{id, name, detail, current}`.
+## Solo the client's list, online the server's (the module hands it to dot-vote's map menu), so both say the same.
 func map_rows() -> Array:
 	var out: Array = []
 	if catalogue == null:
@@ -1004,7 +971,6 @@ func change_map_now(id: StringName) -> DotResult:
 		_lay_out_map()
 	DotLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
 	return DotResult.success(id)
-
 
 
 func _lay_out_map() -> void:
@@ -1121,8 +1087,6 @@ func arm_hunter(player: PhPlayer) -> void:
 			var _selected := player.weapons.arsenal.select(def.slot, _tick)
 			player.wanted_slot = def.slot
 
-
-# --- The loadout (B) ----------------------------------------------------------
 
 const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loadout_command.gd"
 
@@ -1318,13 +1282,9 @@ func _decide(winner: int, why: String) -> void:
 	DotLog.info(CHANNEL, "the round is decided", {"winner": winner, "why": why})
 
 
-# --- Hiding -------------------------------------------------------------------
-
 ## A prop asks to become what they are looking at. Server side.
-##
-## [b]The server looks, not the client.[/b] What is in front of somebody is a ray from where
-## the server has their eyes along the way the server has them looking, through the server's
-## copy of the map; a client that named a prop could name one across the map.
+## The server looks, not the client: a ray from the server's copy of their eyes through the server's map,
+## because a client that named a prop could name one across the map.
 func request_disguise(id: StringName) -> bool:
 	var player: PhPlayer = players.get(id)
 
@@ -1373,15 +1333,9 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 	return true
 
 
-## Makes sure [param player] has room for [param next]'s hull, moving them a little if they
-## need it. False when there is nowhere near enough.
-##
-## [b]A hull changes size in place.[/b] A bottle beside a wall that becomes a bookcase, or a
-## small prop under a table that shows its face, has a capsule half inside the wall or the
-## table, and the motor resolves that by shoving them out a different way on each machine, or
-## not at all. So the server looks first: where they stand, then a step to each side, never
-## through a wall to get there, never off the floor. A move is a teleport, which the owner's
-## client takes from the next snapshot like any other correction.
+## Makes sure [param player] has room for [param next]'s hull, moving them a little if needed; false when nowhere near is enough.
+## A hull changes size in place, leaving a capsule half inside a wall that each machine would shove out differently,
+## so the server looks first: where they stand, then a step to each side, never through a wall or off the floor.
 func _make_room(player: PhPlayer, next: DotPropDisguise) -> bool:
 	var world := get_world_3d()
 
@@ -1664,8 +1618,6 @@ func _look(player: PhPlayer, reach: float) -> int:
 	return map.prop_from_hit(hit.get("collider"), int(hit.get("shape", -1)))
 
 
-# --- Weapons ---------------------------------------------------------------
-
 ## Hands [param player] a weapon, building their rig the first time.
 func arm(player: PhPlayer, weapon_id: StringName) -> bool:
 	if player.weapons == null:
@@ -1725,11 +1677,9 @@ func _advance_weapons() -> void:
 			_charge_for_decoys(player, shot)
 			_break_furniture(shot)
 
-		# A thrown grenade: flown from here (`PhProjectiles`), its blast resolved where it goes
-		# off and charged in `_on_blast`. A client's copy comes from LAUNCH, never from here.
-		# Its owner is this player, as a shot's attacker is: the rig's context does not carry this
-		# game's entity id, and a grenade owned by nobody hit its thrower's own head as it left
-		# the hand (the flight leaves the owner's hitboxes out only by that id).
+				# A thrown grenade: flown from here (`PhProjectiles`), its blast resolved where it goes off and charged in `_on_blast`.
+				# Owned by this player by id, as a shot's attacker is: the flight leaves the owner's hitboxes out only by that id,
+				# and a grenade owned by nobody hit its thrower's head as it left the hand. A client's copy comes from LAUNCH.
 		if authoritative and projectiles != null:
 			for spawn in outcome.spawns:
 				spawn.owner_entity = player.entity_id
@@ -1737,12 +1687,8 @@ func _advance_weapons() -> void:
 			projectiles.accept(outcome)
 
 
-## What shooting the furniture costs: a share of the damage the shot would have done, off the
-## hunter's own health.
-##
-## [b]Every pellet that stopped on a real prop, and none that hit a player.[/b] A shot's
-## impacts include the pellets that struck somebody, and a prop player standing beside the
-## chair they copied would otherwise cost the hunter who found them.
+## What shooting the furniture costs: a share of the shot's damage, off the hunter's own health.
+## Every pellet that stopped on a real prop and none that hit a player, or a prop standing beside the chair they copied would cost the hunter who found them.
 func _charge_for_decoys(player: PhPlayer, shot: DotShot) -> void:
 	if config.decoy_penalty <= 0.0 or map == null:
 		return
@@ -1789,11 +1735,8 @@ func _charge(player: PhPlayer, amount: float) -> void:
 
 
 ## Shooting breakable furniture breaks it. Server side.
-##
-## [b]Breaking is not a free guess.[/b] The decoy penalty is charged for every pellet first
-## ([method _charge_for_decoys]); a bottle shot to bits cost the hunter as much as a sofa. What
-## breaks is the catalogue's (`props/kits.json` "breaks": glass, food, lamps, screens, plants,
-## boxes), and only once the shots that landed on it add up to its number.
+## The decoy penalty is charged for every pellet first ([method _charge_for_decoys]); what breaks is the catalogue's (`props/kits.json` "breaks"),
+## and only once the shots that landed on it add up to its number.
 func _break_furniture(shot: DotShot) -> void:
 	if map == null or props_catalogue == null:
 		return
@@ -1873,8 +1816,6 @@ func weapon_command_for(player: PhPlayer) -> DotWeaponCommand:
 	command.slot = player.wanted_slot
 	return command
 
-
-# --- The tick ---------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
 	if not authoritative or match_node == null or external_tick:
@@ -1964,8 +1905,6 @@ func _watch_world() -> void:
 			var _applied := combat.apply_damage(fall)
 
 
-# --- Toys ----------------------------------------------------------------------
-
 ## Everybody against the map's toys, after they moved: a walk into a barrel or a ball
 ## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
 func _advance_toys(delta: float) -> void:
@@ -1983,10 +1922,8 @@ func _advance_toys(delta: float) -> void:
 	map.toys.advance(delta)
 
 
-## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed
-## (dot-props' `shot_along`). The shot goes on to the combat, whose trace never sees a toy, so
-## a ball is never cover, and a hunter pays nothing for hitting one: it is no prop anybody could
-## be. Server side.
+## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed (dot-props' `shot_along`). Server side.
+## The shot goes on to the combat, whose trace never sees a toy, so a ball is never cover and hitting one costs nothing: it is no prop anybody could be.
 func _shoot_toys(shot: DotShot) -> void:
 	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
 		return
@@ -1994,8 +1931,6 @@ func _shoot_toys(shot: DotShot) -> void:
 	for raw: Variant in directions:
 		var _pushed := map.toys.shot_along(shot.origin, raw as Vector3, maxf(shot.max_range, 1.0), shot.damage, physics.layer_mask(&"world") | physics.layer_mask(&"prop"))
 
-
-# --- Grenades ------------------------------------------------------------------
 
 ## How fast a blast throws a toy at its centre (nothing at its edge), whatever the toy weighs:
 ## game-arena's number, so a ball goes as far from a frag in both games.
@@ -2025,12 +1960,9 @@ func _on_blast(at: Vector3, spawn: DotWeaponSpawn, shot: DotShot) -> void:
 		_charge(thrower, cost)
 
 
-## What a blast at [param at] costs its thrower: nothing when it hurt a prop (it found
-## somebody), nothing when no furniture was within [param radius] in clear sight of it (a
-## grenade into an empty yard is a shot into a wall), and otherwise one decoy at the blast's
-## full [param damage]: `decoy_penalty` of it, at least `decoy_penalty_min`. One, however many
-## pieces it reached: a blast is one guess about one place, and a charge per piece would make a
-## grenade in a classroom of thirty chairs a death sentence for testing anything.
+## What a blast at [param at] costs its thrower: nothing when it hurt a prop or when no furniture was within [param radius] in clear sight,
+## otherwise one decoy at the blast's full [param damage] (`decoy_penalty`, at least `decoy_penalty_min`).
+## One however many pieces it reached: a blast is one guess about one place, and a charge per piece would make a classroom of chairs a death sentence.
 func blast_cost(at: Vector3, radius: float, damage: float, shot: DotShot) -> float:
 	if config.decoy_penalty <= 0.0 or map == null:
 		return 0.0
@@ -2072,8 +2004,6 @@ func set_tick_rate(rate: int) -> bool:
 	return true
 
 
-# --- Applying what the server said (client side) -----------------------------
-
 ## A disguise the server decided, on this client's copy of the player.
 func apply_disguise_wire(id: StringName, wire: Dictionary) -> void:
 	var player: PhPlayer = players.get(id)
@@ -2084,8 +2014,6 @@ func apply_disguise_wire(id: StringName, wire: Dictionary) -> void:
 	player.apply_disguise(DotPropDisguise.from_wire(wire))
 	disguise_changed.emit(id)
 
-
-# --- Bots ------------------------------------------------------------------
 
 ## What the stand-ins press this tick: [code]ph_bots.gd[/code] (hide as what belongs where you
 ## stand, search the rooms, test what looks wrong).
@@ -2129,8 +2057,6 @@ func _clear_between(from: Vector3, to: Vector3, furniture: bool = false) -> bool
 
 	return world.direct_space_state.intersect_ray(query).is_empty()
 
-
-# --- Reacting ---------------------------------------------------------------
 
 func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	var by := entities.key_for_id(damage.attacker)
@@ -2177,8 +2103,6 @@ func decide_death(player: PhPlayer, damage: DotDamage) -> DotPlayerDeath:
 		DotPlayerDeath.seed_of(player.entity_id, _tick), weapon
 	)
 
-
-# --- Reporting --------------------------------------------------------------
 
 func seconds_left() -> float:
 	match phase:

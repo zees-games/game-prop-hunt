@@ -4,14 +4,8 @@ const PhMapDoc := preload("ph_map_doc.gd")
 const PhPaths := preload("ph_paths.gd")
 
 ## Every map this server can play, and which one is next.
-##
-## [b]Two sources, and the built-in one is a floor rather than a feature.[/b] The maps are
-## documents read from [member PhConfig.map_directory] — `maps/`, a link to mg-prop-hunt-maps,
-## in a checkout; a directory in a delivered pack. A server whose directory is missing or empty
-## still has [method practice], so it plays rather than refusing to start.
-##
-## [b]A server reads documents; a client never does.[/b] The map travels in its own event (see
-## [PhMapDoc]), so nothing here runs on a connected client.
+## Documents read from [member PhConfig.map_directory] (`maps/`, a link to mg-prop-hunt-maps, or a directory in a delivered pack); the built-in [method practice] is a floor so a server with none still plays.
+## A server reads documents and a client never does: the map travels in its own event (see [PhMapDoc]).
 
 const CHANNEL := "ph.catalogue"
 
@@ -133,13 +127,9 @@ func _rebuild_order() -> void:
 	_next = 0
 
 
-## Takes the maps subscribed packs provide, for the index's current session only. Opt-in. A
-## pack's map is a prop-hunt map document (the same JSON as `maps/`) named by the entry's
-## `scene` path, with `map_kind` one of [param accepted_kinds] ("*" is every kind, empty none).
-##
-## [b]Synced on every read rather than copied once[/b]: the index filters by its current
-## session, so a game that goes online loses them with no signal to miss. [method playable]
-## is the read everything goes through.
+## Takes the maps subscribed packs provide, for the index's current session only. Opt-in.
+## A pack's map is a prop-hunt map document named by the entry's `scene` path, with `map_kind` one of [param accepted_kinds] ("*" every kind, empty none).
+## Synced on every read, since the index filters by session and a game that goes online loses them with no signal; [method playable] is the read everything goes through.
 func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
 	content_index = index
 	content_kinds = accepted_kinds
@@ -347,15 +337,9 @@ func describe_lines() -> PackedStringArray:
 	return lines
 
 
-# --- The one built in -------------------------------------------------------
-
 ## A two-room house with a garden: enough furniture to hide among and a door between the rooms.
-##
-## [b]Written here rather than shipped as a file,[/b] so a server with no map directory at all
-## — a fresh clone, a suite — has something to play, and the suites have a map whose every
-## number is in front of them. They lean on these: the floor is x -10..10, z -8..8 at y 0; the
-## wall between the rooms is at x 0 with a 1.8 m door at z -1..0.8; the hunters start in the
-## east room, the props in the west; the garden is x 10..22.
+## Written here so a server with no map directory (a fresh clone, a suite) has something to play. Suites lean on: floor x -10..10, z -8..8 at y 0;
+## wall at x 0 with a 1.8 m door at z -1..0.8; hunters start east, props west; garden x 10..22.
 static func practice() -> Dictionary:
 	var boxes: Array = []
 	var height := 3.2

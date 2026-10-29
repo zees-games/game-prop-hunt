@@ -7,14 +7,8 @@ const PhPlayer := preload("../game/ph_player.gd")
 const PhNetBridge := preload("../game/net/ph_net_bridge.gd")
 const PhNetLink := preload("../game/net/ph_net_link.gd")
 
-## The game as a deployed server runs it: a real [DotServer], booted from a config file, with
-## the module loaded BY PATH the way an operator names it — so the netcode, the services, the
-## cvars and the stand-ins are the ones a deployment gets, not a copy assembled for a test.
-##
-## [b]What neither of the other suites can reach.[/b] `headless_run` drives a world by hand and
-## `headless_net` joins two halves with no server; this is the only place [PhModule] loads,
-## [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by
-## nothing but the stand-ins the module seats itself.
+## The game as a deployed server runs it: a real [DotServer] booted from a config file, the module loaded BY PATH as an operator names it.
+## The only suite where [PhModule] loads, [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by the stand-ins the module seats itself (`headless_run` and `headless_net` cannot reach these).
 
 const SECTIONS := 14
 const CHECKS := 107
@@ -337,10 +331,8 @@ func _test_a_round_runs() -> void:
 	_finished()
 
 
-## [b]A seat behind its client's loading cover cannot be hurt or eliminated[/b] (dot-game's "still
-## loading"): a person with a real peer, marked loading on the module's roster the way a join
-## does, takes a lethal hit that must be refused; once their cover lifts the same hit lands.
-## Rounds of stand-ins never reach this, because a bot is never loading.
+## A seat behind its client's loading cover cannot be hurt or eliminated (dot-game's "still loading"): a real peer marked loading takes a lethal hit that must be refused,
+## and once the cover lifts the same hit lands. Stand-in rounds never reach this, a bot never being loading.
 func _covered_seat_cannot_be_harmed(module: Object, bridge: Object) -> void:
 	_section("a covered seat cannot be harmed")
 	var roster: Object = module.get("roster")
@@ -371,10 +363,8 @@ func _covered_seat_cannot_be_harmed(module: Object, bridge: Object) -> void:
 	_finished()
 
 
-## The players' vote decides the next map: a ballot over the server's maps, one vote cast,
-## and the round's end puts the winner on the next round. Driven by hand rather than by
-## the clock, because stand-ins are not voters and a server of stand-ins never opens one.
-## Hibernation: the director follows the server's, and the ballot's timer waits with it.
+## The players' vote decides the next map: a ballot over the server's maps, one vote, and the round's end puts the winner on the next round.
+## Driven by hand because stand-ins are not voters; hibernation: the director follows the server's and the ballot's timer waits with it.
 func _vote_sleeps_with_the_server(vote: Node) -> void:
 	var sleeper: DotVoteDirector = vote.get("director")
 	_check(server.hibernation_changed.is_connected(sleeper.set_hibernating),
@@ -468,10 +458,8 @@ func _test_the_map_vote() -> void:
 	_check(str(game.map_doc.get("id", "")) == str(pick) and game.next_map_id == &"",
 		"and the next map laid is the one voted for, once", "%s / %s" % [game.map_doc.get("id", ""), game.next_map_id])
 
-	# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL the
-	# director opens nothing itself, a passed rtv included: it answered "Rocked. 1 of 1." and
-	# no ballot came. Past dot-vote's cooldown between two ballots, on the director alone so
-	# the map's own ballot timer does not open one first.
+		# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL a passed rtv answered "Rocked. 1 of 1." and no ballot came.
+		# Past dot-vote's cooldown, on the director alone so the map's own ballot timer does not open one first.
 	var laid := StringName(str(game.map_doc.get("id", "")))
 	_check(director.current_id() == laid and not director.is_voting(),
 		"the new map starts the vote over", "%s / %s" % [director.current_id(), laid])
@@ -487,17 +475,14 @@ func _test_the_map_vote() -> void:
 	var rocked := _run_command("rtv")
 	vote.call("advance", 0.05)
 	_check(director.is_voting(), "and a passing rock-the-vote opens a ballot", str(rocked))
-	# The director opens it under MANUAL; this game used to open it from clock.expired too.
+		# The director opens it under MANUAL; this game must not also open it from clock.expired.
 	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", str(opened_count[0]))
 	director.vote_opened.disconnect(counter)
 	_finished()
 
 
-## [b]`time_up: finish_round` waits for a round being played, never for warmup.[/b] The game
-## hands dot-vote its match's answer (`round_in_progress_fn`); without it a limit that ran out
-## in warmup held the change for `finish_round_max_sec` over a round that had not started.
-## Run on a director of its own carrying the game's own hook, so the real vote's clock is
-## untouched; the match's state is set by hand and put back.
+## `time_up: finish_round` waits for a round being played, never for warmup: without the game's `round_in_progress_fn` a limit that ran out in warmup held the change for `finish_round_max_sec`.
+## Run on a director of its own carrying the game's hook, so the real vote's clock is untouched; the match's state is set by hand and put back.
 func _test_finish_round_waits_for_a_live_round() -> void:
 	_section("finish_round waits for a live round, not warmup")
 	var module := _module()
@@ -580,11 +565,8 @@ func _finish_round_probe(hook: Callable, applied: Array) -> DotVoteDirector:
 	return probe
 
 
-## A reload keeps the maps the server names. `ph_reload` reads the map directory again with
-## `load_from`, which forgets everything read before, and in two of the three games built this
-## way it stopped there: every delivered map was gone until a restart, with nothing logged.
-## A pack "mounted" on the disk and a descriptor naming it stand in for dot-cloud and the
-## deployment's map config (dot-server-deploy's cfg/content.yml), which a suite has neither of.
+## A reload keeps the maps the server names: `ph_reload` calls `load_from`, which forgets everything read before, and every delivered map vanished until a restart with nothing logged.
+## A pack "mounted" on disk and a descriptor naming it stand in for dot-cloud and the deployment's `cfg/content.yml`.
 func _test_a_reload_keeps_delivered_maps() -> void:
 	_section("a reload keeps the maps the server names")
 	var key := "dot-test/ph-delivered@1.0.0"
@@ -614,13 +596,9 @@ func _test_a_reload_keeps_delivered_maps() -> void:
 	_check(game.catalogue.maps.has(&"ph_practice"),
 		"beside the built-in one")
 
-	# The ballot sees them from boot, not only after a reload: _game_load builds the vote
-	# before the delivered maps arrive, and a list read then held only the practice map,
-	# which never opens a ballot. A module unloaded and loaded with the pack named is a boot
-	# (not module_reload, which reloads the script under the world's live instances). Every
-	# map for the length of this check, not only this suite's practice one, and the catalogue
-	# as a boot finds it: the world outlives the module and still holds the map from the
-	# ph_reload above, which a vote built at load would read without the fix.
+		# The ballot sees them from boot, not only after a reload: _game_load builds the vote before the delivered maps arrive, and a list read then held only the practice map.
+		# A module unloaded and loaded with the pack named is a boot (not module_reload, which reloads the script under live instances); the world still holds the map from the ph_reload above,
+		# which a vote built at load would read without the fix.
 	var only := game.config.map_ids
 	game.config.map_ids = PackedStringArray()
 	var _builtin := game.catalogue.load_from(game.config.map_directory)
@@ -657,10 +635,8 @@ func _test_a_reload_keeps_delivered_maps() -> void:
 	_finished()
 
 
-## maps.yml on the live module: a map outside the active rotation stays installed and loadable
-## by `ph_map`, but is never drawn, balloted or nominated; a rotation switch takes effect; the
-## game's own commands and dot-vote's are renamed from the file's `commands:`; no file changes
-## nothing.
+## maps.yml on the live module: a map outside the active rotation stays installed and loadable by `ph_map` but is never drawn, balloted or nominated;
+## a rotation switch takes effect; the game's and dot-vote's commands are renamed from `commands:`; no file changes nothing.
 func _test_map_rotation_file() -> void:
 	_section("maps.yml")
 	var module := _module()
@@ -768,9 +744,8 @@ func _test_map_rotation_file() -> void:
 	_finished()
 
 
-## A module reload must leave ONE link under the server, still named for the client's route.
-## Two used to be left, the live one renamed `@Node@n`, and every RPC to a real client was lost
-## without an error. The proof is a real client over the socket: signing on is server events.
+## A module reload must leave ONE link under the server, named for the client's route: a second, the live one renamed `@Node@n`, lost every RPC to a real client without an error.
+## The proof is a real client over the socket: signing on is server events.
 func _test_a_module_reload() -> void:
 	_section("a module reload leaves one live link")
 

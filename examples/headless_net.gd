@@ -1,21 +1,9 @@
 extends "headless_net_base.gd"
 
 
-## The real path minus the socket: two worlds, two managers, two bridges, two links with the
-## RPC replaced by a queue, so the codec, the seal, the snapshots, the prediction and the
-## reconciliation all run, in one process, in two physics worlds.
-##
-## [b]What this suite is for is the two claims the game rests on over a wire.[/b] First, a
-## disguise is a HULL as well as a look: a prop's own client predicts itself with the prop's
-## capsule, so if the client and the server disagree about what somebody is wearing, the client
-## walks through a doorway the server's chair does not fit through and is pulled back every
-## tick. So this asserts the hull on both ends and the two ends agreeing after a run. Second,
-## the blindfold is true on the wire: a hunter's snapshots carry no prop while the props hide
-## (`PhInterest`), so a client that skipped drawing the black screen would still see nothing.
-## Then everything else that crosses: the map document, the sides, turning, a taunt, a joiner
-## told what everybody is wearing, a decoy's charge, the result.
-##
-## Sections and checks are both counted; mg-smash-copter's notes say why the second matters.
+## The real path minus the socket: two worlds, managers, bridges and links with the RPC replaced by a queue, so the codec, seal, snapshots, prediction and reconciliation all run in one process.
+## It asserts the two claims the game rests on over a wire: a disguise is a HULL as well as a look (both ends must agree what somebody wears, or the client walks through a doorway the server's chair does not fit and is pulled back every tick),
+## and the blindfold is true on the wire (a hunter's snapshots carry no prop while the props hide, `PhInterest`). Then everything else that crosses. Sections and checks are both counted (mg-smash-copter's notes say why).
 
 const SECTIONS := 17
 const CHECKS := 91
@@ -62,8 +50,6 @@ func _run() -> void:
 
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
-
-# --- The codec ------------------------------------------------------------------
 
 ## Every encoder against its decoder. Nothing checks that two ends of a serialisation are
 ## inverses for you: dot-moderation once wrote "voice muted" and read back a warning.
@@ -133,10 +119,8 @@ func _test_the_codec() -> void:
 		and absf(float(clock["seek_elapsed"]) - 40.25) < 0.1 and int(clock["props"]) == 3
 		and int(clock["hunters"]) == 1, "CLOCK", str(clock))
 
-	# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a
-	# smaller kind: game-zombie-zone sent HURT and AMMO as HELLO and MAP that way.
-	# The largest MAP a reader accepts survives the event's own body cap. At 4096 a 4100-byte map
-	# went out whole and was read back as no bytes, silently (hs_park with its toys).
+		# A kind goes out in a fixed field the writer masks without a word, so one past it aliases a smaller kind.
+		# The largest MAP a reader accepts must survive the event's own body cap, or it is read back as no bytes, silently.
 	var biggest := PackedByteArray()
 	biggest.resize(PhEvents.MAP_BYTES)
 	var outgoing := PhEvent.new(PhEvents.Kind.MAP, PhEvents.write_map(biggest))
@@ -157,8 +141,6 @@ func _test_the_codec() -> void:
 
 	_finished()
 
-
-# --- Bringing both halves up ---------------------------------------------------------
 
 func _build() -> bool:
 	_section("bringing both halves up")
@@ -192,10 +174,8 @@ func _build() -> bool:
 
 	_server_net = _make_manager(true, &"server", 1, server_side, SERVER_TICK_RATE)
 	_client_net = _make_manager(false, &"client", CLIENT_PEER, client_side, CLIENT_ENGINE_TICK_RATE)
-	# This harness stamps every command itself (`_tick + INPUT_LEAD`), not from the client's
-	# clock, so the client must not ask for dot-net's input-lead report: steered by reports
-	# about commands it never stamped, the clock runs away from them (only dot-net's cap
-	# holds it). By the constant map, so this parses against a dot-net from before the report.
+		# This harness stamps every command itself (`_tick + INPUT_LEAD`), so the client must not ask for dot-net's input-lead report:
+		# steered by reports about commands it never stamped, the clock runs away. By the constant map, so this parses against a dot-net from before the report.
 	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 
@@ -459,15 +439,9 @@ func _test_a_decoy_is_charged() -> void:
 	_finished()
 
 
-## A connected hunter's drawn gun takes the server's ammunition count, read from the owner-only
-## snapshot fields, once it has gone quiet.
-##
-## [b]The online half of `PhClient.correct_drawn`, which only the offline half had a check for[/b]
-## (headless_run reads the world's rig). A real PhClient, not in the tree so it builds no netcode
-## of its own, is handed this suite's client bridge and draws its gun the way `_on_armed` does.
-## The server's count is set apart from the drawn one, as a refused shot or a refill leaves it.
-## Armed: with the online branch of `_server_count` returning nothing, or `correct_drawn` not
-## writing, the last checks fail.
+## A connected hunter's drawn gun takes the server's ammunition count, read from the owner-only snapshot fields, once it has gone quiet.
+## The online half of `PhClient.correct_drawn` (headless_run reads the world's rig): a real PhClient, not in the tree, is handed this suite's client bridge and the server's count is set apart from the drawn one.
+## Armed: with the online branch of `_server_count` returning nothing, or `correct_drawn` not writing, the last checks fail.
 func _test_the_drawn_gun_takes_the_server_count() -> void:
 	_section("a connected hunter's drawn gun takes the server's ammunition count")
 	var server_me := _server_me()
@@ -536,10 +510,8 @@ func _test_the_drawn_gun_takes_the_server_count() -> void:
 	_finished()
 
 
-## The hit marker's wire half (`PhGame.hit_landed` → HIT → `hit_received`); `headless_run` only
-## proves the offline half, where the world's own signal flashes the marker. A hunter shoots the
-## hiding stand-in point-blank. Armed: with the bridge's HIT send removed the first check fails;
-## sent with `_broadcast` the second does.
+## The hit marker's wire half (`PhGame.hit_landed` -> HIT -> `hit_received`); `headless_run` proves only the offline half. A hunter shoots the hiding stand-in point-blank.
+## Armed: with the bridge's HIT send removed the first check fails; sent with `_broadcast` the second does.
 func _test_a_hit_is_the_shooters() -> void:
 	_section("a hunter's shot that lands is told to the hunter alone")
 	var server_me := _server_me()

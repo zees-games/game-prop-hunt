@@ -1,8 +1,7 @@
 extends Node
 
-## Under xvfb-run (never --headless, whose audio driver is Dummy): does the game make a noise?
-## Bakes the bank as a client does, plays the round's cues beside the listener, then plays a
-## taunt file the way a prop does, from a node three metres away.
+## Under xvfb-run (never --headless, whose audio driver is Dummy): does the game make a noise? Bakes the bank as a client does, plays the round's cues beside the listener,
+## then a taunt file from a node three metres away, the way a prop does.
 ##   xvfb-run -a godot --path . res://tools/audio_probe.tscn
 
 const PhAudio := preload("res://game/ph_audio.gd")

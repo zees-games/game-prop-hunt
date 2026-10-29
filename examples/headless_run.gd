@@ -1,25 +1,13 @@
 extends "headless_run_base.gd"
 
 
-## The simulation, headless: the prop catalogue and the map documents, the draw, the hide, every
-## part of hiding as a prop, taunts, shots at props and at the furniture, the beacon, and how a
-## round is decided.
-##
-## [b]Counts sections AND checks, and the second is the one that matters.[/b] A script error
-## inside a section aborts that function and the section counter is already satisfied,
-## because the section announced itself on the way in. dot-settings has the story.
-##
-## Every number about the map here is the built-in practice house's
-## ([method PhCatalogue.practice]), whose comment lists where everything is.
+## The simulation, headless: the prop catalogue and map documents, the draw, the hide, taunts, shots at props and furniture, the beacon, and how a round is decided.
+## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. dot-settings has the story.
+## Every number about the map is the built-in practice house's ([method PhCatalogue.practice]), whose comment lists where everything is.
 
 const SECTIONS := 30
 
 const CHECKS := 174
-
-
-
-
-
 
 
 func _ready() -> void:
@@ -69,8 +57,6 @@ func _run() -> void:
 
 	_report_sections(_sections_entered, _sections_finished, SECTIONS, CHECKS)
 
-
-# --- Without a world ------------------------------------------------------------
 
 func _test_config() -> void:
 	_section("the configuration")
@@ -158,8 +144,6 @@ func _test_documents() -> void:
 	_check(not PhMapDoc.decode(torn).ok, "a torn one is refused rather than half built")
 	_finished()
 
-
-# --- A world ---------------------------------------------------------------------
 
 func _test_world_builds() -> void:
 	_section("the practice house builds, solid where it should be")
@@ -377,11 +361,8 @@ func _test_turning() -> void:
 	_finished()
 
 
-## Christian's first play test: "When I'm a water bottle and default up, I should be able to
-## put it on each side or on its nose ... WITHOUT going into the ground (since that'd be
-## cheating)." Every prop a player may become, turned every way a player can turn it (each side,
-## back, front, upside down), drawn: the lowest point of its real meshes stays on the floor, the
-## feet stay on it, and the hull is as tall as the leant prop.
+## Every prop a player may become, turned every way a player can turn it (each side, back, front, upside down), drawn: its lowest mesh point stays on the floor,
+## the feet stay on it, and the hull is as tall as the leant prop, so nobody sinks into the ground by tipping over.
 func _test_lean_on_the_floor() -> void:
 	_section("every prop turned every way up rests on the floor, never in it")
 	var game := await _hide_round()
@@ -636,11 +617,8 @@ func _test_breaking() -> void:
 var _props_catalogue: PhProps = null
 
 
-## The hunters' grenades (`PhProjectiles`): a frag thrown on B's slot five flies, bursts on its
-## fuse and finds the prop beside it, for nothing; one that goes off by the bookcase and finds
-## nobody costs one decoy at its full damage; one in the open garden costs nothing and throws
-## the football. Armed: with `PhGame._advance_weapons` dropping `outcome.spawns` again the first
-## checks fail; with `blast_cost` charging regardless, the third does.
+## The hunters' grenades (`PhProjectiles`): a frag on B's slot five bursts on its fuse and finds the prop beside it for nothing; one by the bookcase finding nobody costs one decoy at full damage; one in the open garden costs nothing and throws the football.
+## Armed: with `PhGame._advance_weapons` dropping `outcome.spawns` the first checks fail; with `blast_cost` charging regardless, the third does.
 func _test_grenades() -> void:
 	_section("a hunter's grenade flies, bursts, finds a prop, and costs a decoy on the furniture")
 	var game := await _seek_round()
@@ -817,8 +795,7 @@ func _test_bots() -> void:
 	game.start()
 	await _step(game, TICK_RATE * 8)
 	var hidden := game.players_on(PhGame.PROPS).filter(func(p: PhPlayer) -> bool: return p.is_disguised())
-	# Every one, not most: a stand-in whose look met the wrong thing used to ask again every
-	# tick for the rest of the round, in the open.
+		# Every one, not most: a stand-in whose look met the wrong thing asked again every tick for the rest of the round, in the open.
 	_check(hidden.size() == game.players_on(PhGame.PROPS).size(),
 		"every stand-in prop is hiding as something by the end of the hide (%d of %d)" % [hidden.size(), game.players_on(PhGame.PROPS).size()])
 	await _step(game, TICK_RATE * 6)
@@ -858,7 +835,7 @@ func _test_the_client() -> void:
 	client.set(&"remember_loadout", false)
 	client.set(&"config_file", "user://cfg/headless-none.json")
 	add_child(client)
-	# The map used to be drawn, and steered, while it was still being built.
+		# The map must not be drawn, or steered, while it is still being built.
 	var platform: DotGameClient = client.get("platform")
 	var covered := platform != null and platform.gate != null and not platform.is_shown() \
 		and platform.is_input_blocked()
@@ -893,9 +870,8 @@ func _test_the_client() -> void:
 	tab.pressed = false
 	(menu as DotMenu).handle_event(tab)
 
-	# A round started the way dot-match starts one, with this keyboard drawn to hunt. The round
-	# arms its hunters and THEN begins the hide, and the client used to drop every gun at the
-	# start of a hide: a hunter seeking with a gun nobody could see, in every real round.
+		# A round started the way dot-match starts one, with this keyboard drawn to hunt. The round arms its hunters and THEN begins the hide,
+		# so the client dropping every gun at the start of a hide left a hunter seeking with a gun nobody could see.
 	var world: PhGame = client.get("game")
 	world.wish_side(&"local", PhGame.HUNTERS)
 	world._on_round_started(world.round_number + 1)
@@ -987,12 +963,8 @@ func _test_the_client() -> void:
 	_finished()
 
 
-## The family's rule since the first play test: H opens help in every game, nothing else in
-## the table is on H, and the Escape menu has Help & commands and Leave.
-## Offline the world samples the local player's movement itself, so the client's buttons
-## have to go onto that sample. They were stamped on the controller's command and then sampled
-## over, and offline no hunter's trigger ever reached the world's gun (found by
-## game-zombie-zone's play test; the same lines were here).
+## H opens help in every game, nothing else in the table is on H, and the Escape menu has Help & commands and Leave.
+## Offline the world samples the local player's movement itself, so the client's buttons have to go onto that sample, or no hunter's trigger reaches the world's gun.
 func _test_offline_trigger() -> void:
 	_section("offline, the client's trigger reaches the world's gun")
 	var game := await _world()
@@ -1052,11 +1024,8 @@ func _test_help_and_menu() -> void:
 	_finished()
 
 
-## The play test: "weapons are completely broken". The drawn rig was given the whole pack, so each
-## slot held whatever was given last (a hammer, a pistol, a purple rifle, a green sniper) and never
-## the gun the server fired; the default loadout put the SMG and the shotgun in one slot; and the
-## HUD said "1-3 Weapons" and nothing about what was in hand. Armed: with `give_everything` back
-## the first check fails; without `correct_drawn` the last does.
+## The drawn rig must show the gun the server fired: given the whole pack, each slot held whatever was given last; the default loadout put the SMG and shotgun in one slot; the HUD said nothing about what was in hand.
+## Armed: with `give_everything` back the first check fails; without `correct_drawn` the last does.
 func _test_hunter_weapons() -> void:
 	_section("a hunter draws the guns the server armed, counted on the HUD and corrected from it")
 	_check(PhGame.hunter_slot_clash(PhConfig.new().hunter_weapons) == "",
@@ -1184,8 +1153,6 @@ func _check_hunter_hints(hud: Node, drawn: ZeeWeaponRig) -> void:
 	_check(with_grenade.contains("1 2 3  Weapons   5  Grenade") and not hints.text.contains("Grenade"),
 		"and key 5 for a grenade while one is carried", with_grenade)
 
-
-# --- Helpers --------------------------------------------------------------------
 
 ## The family's rule since the first play test: M opens the map list, and solo a choice
 ## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and dot-vote.
@@ -1322,8 +1289,6 @@ func _test_fall_damage() -> void:
 	_finished()
 
 
-
-
 ## A death: the server picks the fall and it rides DEATH; a client lays a person down as
 ## dot-player-char's ragdoll from the figure it draws, and a disguised prop bursts into its own
 ## pieces (or, under `prop_death` 1, topples as the prop).
@@ -1455,8 +1420,6 @@ func _check_death_wire() -> void:
 	for row: Dictionary in DotPlayerDeathSounds.rows():
 		listed = listed and catalogue.find(row["id"]) != null
 	_check(listed, "the death sounds are in the game's catalogue")
-
-
 
 
 ## B, a hunter's loadout (dot-loadout's DotLoadoutCommand on the world's own manager, as the

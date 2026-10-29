@@ -10,7 +10,7 @@
 # rounds_per_map: 4
 # Where map documents are read from, relative to this game's root.
 # map_directory: "maps"
-# The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the game's own shipped `res://...
+# The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (...
 # map_rotation_file: "cfg/maps.yml"
 # Seed every random choice is drawn from: the map, the hunters, the bots.
 # seed_value: 20261009
@@ -26,7 +26,7 @@
 # bot_relocate_seconds: 150.0
 # Metres a stand-in prop's move to another place may reach. [2.0..60.0]
 # bot_relocate_range: 12.0
-# Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints): props hide beside...
+# Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints) to hide and sweep....
 # bot_nav: true
 # With `bot_nav`: how much of the annotated map a stand-in hunter knows, 0..1 (at least its own `bot_map_know... [0.0..1.0]
 # bot_sweep: 0.1

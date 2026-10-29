@@ -6,29 +6,9 @@ const PhBindings := preload("ph_bindings.gd")
 const PhWeaponIcons := preload("ph_weapon_icons.gd")
 const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 
-## What a player needs on screen: the clock and who it is counting for, which side they are on
-## and how much of them is left, what they are hiding as, and — while the props hide — a
-## blindfold for the hunters.
-##
-## [b]The blindfold is a screen, and the HUD is drawn over it.[/b] The brief: hunters cannot see
-## the map, the props or each other while the props hide, but they can still see their HUD and
-## use the menus. So it is a black rect UNDER every widget here, with its own line saying how
-## long is left; the world behind it is not drawn at all. It does not depend on the client
-## being honest about drawing: a blindfolded hunter is also held still by a movement modifier
-## the server owns (see [PhController]), and their gun is the server's to fire.
-##
-## [b]The glance pieces are dot-ui's.[/b] The clock is a [DotScoreStrip] with the props and
-## hunters still up as its two side plates, in the sides' colours; health is a [DotVitals]
-## whose fill is the player's side colour; "look at a prop and press E" is a [DotKeyPrompt]
-## under the crosshair. Health used to be a number on a disc in the side's colour. The disc
-## said which side you are on and nothing about how much of you is left: a prop's health is
-## a share of a size-derived maximum (10 to 200), so 40 is nearly dead as a wardrobe and
-## whole as a bottle. The bar says the share, its fill keeps the side's colour, and the side
-## is also the plates' colours and the word beside it. Decided 2026-10-11 (hud-pieces).
-##
-## [b]The keys are read from the bindings, not written here.[/b] The hints in the corner say
-## the key each action is on NOW, from the same table the menu's Controls page edits, so a
-## rebound key is never a hint that lies.
+## What a player needs on screen: the clock, their side and how much of them is left, what they are hiding as, and a blindfold for hunters while the props hide.
+## The blindfold is a black rect UNDER every widget; the server also holds a blindfolded hunter still ([PhController]) and fires their gun, so it relies on no honest client.
+## Glance pieces are dot-ui's ([DotScoreStrip], [DotVitals], [DotKeyPrompt]); key hints are read from the bindings table, so a rebound key is never a hint that lies.
 
 const BLIND_FADE_SEC := 0.25
 const BLIND_COLOUR := Color(0.01, 0.01, 0.015)
@@ -55,10 +35,8 @@ static func piece_theme() -> Theme:
 	return t
 
 
-## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): the menu sets the
-## theme on the HUD's root now and at every theme change, and applies the player's HUD size.
-## Christian's first play test (2026-10-11) asked for a darker HUD a player can restyle in
-## the menu. Duck-typed and called by name, for a client shell older than dot-menu 7.
+## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): it sets the theme on the HUD's root now and at every change, and applies the player's HUD size.
+## Duck-typed and called by name, for a client shell older than dot-menu 7.
 var _menu: Object = null
 
 
@@ -217,10 +195,8 @@ func _build() -> void:
 	vitals.visible = false
 	_root.add_child(vitals)
 
-	# Bottom right, a hunter's: what is in hand and how much is in it. The chat box and the
-	# health plate are bottom left and the ballot top right, so nothing it shares a corner with;
-	# a ballot that does reach it dims it (DotHudPiece's cover), and headless_run checks the
-	# corners. "1-3 Weapons" on the hints said what to press and nothing said what you held.
+		# Bottom right, a hunter's: what is in hand and how much is in it. It shares no corner with the chat box, health plate or ballot,
+		# and a ballot that does reach it dims it (DotHudPiece's cover); headless_run checks the corners.
 	ammo = DotAmmoCounter.new()
 	ammo.name = "Ammo"
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)

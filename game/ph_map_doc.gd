@@ -2,28 +2,9 @@ extends RefCounted
 
 const PhMaterials := preload("ph_materials.gd")
 
-## What a map IS: a JSON document, checked here before anything is built.
-##
-## [b]A map is a document, not a scene[/b], for mg-wipeout's reason, which every map-driven game
-## in this family has taken since: a scene per map is content to import, to rebase inside a
-## mounted pack and to keep in step across a server and every client; a document is a few tens
-## of kilobytes the server reads off disk and SENDS to each client when the map changes. A
-## client needs no map files, a server gets a new map by having a file dropped in a directory,
-## and the two ends cannot disagree about where a wall or a chair is, because there is one copy
-## and it travelled.
-##
-## [b]What is in one:[/b] boxes (the building: floors, walls, ceilings, glass, a pool), props
-## (the furniture a player hides among and as, by catalogue id), lights, the two sides' spawns,
-## and how the sky and the sun look. Every length is metres, every angle degrees. A box's `at`
-## is its CENTRE; a prop's `at` is the middle of its footprint ON the floor, so a mapper places
-## a chair by where it stands.
-##
-## [b]Normalised into plain arrays, never vectors.[/b] What a server encodes is what this
-## returned, and a vector's float32 components come back out of JSON as `0.300000011920929`:
-## twice the bytes for a map of a thousand boxes and a document whose digest moves when nothing
-## did. Rounded to the millimetre here, once.
-##
-## `maps/README.md` in mg-prop-hunt-maps is the mapper's copy of this.
+## What a map IS: a JSON document, checked here before anything is built (`maps/README.md` in mg-prop-hunt-maps is the mapper's copy).
+## A document, not a scene: it is read off disk and SENT to each client, so the two ends cannot disagree. Boxes' `at` is the CENTRE, a prop's the middle of its footprint ON the floor; metres and degrees.
+## Normalised into plain arrays, never vectors: float32 components come back from JSON as `0.300000011920929`, doubling the bytes and moving the digest. Rounded to the millimetre, once.
 
 
 ## The format this build reads. A document written for a later one is refused rather than
@@ -302,8 +283,6 @@ static func decode(bytes: PackedByteArray) -> DotResult:
 static func digest(doc: Dictionary) -> String:
 	return JSON.stringify(doc, "", true).sha256_text().substr(0, 12)
 
-
-# --- Small readers ----------------------------------------------------------
 
 static func v3(value: Variant) -> Vector3:
 	if value is Vector3:

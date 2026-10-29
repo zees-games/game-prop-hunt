@@ -4,17 +4,9 @@ const PhCatalogue := preload("../game/ph_catalogue.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhVote := preload("../game/ph_vote.gd")
 
-## What a subscribed map pack does to this game's lists, against a fixture
-## [DotContentIndex] and never the process's shared one.
-##
-## [codeblock]
-## godot --headless --path . res://examples/headless_workshop.tscn
-## [/codeblock]
-##
-## Three things are the point: a solo pack map is listed ("Name [Pack]", in the catalogue, the
-## M menu rows, `ph_maps` and the ballot) and can be chosen as the next map, an online session
-## lists none of it, and a map kind the game does not accept is left out. The game's own ids
-## winning is the fourth. The pack's map is a real document, written to `user://` here.
+## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex] and never the process's shared one.
+##   godot --headless --path . res://examples/headless_workshop.tscn
+## A solo pack map is listed ("Name [Pack]") and can be chosen next, an online session lists none of it, a map kind the game does not accept is left out, and the game's own ids win.
 
 const SECTIONS := 5
 const MAP := &"fixture_barn"

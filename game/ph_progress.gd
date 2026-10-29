@@ -3,31 +3,11 @@ extends Node
 const PhPlayer := preload("ph_player.gd")
 
 ## What a player keeps from a round: the numbers this game produces, and what they earn.
-##
-## [b]The numbers are the ones only this game has.[/b] A deathmatch counts kills; a hiding
-## game counts both ends of a hide — how many rounds somebody got through as a piece of
-## furniture, and as a hunter how many props they found and how often they shot a real chair
-## instead. Each is declared once, in [method schema], counted as it happens and reported by
-## dot-stats as a DELTA — "add one", never "now has forty" — so two servers reporting one
-## player add up rather than overwrite.
-##
-## [b]Achievements are rules over those numbers and nothing else.[/b] dot-achievements never
-## hears about a disguise; it hears that a number moved, through [DotAchievementStatsLink] —
-## which is the differencer between dot-stats' SESSION totals and a lifetime total, and the
-## reason this is not one `connect`.
-##
-## [b]Stand-ins are never counted.[/b] An achievement a bot can earn is noise in every log an
-## operator reads, and a stand-in's numbers are no player's numbers.
-##
-## [b]Server side, and on an offline client — wherever the world is authoritative.[/b]
-##
-## [b]A player's numbers are filed under their scoped profile key when they have one[/b] — see
-## mg-wipeout's note, which this is, unchanged: [member durable_key_fn] supplies it, and
-## without one the key is the world's id and lasts a connection.
+## Numbers (rounds survived as furniture; props found and real chairs shot) are declared once in [method schema] and reported by dot-stats as a DELTA, so two servers reporting one player add up.
+## Achievements are rules over them through [DotAchievementStatsLink]; stand-ins are never counted. Filed under the scoped profile key when there is one ([member durable_key_fn]), else the world's id.
 
 const CHANNEL := "ph.progress"
 
-# --- The numbers -------------------------------------------------------------
 
 ## Rounds a player was in from the start to the end, and won.
 const ROUNDS_PLAYED := &"ph.rounds_played"
@@ -78,8 +58,6 @@ var _keys: Dictionary = {}
 var _ids: Dictionary = {}
 
 
-# --- The documents -----------------------------------------------------------
-
 static func ids() -> Array[StringName]:
 	return [
 		ROUNDS_PLAYED, ROUNDS_WON, PROP_ROUNDS, HUNTER_ROUNDS, SURVIVED, PROPS_FOUND,
@@ -120,10 +98,7 @@ static func _add(
 
 
 ## What a player can earn, as rules over [method schema]'s numbers.
-##
-## [b]Every stat read here is one [method schema] declares and this file records[/b] — an
-## achievement over a stat nothing reports never unlocks and nothing errors. The suite checks
-## it both ways.
+## Every stat read here must be one [method schema] declares and this file records, or the achievement never unlocks and nothing errors; the suite checks both ways.
 static func catalogue() -> DotAchievementCatalogue:
 	var made: Array[DotAchievement] = []
 
@@ -178,8 +153,6 @@ static func _sum(
 	return out
 
 
-# --- Building ---------------------------------------------------------------
-
 ## [param directory] empty keeps achievement progress in memory; see
 ## [member PhConfig.progress_directory]. [param report] is [member PhConfig.report_progress].
 func setup(directory: String, report: bool) -> DotResult:
@@ -228,15 +201,9 @@ func setup(directory: String, report: bool) -> DotResult:
 	return link.start().wrap("prophunt's stats-to-achievements link")
 
 
-# --- Counting ---------------------------------------------------------------
-
 ## Files one reading for one person, and starts counting for them the first time.
-##
-## [b]Begun lazily, on the first number, and that is what keeps stand-ins out.[/b] A player
-## is added to the world before a bridge or a client marks them a stand-in, so a check at
-## join time would see every bot as a person; by the time anything is worth counting, the
-## flag is set. The memory and file stores load synchronously, so the achievement tracker
-## has them before the reading that follows.
+## Begun lazily, on the first number, which keeps stand-ins out: a player is added before a bridge or client marks them one, so a join-time check would see every bot as a person.
+## The memory and file stores load synchronously, so the tracker has them before the reading that follows.
 func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void:
 	if stats == null:
 		return
@@ -330,8 +297,6 @@ func session_values(player_id: StringName) -> DotStatsValues:
 func filed_under(player_id: StringName) -> StringName:
 	return _keys.get(player_id, player_id)
 
-
-# --- What the world reports -------------------------------------------------
 
 func on_round_began() -> void:
 	_in_round.clear()

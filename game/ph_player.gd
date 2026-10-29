@@ -6,21 +6,9 @@ const PhFigure := preload("ph_figure.gd")
 const PhAvatars := preload("ph_avatars.gd")
 const PhProps := preload("ph_props.gd")
 
-## One person: how they move, which side they are on, and — on the props' side — what they are
-## hiding as.
-##
-## [b]A disguise changes the hull, on both ends, from one replicated value.[/b] A player who
-## becomes a sofa is swept as a squat capsule half the sofa's depth across; one who becomes a
-## bottle as the smallest capsule the rules allow. [method apply_disguise] writes those
-## numbers into the controller's own tunables in place — the motor holds them by reference and
-## reads them every sweep — and it is called on the server when the disguise is decided and on
-## every client when the DISGUISE event says so, from [DotPropDisguise.hull] over the same size.
-## So a predicting client sweeps exactly the capsule the server does, which is the whole of
-## what keeps a sofa from being corrected on every step.
-##
-## [b]The hitbox is the prop's box, not the hull.[/b] A hunter shoots what they can see, and a
-## sofa's picture is two metres across where its hull is under one. [method _fit_hitboxes]
-## turns one box to the prop's turn every tick on the server, which is where shots resolve.
+## One person: how they move, which side they are on, and, on the props' side, what they are hiding as.
+## A disguise changes the hull on both ends from one replicated value ([method apply_disguise] writes the controller's tunables in place), so a predicting client sweeps the capsule the server does and a sofa is not corrected every step.
+## The hitbox is the prop's box, not the hull: a hunter shoots what they can see. [method _fit_hitboxes] turns it every tick on the server, where shots resolve.
 
 ## Metres above a player's feet that their eyes are, in their own body.
 const EYE_HEIGHT := 1.6
@@ -199,11 +187,8 @@ static func register_actions(p_sampler: DotFpsSampler = null) -> void:
 
 
 ## One simulated tick. On the server and offline; a client predicts through its behaviour.
-## Offline only: puts the client's buttons (fire, alt, reload) on the command [member sampler]
-## has just made. Stamped here, after sampling: the client used to stamp
-## `controller.current_command` from its own physics frame, and this function then applied a
-## fresh sample over it, so offline no hunter's trigger ever reached the world's rig and no shot
-## landed (game-zombie-zone's play test found it; docs/history.md has it).
+## Offline only: puts the client's buttons (fire, alt, reload) on the command [member sampler] has just made, stamped after sampling,
+## or a fresh sample overwrote them and no hunter's trigger ever reached the rig (docs/history.md).
 var command_stamp: Callable = Callable()
 
 
@@ -230,19 +215,13 @@ func delta_for_tick() -> float:
 	return 1.0 / float(maxi(tick_rate, 1))
 
 
-# --- The disguise ----------------------------------------------------------
-
 func is_disguised() -> bool:
 	return disguise != null and disguise.is_disguised()
 
 
-## Wears [param next] — or their own body, for an empty one — and moves the hull to match.
-##
-## [b]The hull is written into the live tunables, not swapped for new ones.[/b] The motor holds
-## the tunables it was built with by reference and reads the radius and height on every sweep,
-## so writing the numbers in place takes effect on the next tick without rebuilding anything;
-## a new tunables object would need the motor rebuilt, and a rebuild mid-round resets the
-## state a predicting client is replaying.
+## Wears [param next], or their own body for an empty one, and moves the hull to match.
+## The hull is written into the live tunables, not swapped: the motor holds them by reference and reads them every sweep,
+## and a new object would need the motor rebuilt, which mid-round resets the state a predicting client is replaying.
 func apply_disguise(next: DotPropDisguise) -> void:
 	disguise = next if next != null else DotPropDisguise.new()
 
@@ -345,9 +324,7 @@ func build_hitboxes(combat: DotCombatManager) -> void:
 
 
 ## Turns the hitboxes to whoever this player is now. Every tick on the server.
-##
-## [b]A prop has no head.[/b] Every hit on a prop is the same hit, which is what makes a small
-## prop survivable at all; a headshot multiplier on a bottle is a bottle that dies to a pistol.
+## A prop has no head: every hit is the same hit, which is what makes a small prop survivable; a headshot multiplier on a bottle kills it with a pistol.
 func _fit_hitboxes() -> void:
 	if not body_ready():
 		return
@@ -382,8 +359,6 @@ func refit() -> void:
 	if is_disguised() and not disguise.locked:
 		_fit_hitboxes()
 
-
-# --- The rest of a body ----------------------------------------------------
 
 ## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
 func component(type_name: StringName) -> Object:
@@ -441,8 +416,6 @@ func retune() -> void:
 func is_alive() -> bool:
 	return health == null or health.alive
 
-
-# --- Drawing (client side) --------------------------------------------------
 
 ## Draws the beacon at [param at], from the admin's flag or the rule's. Returns whether it
 ## pinged.

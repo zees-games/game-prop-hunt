@@ -3,13 +3,8 @@ extends Node3D
 const PhProjectiles := preload("ph_projectiles.gd")
 
 ## Every grenade the world is flying, drawn. Client side; game-arena's `ArenaProjectileView`, copied.
-##
-## Reads the list the simulation advances (the world's own offline, the copies the server's
-## LAUNCH events started online) once a frame and moves one node per entry; it writes nothing
-## back, so dropping it changes no outcome. A grenade is its own model from zee-dot-weapons' art
-## table, turned and scaled as the pack draws it in a hand, with a small red fuse light: rendered
-## without one in the arena, a frag fourteen metres away was two brown pixels on the floor, and a
-## grenade nobody sees is one nobody gets away from.
+## Reads the simulation's list once a frame and moves one node per entry, writing nothing back. A grenade is its own model from zee-dot-weapons' art table with a small red fuse light:
+## without one a frag fourteen metres away was two brown pixels, and a grenade nobody sees is one nobody gets away from.
 
 const ROUND_RADIUS := 0.11
 const ROUND_COLOUR := Color(1.0, 0.62, 0.22)

@@ -1,17 +1,8 @@
 extends Node
 
-## The cameras and bodies the first play test caught, in the real offline game:
-##
-## - the third-person and spectator chase cameras flown round the start and every
-##   checkpoint of the course (dot-core's DotCameraCheck): never inside, armed by the
-##   unprotected camera being in or behind the course on some frames;
-## - `mp_forceview` through the view key's path (no `mp_solidplayers` here: a disguised
-##   player is the shape of their prop);
-## - with `--render`, that moment from the player's eyes before (pass-through, no fade) and
-##   after, and both views.
-##
-##   tools/camera_check.sh            # headless; exit 1 on a failure
-##   tools/camera_check.sh --render   # and the frames, in screenshots/cameras/
+## The cameras and bodies in the real offline game: the third-person and spectator chase cameras flown round the start and every checkpoint (dot-core's DotCameraCheck), `mp_forceview` through the view key's path, and with `--render` the player's eyes before and after.
+## No `mp_solidplayers` here: a disguised player is the shape of their prop.
+##   tools/camera_check.sh [--render]   # headless; exit 1 on a failure; frames in screenshots/cameras/
 
 const PhClient := preload("../game/ph_client.gd")
 const PhGame := preload("../game/ph_game.gd")

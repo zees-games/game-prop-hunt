@@ -70,8 +70,6 @@ func aim_of(player: PhPlayer) -> DotBotAim:
 	return _state_of(player)["aim"]
 
 
-# --- Hiding ---------------------------------------------------------------------
-
 func _hide(player: PhPlayer, command: DotFpsCommand) -> void:
 	var state := _state_of(player)
 	var t := now()
@@ -333,8 +331,6 @@ func _watch_for_hunters(player: PhPlayer, state: Dictionary) -> void:
 			return
 
 
-# --- Hunting ----------------------------------------------------------------------
-
 func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 	var state := _state_of(player)
 	var t := now()
@@ -585,10 +581,8 @@ func _oddness(player: PhPlayer, row: Array, props: Array, base: float, t: float)
 	if kin == 0:
 		odd += 0.35
 
-	# Remembered: a hunter who knows the map knows this one was there (real) or was not (a
-	# prop). Drawn once per hunter and piece from the hunter's own seed, so it holds all round.
-	# The more of its kind round it the harder: a third sink is noticed, a thirty-first chair
-	# is not.
+		# Remembered: a hunter who knows the map knows this one was there (real) or was not (a prop), drawn once per hunter and piece from its own seed so it holds all round.
+		# The more of its kind round it the harder: a third sink is noticed, a thirty-first chair is not.
 	var memory := _memory_draw(player, row)
 	if memory < profile.map_knowledge / (1.0 + float(kin) * 0.6):
 		if index >= 0:
@@ -666,8 +660,6 @@ func shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, veloc
 		aim.note_shot(eye, at, t)
 	return fire
 
-
-# --- Moving -------------------------------------------------------------------------
 
 ## Walks [param player] along the mesh to [param goal]. Returns true when there.
 func _walk_to(player: PhPlayer, command: DotFpsCommand, state: Dictionary, goal: Vector3, sprint: bool, look: bool = true) -> bool:

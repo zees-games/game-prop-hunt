@@ -1,24 +1,8 @@
 extends RefCounted
 
-## A hunter's grenades in flight, and what happens where they go off.
-##
-## [b]Copied from game-arena's `ArenaProjectiles`, on purpose.[/b] dot-weapon spawns nothing: a
-## thrown weapon's use returns a [DotWeaponSpawn] ("this should exist now") and somebody has to
-## fly it. Until this file `PhGame._advance_weapons` resolved `outcome.shots` and dropped
-## `outcome.spawns`, so a frag would have cost the slot and done nothing, which is why hunters had
-## no grenade slot. The arena's flight (a swept segment per tick against dot-combat's own trace, a
-## bounce that keeps more speed along a surface than into it, a sticky that stops dead on what it
-## touches) has been played and rendered there; the parts that are this game's are marked.
-##
-## [b]Everything is a pure function of the tick.[/b] A server and a client fly the same spawn
-## through the same code over the same map and reach the same place, so the wire carries one
-## LAUNCH per grenade (`PhEvents.Kind.LAUNCH`) and nothing per tick. A client's copies decide
-## nothing: its combat manager is not the authority, so [method _detonate] resolves no damage
-## there and only says where it went off, which is what draws the burst.
-##
-## [b]A blast is resolved by dot-combat as a shot with a splash[/b], so the falloff, self damage
-## and friendly fire are the same rules as every gun. What a blast COSTS is the game's
-## ([signal blasted], `PhGame._on_blast`): see docs/design.md, "Grenades".
+## A hunter's grenades in flight, and what happens where they go off; copied from game-arena's `ArenaProjectiles` because dot-weapon spawns nothing.
+## Everything is a pure function of the tick, so the wire carries one LAUNCH per grenade; a client's copies resolve no damage and only draw the burst.
+## A blast is a dot-combat shot with a splash; what it COSTS is the game's ([signal blasted], docs/design.md "Grenades").
 
 ## One projectile, mid-air, rolling, or stuck to something.
 class Flying extends RefCounted:
@@ -147,12 +131,8 @@ func clear() -> void:
 	_live.clear()
 
 
-## Advances every projectile one tick and detonates the ones that are due. Backwards, so a
-## detonation can remove its own entry without the loop skipping the next one.
-##
-## A spawn with no fuse goes off on contact; one with a fuse (both of zee's grenades) goes off
-## when it runs out, wherever it has got to: a frag bounces and rolls, a sticky stops dead on
-## the first thing it touches.
+## Advances every projectile one tick and detonates the ones that are due; backwards, so a detonation can remove its own entry.
+## A spawn with no fuse goes off on contact; one with a fuse goes off when it runs out, wherever it has got to.
 func tick(delta: float) -> void:
 	for i in range(_live.size() - 1, -1, -1):
 		var f: Flying = _live[i]
@@ -246,10 +226,8 @@ func _body_of(hit: DotHitbox.Hit) -> Node3D:
 	return set_node as Node3D if set_node is Node3D else null
 
 
-## Traces one tick of flight. A swept segment rather than a point test: a wall is thinner than
-## a fast grenade's step, and testing only the end point lets it through one time in three.
-## The trace is dot-combat's (`PhGame._build_combat`: the world and the furniture), so a
-## grenade bounces off a sofa as a shot stops on it.
+## Traces one tick of flight, a swept segment rather than a point test: a wall is thinner than a fast grenade's step.
+## The trace is dot-combat's (`PhGame._build_combat`), so a grenade bounces off a sofa as a shot stops on it.
 func _sweep(f: Flying, step: Vector3) -> DotHitbox.Hit:
 	if _combat == null or _combat.trace == null:
 		return null
@@ -282,9 +260,7 @@ func _sweep(f: Flying, step: Vector3) -> DotHitbox.Hit:
 
 
 ## Turns an arrival into an ordinary [DotShot] with a splash and lets dot-combat do the rest.
-## The impact is set by hand (the trace already happened) and `max_range` is 0, so nothing
-## re-traces it; this game never pins a believed origin (`set_authoritative_origin`), so
-## dot-combat does not move the blast back to the thrower as it once did in the arena.
+## The impact is set by hand and `max_range` is 0 so nothing re-traces it; no believed origin is pinned, so the blast is not moved back to the thrower.
 func _detonate(f: Flying, at: Vector3) -> void:
 	if _combat != null and _combat.is_authority:
 		var shot := DotShot.make(f.spawn.id, f.spawn.owner_entity, f.spawn.tick, 0)

@@ -48,7 +48,7 @@
 # --- The beacon
 # Every prop still alive is beaconed once this few are left. 0 never. [0..32]
 # beacon_props_left: 1
-# Every prop still alive is beaconed once this few seconds are left. 0 never, the default: with it at 30 the ... [0.0..600.0]
+# Every prop still alive is beaconed once this few seconds are left; 0 never, the default. At 30 the stand-in... [0.0..600.0]
 # beacon_seconds_left: 0.0
 # Seconds between a beacon's pings. [0.25..10.0]
 # beacon_period: 2.0

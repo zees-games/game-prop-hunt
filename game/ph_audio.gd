@@ -3,25 +3,9 @@ extends Node
 const PhPaths := preload("ph_paths.gd")
 const PhAmbience := preload("ph_ambience.gd")
 
-## What this game makes a noise about, and the noise, on the client.
-##
-## [b]In a hiding game the sounds ARE the game.[/b] A taunt is the only thing that says where a
-## prop is, so it is heard where the prop is, as loud as the server allows and no further; a
-## prop found has a noise of its own, so a hunter in the next room knows somebody else got one;
-## the hunters' release is a horn every prop hears wherever they are hiding.
-##
-## [b]A catalogue of ids and a table of stand-ins, which is the family's shape.[/b] dot-audio
-## decides what is audible, how many at once and how far; [method sound_catalogue] is those
-## decisions, naming paths under `audio/`, and [method sound_recipes] says which synthesised
-## voice stands in for each until a real `.ogg` is dropped in — [DotAudioSinkGodot] consults
-## the file before the stand-in.
-##
-## [b]Taunts are files, and they are played from the prop.[/b] They are CC0 voice lines and
-## jingles in `taunts/` (see its README), listed in `taunts/taunts.json`; a taunt is an
-## [AudioStreamPlayer3D] parented to the player who made it, so it moves with a prop that
-## runs, and dies with one that is found.
-##
-## [b]Never on a server, and never deciding anything.[/b]
+## What this game makes a noise about, and the noise, on the client; never on a server, never deciding anything.
+## A taunt is the only thing that says where a prop is, so it is heard where the prop is and played from an [AudioStreamPlayer3D] parented to the player (CC0 files in `taunts/`, see `taunts/taunts.json`).
+## [method sound_catalogue] names paths under `audio/` and [method sound_recipes] the synthesised stand-in for each until a real `.ogg` is dropped in.
 
 const CHANNEL := "ph.audio"
 
@@ -249,9 +233,7 @@ func setup() -> DotResult:
 	manager.mixer = DotAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 24
-	# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in round
-	# read -20.1 LUFS integrated with the beds and the steps in. Once the stand-in turned off
-	# walls (2026-10-12): -19.8 and -20.5 at +3, -18.2 twice at +6, -17.5 and -17.3 at +7.
+		# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in round read -20.1 LUFS integrated with the beds and steps in.
 	manager.loudness_trim_db = 7.0
 	add_child(manager)
 
