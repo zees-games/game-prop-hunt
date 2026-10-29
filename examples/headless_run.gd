@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 174
+const CHECKS := 175
 
 
 func _ready() -> void:
@@ -269,6 +269,10 @@ func _test_disguise() -> void:
 	_check(hunter_fig != null and hunter.figure != null and client.call(&"_avatar_figure", 0) == null,
 		"a disguised player has no figure for an avatar action, an undisguised one does")
 	client.free()
+	# The figure steps its clip by game time (DotHumanoidFigure.frame_delta), which stamps the frame it ran in.
+	hunter.figure.pose(hunter.global_position, 0.0, 3.0)
+	_check(int(hunter.figure.person.get("_posed_frame")) == Engine.get_process_frames(),
+		"a posed figure animates by game time, not the wall clock")
 	for who: PhPlayer in [hunter, prop]:
 		who.figure.person.free()
 		who.figure.free()
