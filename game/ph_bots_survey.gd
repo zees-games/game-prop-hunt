@@ -149,11 +149,23 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	_places.clear()
 	_nav_places = false
 	var still: Array = [map.get("_solid"), map.get("_furniture")]
-	var baked := nav.bake(map, {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}, 0, still)
-	if not baked.ok:
-		_surveyed = key
-		DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": str(doc.get("id", "")), "why": baked.error.message})
+	var agent := {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}
+	var failed := _bake_failed.bind(key, str(doc.get("id", "")))
+	# Off the tick only on a live server: a harness that ticks by hand needs the mesh on the tick for a seeded round to replay.
+	var live := (game as Node).is_physics_processing()
+	if live:
+		var started := nav.bake_in_background(map, agent, 0, still, failed)
+		if not started.ok:
+			failed.call(started)
+	else:
+		failed.call(nav.bake(map, agent, 0, still))
 	_survey_at = -1
+
+
+func _bake_failed(res: DotResult, key: String, map_id: String) -> void:
+	if not res.ok and _baked == key:
+		_surveyed = key
+		DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": map_id, "why": res.error.message})
 
 
 ## The survey comes a quarter second of game time after the first round tick, always the same tick.
