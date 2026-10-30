@@ -11,7 +11,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## The only suite where [PhModule] loads, [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by the stand-ins the module seats itself (`headless_run` and `headless_net` cannot reach these).
 
 const SECTIONS := 14
-const CHECKS := 107
+const CHECKS := 108
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -169,6 +169,8 @@ func _test_the_module_loads() -> void:
 	_check(loaded.ok, "the module loads into the server", loaded.error.message if not loaded.ok else "")
 
 	var module := _module()
+	_check(game != null and game.progress != null and game.progress.durable_key_fn.is_valid(),
+		"progress is filed under dot-game's stable stats key")
 	_check(module != null and module.get("net") != null and module.get("bridge") != null,
 		"with its netcode and the game's bridge")
 
