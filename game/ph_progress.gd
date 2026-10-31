@@ -39,6 +39,9 @@ const REPORT_INTERVAL := 60.0
 var _report_timer: Timer
 
 var stats: DotStatsTracker = null
+
+## Kills and hits by body zone, through dot-stats' event feed.
+var feed: DotStatsEventFeed = null
 var achievements: DotAchievementTracker = null
 var link: DotAchievementStatsLink = null
 
@@ -88,6 +91,7 @@ static func schema() -> DotStatsSchema:
 	_add(out, DECOYS_SHOT, DotStatsDef.Kind.COUNTER, "Shots at the furniture", "shots", true)
 	_add(out, DECOY_DEATHS, DotStatsDef.Kind.COUNTER, "Beaten by the furniture", "deaths", true)
 	_add(out, DEATHS, DotStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
+	DotStatsHitzones.declare(out)
 	return out
 
 
@@ -197,6 +201,8 @@ func setup(directory: String, report: bool) -> DotResult:
 	stats.report_to_backbone = report
 	stats.define_on_start = report
 	add_child(stats)
+	feed = DotStatsEventFeed.new(stats)
+	feed.key_of = func(id: Variant) -> StringName: return _key(StringName(str(id)))
 
 	var counted := stats.start()
 
@@ -262,6 +268,20 @@ func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void
 		DotLog.warn(CHANNEL, "a reading was refused", {
 			"player": String(player_id), "stat": String(stat), "why": filed.error.message,
 		})
+
+
+## A landed hit by body zone; a trace that met no hitbox has no zone.
+func report_hit(attacker: StringName, victim: StringName, damage: DotDamage) -> void:
+	if feed == null or damage.hit_group == DotHitGroup.GENERIC:
+		return
+	var side := StringName(str(damage.context.get(DotHitzone.CONTEXT_SIDE, "")))
+	var _ok := feed.report_hit(attacker, victim, String(damage.weapon_id), damage.hit_group, damage.health_lost, damage.lethal, side)
+
+
+## Files a kill for the head-to-head table.
+func report_kill(killer: StringName, victim: StringName) -> void:
+	if feed != null:
+		var _ok := feed.report_kill(killer, victim)
 
 
 ## The key a player's numbers are filed under. Asked of [member durable_key_fn] once, then

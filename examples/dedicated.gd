@@ -4,6 +4,7 @@ const PhAmbience := preload("../game/ph_ambience.gd")
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
+const PhProgress := preload("../game/ph_progress.gd")
 const PhNetBridge := preload("../game/net/ph_net_bridge.gd")
 const PhNetLink := preload("../game/net/ph_net_link.gd")
 
@@ -11,7 +12,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## The only suite where [PhModule] loads, [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by the stand-ins the module seats itself (`headless_run` and `headless_net` cannot reach these).
 
 const SECTIONS := 14
-const CHECKS := 113
+const CHECKS := 116
 
 const SERVER_DIR := "user://ph_dedicated"
 const PORT := 28931
@@ -21,11 +22,19 @@ const TICK_RATE := 60
 
 var server: DotServer = null
 var game: PhGame = null
+var _stats_errors: PackedStringArray = []
 
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
+	DotLog.signals().record.connect(_on_log_record)
 	_run.call_deferred()
+
+
+## An ERROR from the stats layer would otherwise scroll past and leave a stat dead with every check green.
+func _on_log_record(rec: Dictionary) -> void:
+	if int(rec.get("level", 0)) >= DotLog.Level.ERROR and String(rec.get("channel", "")).begins_with("stats"):
+		_stats_errors.append(str(rec.get("message", rec)))
 
 
 func _run() -> void:
@@ -61,6 +70,9 @@ func _run() -> void:
 	# The copy of this suite that the exit probe runs does not run the probe itself.
 	var sections := SECTIONS - (1 if _is_exit_probe() else 0)
 	var checks := CHECKS - (EXIT_PROBE_CHECKS if _is_exit_probe() else 0)
+
+	_check(_stats_errors.is_empty(), "the stats layer logged no error", str(_stats_errors))
+	_check(PhProgress.schema().validate().ok, "the stats schema, hitzones included, validates")
 
 	await _shut_down()
 	DotPaths.remove_tree(SERVER_DIR)
@@ -208,6 +220,16 @@ func _test_stats_report() -> void:
 	_check(not progress.stats.report_to_backbone, "off stops it again")
 	DotRegistry.unregister_instance(&"dot_backbone_client", client)
 	client.free()
+
+	var zoned := DotDamage.make(1, 2, 5.0, game.combat.damage_type(&"kinetic"))
+	zoned.hit_group = DotHitGroup.NECK
+	zoned.weapon_id = &"probe"
+	progress.stats.begin(&"ph-test", "ph-test")
+	progress.report_hit(&"ph-test", &"ph-victim", zoned)
+	_check(
+		progress.stats.session_values(&"ph-test").get_cell(DotStatsHitzones.HITS, "zone:neck") >= 1.0,
+		"a hit with a hit_group is filed by body zone through the dot-stats hitzone hook"
+	)
 
 
 ## Config cvars, the workbench, and dot-team's block rules through dot-game's DotGameNoblock.

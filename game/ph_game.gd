@@ -2074,6 +2074,8 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 
 	if progress != null:
 		progress.on_died(player.player_id, by, why)
+		if by != &"" and players.has(by):
+			progress.report_kill(by, player.player_id)
 
 	player.marked = false
 
@@ -2159,4 +2161,7 @@ func _note_hits(shooter: PhPlayer, shot: DotShot) -> void:
 	for damage: DotDamage in shot.damages:
 		if damage == null or damage.refused or damage.health_lost <= 0.0 or damage.victim == shooter.entity_id:
 			continue
+		var victim := entities.key_for_id(damage.victim) as StringName
+		if progress != null and players.has(victim):
+			progress.report_hit(shooter.player_id, victim, damage)
 		hit_landed.emit(shooter.player_id, damage.point, damage.lethal, damage.hit_group == DotHitGroup.HEAD)
