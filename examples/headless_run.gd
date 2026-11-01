@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 175
+const CHECKS := 184
 
 
 func _ready() -> void:
@@ -1030,6 +1030,47 @@ func _test_help_and_menu() -> void:
 
 ## The drawn rig must show the gun the server fired: given the whole pack, each slot held whatever was given last; the default loadout put the SMG and shotgun in one slot; the HUD said nothing about what was in hand.
 ## Armed: with `give_everything` back the first check fails; without `correct_drawn` the last does.
+## Walls and props stop a shot, other bodies do not, on the server rig and the drawn (local) rig; both rigs lower the held gun at
+## what stops the player (the motor mask `PhGame` hands them), which also covers the fences and clip a shot passes.
+func _shots_and_walls(world: PhGame, me: PhPlayer, drawn: ZeeWeaponRig) -> void:
+	var motor := me.controller.tunables.collision_mask
+	_check(motor != 0 and me.weapons.wall_extra_mask == motor,
+		"the server rig's wall_extra_mask is the player's motor mask", "%d vs %d" % [me.weapons.wall_extra_mask, motor])
+	_check(drawn.wall_extra_mask == motor and drawn.role == ZeeWeaponRig.Role.LOCAL,
+		"and the drawn rig's too", "%d vs %d" % [drawn.wall_extra_mask, motor])
+	var view: Variant = drawn.get(&"_view")
+	var fx: Variant = drawn.get(&"_fx")
+	_check(view != null and fx != null and (int(view.get(&"wall_mask")) & motor) == motor
+		and (int(view.get(&"wall_mask")) & int(fx.get(&"collision_mask"))) == int(fx.get(&"collision_mask")),
+		"the drawn view's wall probe stops on the motor mask and the shot mask both",
+		"wall_mask %s" % str(view.get(&"wall_mask")) if view != null else "no view")
+
+	var from := Vector3(500.0, 50.0, 500.0)
+	var to := from + Vector3(0.0, 0.0, -10.0)
+	var trace := world.combat.trace
+	_check(trace.line_of_sight(from, to), "a clear line is clear")
+	var layers := {&"world": false, &"prop": false, &"player": true, &"toy": true, &"footprint": true}
+	for id in layers:
+		var body := StaticBody3D.new()
+		body.collision_layer = world.physics.layer_mask(id)
+		body.collision_mask = 0
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(4.0, 4.0, 0.5)
+		shape.shape = box
+		body.add_child(shape)
+		world.add_child(body)
+		body.global_position = from + Vector3(0.0, 0.0, -5.0)
+		await get_tree().physics_frame
+		await get_tree().physics_frame
+		var clear := trace.line_of_sight(from, to)
+		_check(clear == bool(layers[id]), "a %s-layer body %s the shot" % [id, "passes" if layers[id] else "blocks"],
+			"line_of_sight %s" % str(clear))
+		body.collision_layer = 0
+		world.remove_child(body)
+		body.free()
+
+
 func _test_hunter_weapons() -> void:
 	_section("a hunter draws the guns the server armed, counted on the HUD and corrected from it")
 	_check(PhGame.hunter_slot_clash(PhConfig.new().hunter_weapons) == "",
@@ -1064,6 +1105,7 @@ func _test_hunter_weapons() -> void:
 	_check(same, "the drawn gun holds exactly the server's weapons, slot for slot", " ".join(held))
 	_check(drawn != null and drawn.arsenal.current_slot() == me.weapons.arsenal.current_slot(),
 		"and holds the same one")
+	await _shots_and_walls(world, me, drawn)
 
 	# Blindfolded through the hide, the counter is under the cover with everything else; seeking.
 	var hud: Node = client.get("hud")
