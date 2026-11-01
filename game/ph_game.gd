@@ -622,6 +622,9 @@ func add_player(
 
 		player.controller.set_collision_mask(physics.collision_mask(&"player"))
 
+		if player.weapons != null:
+			player.weapons.wall_extra_mask = player.controller.tunables.collision_mask
+
 	var opened := entities.open(
 		DotEntity.KIND_PLAYER, player, &"", player_id, float(_tick) / float(maxi(tick_rate, 1))
 	)
@@ -1626,6 +1629,7 @@ func arm(player: PhPlayer, weapon_id: StringName) -> bool:
 		rig.role = ZeeWeaponRig.Role.SERVER
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
+		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
 		player.add_child(rig)
 
