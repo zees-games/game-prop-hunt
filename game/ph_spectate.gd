@@ -29,6 +29,7 @@ func _init() -> void:
 	history_seconds = 0.0
 	eye_height = 0.0
 	prefer_own_side = true
+	guard_roam = true
 	fixed_index_fn = func(_key: String) -> int: return 0
 
 
@@ -42,17 +43,6 @@ func _tune_rules(r: DotSpectatorRules) -> DotSpectatorRules:
 	r.cycle_includes_dead = false
 	r.delay_ticks = 0
 	return r
-
-
-## The free-camera key. A mirror is told, not asked; a refusal (roaming off, `mp_forcecamera` set) is the manager's own.
-func toggle_roam(key: String) -> DotResult:
-	if manager == null:
-		return _unset()
-
-	if not authoritative:
-		return DotResult.fail(DotError.CODE_STATE, "A mirror is told, not asked.")
-
-	return manager.toggle_roam(key)
 
 
 ## Somebody is out. Starts the death camera; the server's tick hands it over.

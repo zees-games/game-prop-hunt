@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 185
+const CHECKS := 187
 
 
 func _ready() -> void:
@@ -1297,6 +1297,10 @@ func _test_free_roam() -> void:
 	_check(not held.ok and not spec.can_roam(dead.player_id), "mp_forcecamera 1 refuses it, and the key is not offered")
 	spec.set_force_camera(0)
 	_check(spec.can_roam(dead.player_id), "and mp_forcecamera 0 gives it back")
+	var playing: PhPlayer = game.players[&"u300"]
+	var refused := spec.toggle_roam(playing.player_id)
+	_check(not spec.is_spectating(playing.player_id) and not refused.ok and not spec.can_roam(playing.player_id),
+		"somebody still playing cannot roam")
 
 	var wire := PhEvents.read_spectate(DotNetReader.new(PhEvents.write_spectate(
 		7, DotSpectatorView.Mode.ROAMING, 0, 0, Vector3.ZERO)))
@@ -1311,6 +1315,8 @@ func _test_free_roam() -> void:
 	mirror.call(&"apply_view", &"u301", DotSpectatorView.Mode.ROAMING, &"", &"", Vector3.ZERO)
 	_check(made.ok and bool(mirror.call(&"is_roaming", &"u301")) and bool(mirror.call(&"is_spectating", &"u301")),
 		"a mirror told ROAMING with no target is roaming, not 'stopped watching'")
+	var told: DotResult = mirror.call(&"toggle_roam", &"u301")
+	_check(not told.ok, "a spectating mirror cannot ask to roam; it is told")
 	remove_child(mirror)
 	mirror.free()
 
