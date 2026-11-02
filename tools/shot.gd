@@ -121,13 +121,8 @@ static func _v3(text: String) -> Vector3:
 	return Vector3(parts[0].to_float(), parts[1].to_float(), parts[2].to_float()) if parts.size() == 3 else Vector3.INF
 
 
-func _run() -> void:
-	var game: PhGame = _client.get("game")
-	await _until_a_round(game)
-	var local = _client.get("player")
-	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade", "killcam"]
-
-	# The person at this keyboard on the side the view is about; one stand-in on the other.
+## The person at this keyboard on the side the view is about; one stand-in on the other.
+func _pick_sides(game: PhGame, local: Object, hunter: bool) -> void:
 	var other_side_drawn := false
 	for id: StringName in game.players:
 		var side := PhGame.PROPS
@@ -137,6 +132,15 @@ func _run() -> void:
 			side = PhGame.HUNTERS
 			other_side_drawn = true
 		game._set_side(id, side)
+
+
+func _run() -> void:
+	var game: PhGame = _client.get("game")
+	await _until_a_round(game)
+	var local = _client.get("player")
+	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade", "killcam"]
+
+	_pick_sides(game, local, hunter)
 
 	if _view == "round":
 		# Everybody else hides, as stand-ins do: the round plays on its own clock.
@@ -185,55 +189,64 @@ func _run() -> void:
 		"grenade":
 			await _view_grenade(game, local)
 		"maps":
-			# M: the solo map list, with the Workshop's map among the game's own.
-			await _seconds_of(0.5)
-			var settings: Object = _client.get("settings")
-			var menu: Variant = settings.get("menu")
-			menu.call(&"open_maps")
-			var picker: Variant = menu.get("picker")
-			if picker != null:
-				# Past the last row and back one: the fixture sorts after the shipped maps' ids.
-				var rows := game.map_rows()
-				for i in range(rows.size()):
-					if str(rows[i]["id"]) == "fixture_barn":
-						picker.call(&"turn", 99)
-						picker.call(&"turn", i - rows.size() + 1)
-			await _seconds_of(_seconds)
+			await _view_maps(game)
 		"loadout":
-			# B in the hide, blindfolded, when a choice goes straight into the hands.
-			await _seconds_of(0.5)
-			var menu: Variant = _client.get("loadout_menu")
-			if menu == null:
-				print("no loadout menu on this host")
-			else:
-				await menu.call(&"open")
-				await _seconds_of(_seconds)
+			await _view_loadout()
 		"round":
-			# A round in progress: the stand-ins hide on the round's own clock, then the seek
-			# runs [code]--seconds[/code]; from the hunter's eyes, or from [code]--at[/code].
-			while game.phase != PhGame.Phase.SEEK:
-				await _frames(1)
-			await _seconds_of(_seconds)
-			for id: StringName in game.players:
-				var who: PhPlayer = game.players[id]
-				print("  %s %s at %s as %s" % [id, "hunter" if game.team_of(id) == PhGame.HUNTERS else "prop",
-					who.controller.state.position.snapped(Vector3.ONE * 0.1), who.disguise.prop_id if who.is_disguised() else "-"])
-			if _at != Vector3.INF:
-				_free_camera().look_at_from_position(_at, _look)
+			await _view_round(game)
 		"hunter":
 			await _view_hunter(game, local)
 		"crosshair":
-			# Alive saves to --out; then the same frame dead, to <out>_dead.png (the dot must be gone).
-			await _seconds_of(_seconds)
-			await _frames(3)
-			await RenderingServer.frame_post_draw
-			var _alive_saved := get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(_out))
-			_client.get("player").health.alive = false
-			await _seconds_of(0.5)
-			_out = _out.get_basename() + "_dead.png"
+			await _view_crosshair()
 		_:
 			await _seconds_of(_seconds)
 
+	await _finish()
+
+
+## M: the solo map list, with the Workshop's map among the game's own.
+func _view_maps(game: PhGame) -> void:
+	await _seconds_of(0.5)
+	var settings: Object = _client.get("settings")
+	var menu: Variant = settings.get("menu")
+	menu.call(&"open_maps")
+	var picker: Variant = menu.get("picker")
+	if picker != null:
+		# Past the last row and back one: the fixture sorts after the shipped maps' ids.
+		var rows := game.map_rows()
+		for i in range(rows.size()):
+			if str(rows[i]["id"]) == "fixture_barn":
+				picker.call(&"turn", 99)
+				picker.call(&"turn", i - rows.size() + 1)
+	await _seconds_of(_seconds)
+
+
+## B in the hide, blindfolded, when a choice goes straight into the hands.
+func _view_loadout() -> void:
+	await _seconds_of(0.5)
+	var menu: Variant = _client.get("loadout_menu")
+	if menu == null:
+		print("no loadout menu on this host")
+	else:
+		await menu.call(&"open")
+		await _seconds_of(_seconds)
+
+
+## A round in progress: the stand-ins hide on the round's own clock, then the seek runs [code]--seconds[/code]; from the hunter's eyes, or from [code]--at[/code].
+func _view_round(game: PhGame) -> void:
+	while game.phase != PhGame.Phase.SEEK:
+		await _frames(1)
+	await _seconds_of(_seconds)
+	for id: StringName in game.players:
+		var who: PhPlayer = game.players[id]
+		print("  %s %s at %s as %s" % [id, "hunter" if game.team_of(id) == PhGame.HUNTERS else "prop",
+			who.controller.state.position.snapped(Vector3.ONE * 0.1), who.disguise.prop_id if who.is_disguised() else "-"])
+	if _at != Vector3.INF:
+		_free_camera().look_at_from_position(_at, _look)
+
+
+## Saves the frame to --out, records the sequence, and quits.
+func _finish() -> void:
 	if _board:
 		var menu: Variant = _client.get("settings").menu
 		var tab := InputEventKey.new()
@@ -249,6 +262,17 @@ func _run() -> void:
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
 	await DotShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
+
+
+## Alive saves to --out; then the same frame dead, to <out>_dead.png (the dot must be gone).
+func _view_crosshair() -> void:
+	await _seconds_of(_seconds)
+	await _frames(3)
+	await RenderingServer.frame_post_draw
+	var _alive_saved := get_viewport().get_texture().get_image().save_png(ProjectSettings.globalize_path(_out))
+	_client.get("player").health.alive = false
+	await _seconds_of(0.5)
+	_out = _out.get_basename() + "_dead.png"
 
 
 ## The map's annotations the stand-ins and hunters use, drawn over it from above.

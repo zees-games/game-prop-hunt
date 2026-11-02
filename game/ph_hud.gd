@@ -143,6 +143,23 @@ func _build() -> void:
 	_root.theme = piece_theme()
 	_follow()
 
+	_build_top()
+	_build_bottom()
+
+	hit_marker = DotHitMarker.new()
+	hit_marker.name = "HitMarker"
+	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hit_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(hit_marker)
+
+	_build_status_labels()
+
+	_crosshair = _make_crosshair()
+	_root.add_child(_crosshair)
+
+
+## The strip, the prompt, the key hints and the shout, over the top of the view.
+func _build_top() -> void:
 	# Top centre, full width because the strip centres itself on its own middle. Its plates
 	# span 388 pixels round the middle, clear of the key hints top left at 1280 x 720.
 	strip = DotScoreStrip.new()
@@ -181,6 +198,9 @@ func _build() -> void:
 	_shout.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_shout.add_theme_color_override("font_color", Color(0.99, 0.86, 0.40))
 
+
+## Health, ammunition and the weapon picture in the bottom corners.
+func _build_bottom() -> void:
 	# Bottom left: health on its plate, and over it what you are, the rotation lock and the
 	# forced-taunt meter. The plate ends 214 pixels off the bottom, above the chat box's full
 	# eight-row log, which reaches 202 (checked in headless_run).
@@ -195,8 +215,8 @@ func _build() -> void:
 	vitals.visible = false
 	_root.add_child(vitals)
 
-		# Bottom right, a hunter's: what is in hand and how much is in it. It shares no corner with the chat box, health plate or ballot,
-		# and a ballot that does reach it dims it (DotHudPiece's cover); headless_run checks the corners.
+	# Bottom right, a hunter's: what is in hand and how much is in it. It shares no corner with the chat box, health plate or ballot,
+	# and a ballot that does reach it dims it (DotHudPiece's cover); headless_run checks the corners.
 	ammo = DotAmmoCounter.new()
 	ammo.name = "Ammo"
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
@@ -220,17 +240,6 @@ func _build() -> void:
 	weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	weapon_icon.visible = false
 	_root.add_child(weapon_icon)
-
-	hit_marker = DotHitMarker.new()
-	hit_marker.name = "HitMarker"
-	hit_marker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	hit_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(hit_marker)
-
-	_build_status_labels()
-
-	_crosshair = _make_crosshair()
-	_root.add_child(_crosshair)
 
 
 ## The labels over the health plate and under the view: what you are, the lock, the taunt meter, and who a spectator watches.

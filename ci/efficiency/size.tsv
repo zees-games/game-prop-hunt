@@ -16,15 +16,10 @@ game/net/ph_net_bridge.gd	1559
 game/net/ph_net_bridge.gd::_on_event	150
 game/net/ph_net_bridge.gd::attach	119
 game/ph_bots.gd::_pick_spot	81
-game/ph_bots.gd::_seek	130
 game/ph_catalogue.gd::practice	97
 game/ph_client.gd	1863
 game/ph_client.gd::_build_netcode	84
 game/ph_game.gd	2239
-game/ph_hud.gd::_build	124
-game/ph_map_doc.gd::validate	127
 game/ph_module.gd	899
 game/ph_module.gd::_game_load	99
 game/ph_vote.gd::setup	88
-tools/measure_props.gd::_initialize	129
-tools/shot.gd::_run	130

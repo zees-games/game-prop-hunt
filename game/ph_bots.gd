@@ -340,39 +340,16 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 	var aim := aim_of(player)
 
 	if state["search"] == null:
-		var search := DotBotSearch.new()
-		var sweep := float(config_of().get("bot_sweep")) if _nav_places else 0.0
-		search.setup(_places, maxf(profile.map_knowledge, sweep))
-		if _nav_places:
-			# Weight the places the annotations call good (a snug spot, a chokepoint), so a hunter
-			# looks at the best hiding places before the near ones: sweeping, not wandering.
-			for n in range(mini(search.places.size(), _places.size())):
-				var q: float = float(_places[n].get("q", 0.0))
-				search.places[n]["weight"] = lerpf(1.0, 0.1 + 3.5 * q * q, sweep)
-		state["search"] = search
+		state["search"] = _new_search(profile)
 	var search: DotBotSearch = state["search"]
 
 	var careful := player.health != null and player.health.health < player.health.max_health * 0.4
 
-	# A prop seen moving, showing its face, beaconed, or one a test found: shoot it.
 	var prey := _prey(player, state)
 	if prey != null:
-		var eye := player.eye_position()
-		var middle := prey.controller.state.position + Vector3(0.0, minf(prey.hull_height(), 1.4) * 0.5, 0.0)
-		if state["prey"] != prey.player_id:
-			state["why"] = "prey %s marked %s face %s moving %.1f" % [prey.player_id, prey.marked, not prey.is_disguised(), Vector2(prey.controller.state.velocity.x, prey.controller.state.velocity.z).length()]
-		state["prey"] = prey.player_id
-		state["prey_seen_at"] = t
-		state["prey_at"] = prey.controller.state.position
-		var fire: bool = shoot(player, command, prey.entity_id, middle, prey.controller.state.velocity)
-		command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
-		var d := at.distance_to(prey.controller.state.position)
-		if d > 5.0:
-			var _close := _walk_to(player, command, state, prey.controller.state.position, d > 10.0, false)
-		state["test"] = {}
+		_chase(player, command, state, prey, t, at)
 		return
 
-	# Lost it: to where it was, and look round there.
 	if state["prey"] != StringName() and t - float(state["prey_seen_at"]) < profile.memory + 2.0:
 		aim.release()
 		var where: Vector3 = state["prey_at"]
@@ -383,26 +360,8 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 	state["prey"] = StringName()
 
 	# A test under way: keep firing at the piece for its moment.
-	var test: Dictionary = state["test"]
-	if not test.is_empty():
-		if t - float(test["since"]) < TEST_SECONDS and not (careful and float(test["odd"]) < 1.0):
-			command.move = Vector2.ZERO
-			var point: Vector3 = test["at"]
-			var target := _player_by_id(test.get("player", StringName()))
-			if target != null:
-				point = target.controller.state.position + Vector3(0.0, minf(target.hull_height(), 1.4) * 0.5, 0.0)
-				# Bleeding: found.
-				if target.health != null and target.health.health < float(test["health"]) - 0.01:
-					state["found"] = target.player_id
-					state["found_at"] = t
-			var fire: bool = shoot(player, command, int(test["id"]), point, Vector3.ZERO)
-			command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
-			return
-		var cleared: Dictionary = state["cleared"]
-		cleared[test["key"]] = t
-		state["test"] = {}
-		state["tested_at"] = t
-		aim.forget()
+	if _keep_testing(player, command, state, careful, t, aim):
+		return
 
 	# Heard a taunt: the places round it first, and go.
 	for heard: Dictionary in _taunts:
@@ -427,7 +386,79 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 			if started:
 				return
 
-	# Search: the next likely place.
+	var place := _goal_place(player, state, search, at, t, stream)
+
+	var _there := _walk_to(player, command, state, place["at"], false)
+
+	var target_at: Vector3 = place["at"]
+	if at.distance_to(target_at) < search.look_reach:
+		_look(player, command, target_at + Vector3(0.0, 0.5, 0.0))
+	else:
+		var ahead := _next_corner(state, at)
+		var sweep := sin(t * 1.3 + float(player.entity_id % 7)) * 40.0
+		var dir := Vector3(ahead.x - at.x, 0.0, ahead.z - at.z)
+		if dir.length() > 0.1:
+			dir = dir.normalized().rotated(Vector3.UP, deg_to_rad(sweep))
+			_look(player, command, player.eye_position() + dir * 5.0 + Vector3(0.0, -0.8, 0.0))
+
+
+## A hunter's search over the map's places; with annotations, the good ones weigh most.
+func _new_search(profile: DotBotProfile) -> DotBotSearch:
+	var search := DotBotSearch.new()
+	var sweep := float(config_of().get("bot_sweep")) if _nav_places else 0.0
+	search.setup(_places, maxf(profile.map_knowledge, sweep))
+	if _nav_places:
+		# Good places (snug, a chokepoint) weigh most: a hunter sweeps, not wanders.
+		for n in range(mini(search.places.size(), _places.size())):
+			var q: float = float(_places[n].get("q", 0.0))
+			search.places[n]["weight"] = lerpf(1.0, 0.1 + 3.5 * q * q, sweep)
+	return search
+
+
+## Shoots the prop it has marked and closes in when it is far.
+func _chase(player: PhPlayer, command: DotFpsCommand, state: Dictionary, prey: PhPlayer, t: float, at: Vector3) -> void:
+	var middle := prey.controller.state.position + Vector3(0.0, minf(prey.hull_height(), 1.4) * 0.5, 0.0)
+	if state["prey"] != prey.player_id:
+		state["why"] = "prey %s marked %s face %s moving %.1f" % [prey.player_id, prey.marked, not prey.is_disguised(), Vector2(prey.controller.state.velocity.x, prey.controller.state.velocity.z).length()]
+	state["prey"] = prey.player_id
+	state["prey_seen_at"] = t
+	state["prey_at"] = prey.controller.state.position
+	var fire: bool = shoot(player, command, prey.entity_id, middle, prey.controller.state.velocity)
+	command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
+	var d := at.distance_to(prey.controller.state.position)
+	if d > 5.0:
+		var _close := _walk_to(player, command, state, prey.controller.state.position, d > 10.0, false)
+	state["test"] = {}
+
+
+## A test under way: keep firing at the piece for its moment. True while it still holds the turn.
+func _keep_testing(player: PhPlayer, command: DotFpsCommand, state: Dictionary, careful: bool, t: float, aim: DotBotAim) -> bool:
+	var test: Dictionary = state["test"]
+	if test.is_empty():
+		return false
+
+	if t - float(test["since"]) < TEST_SECONDS and not (careful and float(test["odd"]) < 1.0):
+		command.move = Vector2.ZERO
+		var point: Vector3 = test["at"]
+		var target := _player_by_id(test.get("player", StringName()))
+		if target != null:
+			point = target.controller.state.position + Vector3(0.0, minf(target.hull_height(), 1.4) * 0.5, 0.0)
+			if target.health != null and target.health.health < float(test["health"]) - 0.01:
+				state["found"] = target.player_id
+				state["found_at"] = t
+		var fire: bool = shoot(player, command, int(test["id"]), point, Vector3.ZERO)
+		command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
+		return true
+	var cleared: Dictionary = state["cleared"]
+	cleared[test["key"]] = t
+	state["test"] = {}
+	state["tested_at"] = t
+	aim.forget()
+	return false
+
+
+## The place the hunter is walking to, picked again when it is reached, stale or seen.
+func _goal_place(player: PhPlayer, state: Dictionary, search: DotBotSearch, at: Vector3, t: float, stream: DotRandomStream) -> Dictionary:
 	var place: Dictionary = state.get("goal_place", {})
 	if place.is_empty() or at.distance_to(place["at"]) < 1.2 or t - float(place.get("since", t)) > 25.0 \
 			or float(place.get("seen_at", -INF)) > float(place.get("picked_at", -INF)):
@@ -448,19 +479,7 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 		place["picked_at"] = t
 		state["goal_place"] = place
 		state["path"] = PackedVector3Array()
-
-	var _there := _walk_to(player, command, state, place["at"], false)
-
-	var target_at: Vector3 = place["at"]
-	if at.distance_to(target_at) < search.look_reach:
-		_look(player, command, target_at + Vector3(0.0, 0.5, 0.0))
-	else:
-		var ahead := _next_corner(state, at)
-		var sweep := sin(t * 1.3 + float(player.entity_id % 7)) * 40.0
-		var dir := Vector3(ahead.x - at.x, 0.0, ahead.z - at.z)
-		if dir.length() > 0.1:
-			dir = dir.normalized().rotated(Vector3.UP, deg_to_rad(sweep))
-			_look(player, command, player.eye_position() + dir * 5.0 + Vector3(0.0, -0.8, 0.0))
+	return place
 
 
 func _player_by_id(id: StringName) -> PhPlayer:

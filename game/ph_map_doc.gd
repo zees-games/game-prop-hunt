@@ -85,24 +85,7 @@ static func validate(source: Dictionary) -> DotResult:
 		"kill_y": float(source.get("kill_y", -30.0)),
 	}
 
-	var env := DEFAULT_ENV.duplicate(true)
-	var given: Variant = source.get("environment", {})
-
-	if given is Dictionary:
-		for key: String in DEFAULT_ENV:
-			if (given as Dictionary).has(key):
-				var value: Variant = (given as Dictionary)[key]
-				env[key] = _floats(value, 3) if DEFAULT_ENV[key] is Array else float(value)
-
-	# The map's own fog, in metres, when it has one: absent, the map gets the horizon haze every map has.
-	if given is Dictionary and (given as Dictionary).has("fog_end"):
-		var g := given as Dictionary
-		env["fog_colour"] = _floats(g.get("fog_colour", env["sky_horizon"]), 3)
-		env["fog_start"] = maxf(float(g.get("fog_start", 0.0)), 0.0)
-		env["fog_end"] = maxf(float(g["fog_end"]), env["fog_start"] + 1.0)
-		env["fog_max"] = clampf(float(g.get("fog_max", 1.0)), 0.0, 1.0)
-
-	doc["environment"] = env
+	doc["environment"] = _environment(source)
 
 	# The beds under the map: outdoors, and indoors under any ceiling. Only dot-audio's stock ones.
 	for key: String in ["ambience", "ambience_indoor"]:
@@ -136,38 +119,47 @@ static func validate(source: Dictionary) -> DotResult:
 
 	doc["props"] = props
 
-	# Toys: dot-props' DotPropToyBox placements, `{toy, at, yaw}`. Which ids exist is the
-	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
-	# with a toy a newer dot-props has still plays on an older server.
-	var toys: Array = []
-	for raw: Variant in source.get("toys", []):
-		var toy := DotPropToyBox.normal_placement(raw)
-		if toy.is_empty():
-			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
-		toys.append(toy)
+	var toys_res := _toys(source)
+	if not toys_res.ok:
+		return toys_res
 
-	if toys.size() > MAX_TOYS:
-		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
+	doc["toys"] = toys_res.value
 
-	doc["toys"] = toys
+	var lights_res := _lights(source)
+	if not lights_res.ok:
+		return lights_res
 
-	var lights: Array = []
-	for raw: Variant in source.get("lights", []):
-		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
-			return _refuse("light %d has no 'at'" % lights.size(), source)
-		var light := raw as Dictionary
-		lights.append({
-			"at": _floats(light["at"], 3),
-			"range": clampf(float(light.get("range", 8.0)), 0.5, 80.0),
-			"energy": clampf(float(light.get("energy", 1.0)), 0.0, 16.0),
-			"colour": _floats(light.get("colour", [1.0, 0.95, 0.85]), 3),
-		})
+	doc["lights"] = lights_res.value
 
-	if lights.size() > MAX_LIGHTS:
-		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
+	var spawned := _spawns(source)
+	if not spawned.ok:
+		return spawned
 
-	doc["lights"] = lights
+	doc["spawns"] = spawned.value
+	return DotResult.success(doc)
 
+
+static func _environment(source: Dictionary) -> Dictionary:
+	var env := DEFAULT_ENV.duplicate(true)
+	var given: Variant = source.get("environment", {})
+
+	if given is Dictionary:
+		for key: String in DEFAULT_ENV:
+			if (given as Dictionary).has(key):
+				var value: Variant = (given as Dictionary)[key]
+				env[key] = _floats(value, 3) if DEFAULT_ENV[key] is Array else float(value)
+
+	# The map's own fog, in metres, when it has one: absent, the map gets the horizon haze every map has.
+	if given is Dictionary and (given as Dictionary).has("fog_end"):
+		var g := given as Dictionary
+		env["fog_colour"] = _floats(g.get("fog_colour", env["sky_horizon"]), 3)
+		env["fog_start"] = maxf(float(g.get("fog_start", 0.0)), 0.0)
+		env["fog_end"] = maxf(float(g["fog_end"]), env["fog_start"] + 1.0)
+		env["fog_max"] = clampf(float(g.get("fog_max", 1.0)), 0.0, 1.0)
+	return env
+
+
+static func _spawns(source: Dictionary) -> DotResult:
 	var spawns: Variant = source.get("spawns", {})
 	if not (spawns is Dictionary):
 		return _refuse("'spawns' is not {props, hunters}", source)
@@ -184,9 +176,43 @@ static func validate(source: Dictionary) -> DotResult:
 		if list.size() > MAX_SPAWNS:
 			return _refuse("%d %s spawns; the most is %d" % [list.size(), side, MAX_SPAWNS], source)
 		out_spawns[side] = list
+	return DotResult.success(out_spawns)
 
-	doc["spawns"] = out_spawns
-	return DotResult.success(doc)
+
+static func _toys(source: Dictionary) -> DotResult:
+	# Toys: dot-props' DotPropToyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
+	# with a toy a newer dot-props has still plays on an older server.
+	var toys: Array = []
+	for raw: Variant in source.get("toys", []):
+		var toy := DotPropToyBox.normal_placement(raw)
+		if toy.is_empty():
+			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
+		toys.append(toy)
+
+	if toys.size() > MAX_TOYS:
+		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
+
+	return DotResult.success(toys)
+
+
+static func _lights(source: Dictionary) -> DotResult:
+	var lights: Array = []
+	for raw: Variant in source.get("lights", []):
+		if not (raw is Dictionary) or not (raw as Dictionary).has("at"):
+			return _refuse("light %d has no 'at'" % lights.size(), source)
+		var light := raw as Dictionary
+		lights.append({
+			"at": _floats(light["at"], 3),
+			"range": clampf(float(light.get("range", 8.0)), 0.5, 80.0),
+			"energy": clampf(float(light.get("energy", 1.0)), 0.0, 16.0),
+			"colour": _floats(light.get("colour", [1.0, 0.95, 0.85]), 3),
+		})
+
+	if lights.size() > MAX_LIGHTS:
+		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
+
+	return DotResult.success(lights)
 
 
 static func _box(raw: Variant) -> Dictionary:

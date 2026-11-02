@@ -18,12 +18,67 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	var titles: Dictionary = (spec as Dictionary).get("titles", {})
+	var measured := _measure_kits(spec as Dictionary)
+	var props: Array = measured["props"]
+	var shaped: Dictionary = measured["shaped"]
+	var tops: Dictionary = measured["tops"]
+
+	var recolour := {}
+
+	for kit: Dictionary in (spec as Dictionary).get("kits", []):
+		if kit.has("recolour"):
+			recolour[str(kit["id"])] = kit["recolour"]
+
+	var out := {
+		"format": 1,
+		"comment": "Written by tools/measure_props.gd from props/kits.json. Do not edit by hand.",
+		"recolour": recolour,
+		"props": props,
+	}
+	var text := JSON.stringify(out, "  ", false) + "\n"
+	var pieces_text := _pieces_text(shaped, tops)
+
+	if check:
+		var have := FileAccess.get_file_as_string(OUT)
+		if have != text:
+			printerr("props/catalogue.json is not what the models measure; run tools/measure_props.gd")
+			quit(1)
+			return
+		if FileAccess.get_file_as_string(PIECES) != pieces_text:
+			printerr("props/pieces.json is not what the models measure; run tools/measure_props.gd")
+			quit(1)
+			return
+		print("props/catalogue.json and props/pieces.json match %d models" % props.size())
+		quit(0)
+		return
+
+	var f := FileAccess.open(OUT, FileAccess.WRITE)
+	f.store_string(text)
+	f.close()
+	f = FileAccess.open(PIECES, FileAccess.WRITE)
+	f.store_string(pieces_text)
+	f.close()
+
+	var total := 0
+	for p: Dictionary in props:
+		var count := (shaped.get(p["id"], []) as Array).size()
+		total += count
+		print("%-34s %5.2f x %5.2f x %5.2f%s%s" % [p["id"], p["size"][0], p["size"][1], p["size"][2],
+			"" if p["disguise"] else "  (fixed)", "  %d pieces" % count if count > 0 else ""])
+
+	print("wrote %s: %d props; %s: %d shaped, %d pieces" % [OUT, props.size(), PIECES, shaped.size(), total])
+
+	quit(0)
+
+
+## Measures every model of every kit: `{props, shaped, tops}`.
+func _measure_kits(spec: Dictionary) -> Dictionary:
+	var titles: Dictionary = spec.get("titles", {})
 	var props: Array = []
 	var shaped: Dictionary = {}
 	var tops: Dictionary = {}
 
-	for kit: Dictionary in (spec as Dictionary).get("kits", []):
+	for kit: Dictionary in spec.get("kits", []):
 		var dir := "res://%s" % str(kit["dir"])
 		var fixed: Array = kit.get("fixed", [])
 		var files := DirAccess.get_files_at(dir)
@@ -84,53 +139,7 @@ func _initialize() -> void:
 				tops[id] = _tops(pieces, size)
 
 	props.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a["id"]) < str(b["id"]))
-
-	var recolour := {}
-
-	for kit: Dictionary in (spec as Dictionary).get("kits", []):
-		if kit.has("recolour"):
-			recolour[str(kit["id"])] = kit["recolour"]
-
-	var out := {
-		"format": 1,
-		"comment": "Written by tools/measure_props.gd from props/kits.json. Do not edit by hand.",
-		"recolour": recolour,
-		"props": props,
-	}
-	var text := JSON.stringify(out, "  ", false) + "\n"
-	var pieces_text := _pieces_text(shaped, tops)
-
-	if check:
-		var have := FileAccess.get_file_as_string(OUT)
-		if have != text:
-			printerr("props/catalogue.json is not what the models measure; run tools/measure_props.gd")
-			quit(1)
-			return
-		if FileAccess.get_file_as_string(PIECES) != pieces_text:
-			printerr("props/pieces.json is not what the models measure; run tools/measure_props.gd")
-			quit(1)
-			return
-		print("props/catalogue.json and props/pieces.json match %d models" % props.size())
-		quit(0)
-		return
-
-	var f := FileAccess.open(OUT, FileAccess.WRITE)
-	f.store_string(text)
-	f.close()
-	f = FileAccess.open(PIECES, FileAccess.WRITE)
-	f.store_string(pieces_text)
-	f.close()
-
-	var total := 0
-	for p: Dictionary in props:
-		var count := (shaped.get(p["id"], []) as Array).size()
-		total += count
-		print("%-34s %5.2f x %5.2f x %5.2f%s%s" % [p["id"], p["size"][0], p["size"][1], p["size"][2],
-			"" if p["disguise"] else "  (fixed)", "  %d pieces" % count if count > 0 else ""])
-
-	print("wrote %s: %d props; %s: %d shaped, %d pieces" % [OUT, props.size(), PIECES, shaped.size(), total])
-
-	quit(0)
+	return {"props": props, "shaped": shaped, "tops": tops}
 
 
 ## The part-shaped collision (dot-props' DotPropPieces), one prop a line so a re-measure's diff reads by prop: `pieces` is `{id: [[x, y, z, ...] per convex piece]}` in the prop's frame.
