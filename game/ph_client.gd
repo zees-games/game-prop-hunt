@@ -1,6 +1,7 @@
 extends "ph_client_round.gd"
 
 const PhAudio := preload("ph_audio.gd")
+const PhBreakFx := preload("ph_break_fx.gd")
 const PhBindings := preload("ph_bindings.gd")
 const PhServices := preload("ph_services.gd")
 const PhNetCommand := preload("net/ph_net_command.gd")
@@ -79,6 +80,9 @@ var _beeped: int = -1
 ## The rules a hunter's body comes apart by when the furniture finishes them.
 var _break_rules: DotPlayerBreakRules = null
 
+## Splinters and shards where furniture breaks.
+var break_fx: Node = null
+
 ## Covers the screen, and keeps the local body and the input still, until the level is built,
 ## the local player exists and its camera is current. It is [member DotGameClient.gate].
 var gate: DotLoadGate = null
@@ -131,6 +135,7 @@ func _ready() -> void:
 	_build_settings()
 	_build_killcam()
 	_build_break_rules()
+	_build_break_fx()
 
 	if _offline:
 		_start_offline()
@@ -1030,6 +1035,9 @@ func _build_settings() -> void:
 	if _sampler != null:
 		settings.bind_look(_sampler.tunables)
 
+	if break_fx != null:
+		break_fx.follow(settings.settings)
+
 	if audio != null:
 		settings.bind_audio(audio.manager)
 		if audio.ambient != null:
@@ -1122,6 +1130,21 @@ func _burst_prop(who: PhPlayer, death: DotPlayerDeath) -> PhDebris:
 	debris.burst(parts, bounds.get_center(), bounds.size, direction,
 		game.physics.layer_mask(&"world") if game.physics != null else 1, death.roll_seed)
 	return debris
+
+
+func _build_break_fx() -> void:
+	break_fx = PhBreakFx.new()
+	add_child(break_fx)
+	game.prop_broken.connect(_on_prop_broken_fx)
+
+
+## Pieces where a broken prop stood; a prop told on joining (already broken) never reaches here.
+func _on_prop_broken_fx(index: int, direction: Vector3) -> void:
+	if game.map == null or index < 0 or index >= game.map.props.size():
+		return
+	var prop: Dictionary = game.map.props[index]
+	var size: Vector3 = prop["size"]
+	break_fx.shatter(prop["id"], (prop["transform"] as Transform3D) * Vector3(0.0, size.y * 0.5, 0.0), size, direction)
 
 
 func _build_break_rules() -> void:

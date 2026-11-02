@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 187
+const CHECKS := 190
 
 
 func _ready() -> void:
@@ -855,6 +855,16 @@ func _test_the_client() -> void:
 	_check(covered and platform.is_shown() and not platform.is_input_blocked() and platform.console != null,
 		"the loading cover is up at the start and lifts once the player is in, with the console built",
 		str(platform.describe()) if platform != null else "no platform")
+
+	var fx: DotFxBreak = client.get("break_fx").break_fx
+	fx.config.headless = true
+	var client_game: PhGame = client.get("game")
+	client_game.prop_broken.emit(0, Vector3.FORWARD)
+	_check(fx.spawned == 1, "furniture breaking throws a burst of pieces", str(fx.spawned))
+	_check(client.get("break_fx").material_of(&"furniture_bathroom_mirror") == "glass" and client.get("break_fx").material_of(&"furniture_chair") == "wood",
+		"a mirror breaks as glass and a chair as wood")
+	client_game.prop_broken.emit(99999, Vector3.UP)
+	_check(fx.spawned == 1, "an index past the map's props draws nothing", fx.last_refusal)
 
 	_check(InputMap.has_action(&"ph_disguise") and InputMap.has_action(&"ph_taunt_menu"),
 		"the game's keys are actions, from the bindings table")
