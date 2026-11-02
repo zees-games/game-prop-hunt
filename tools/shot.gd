@@ -179,6 +179,10 @@ func _run() -> void:
 			await _seconds_of(_seconds)
 		"killcam":
 			await _view_killcam(game, local)
+		"break":
+			await _view_break(game)
+			get_tree().quit(0)
+			return
 		"dead":
 			if not await _view_dead(game, local):
 				return
@@ -246,6 +250,50 @@ func _view_round(game: PhGame) -> void:
 
 
 ## Saves the frame to --out, records the sequence, and quits.
+## --view=break: a wood and a glass prop broken in front of a free camera, frames before and after (_<material>_<t>.png).
+func _view_break(game: PhGame) -> void:
+	var BreakFx := preload("../game/ph_break_fx.gd")
+	await _seconds_of(2.5)
+	var camera := _free_camera()
+	var shown: Dictionary = {}
+	for index in range(game.map.props.size()):
+		var id: StringName = game.map.prop_id(index)
+		var material: String = BreakFx.material_of(id)
+		if shown.has(material) or not material in ["wood", "glass"]:
+			continue
+		shown[material] = true
+		var prop: Dictionary = game.map.props[index]
+		var size: Vector3 = prop["size"]
+		var centre: Vector3 = (prop["transform"] as Transform3D) * Vector3(0.0, size.y * 0.5, 0.0)
+		print("break %s: %s index %d centre %s size %s" % [material, id, index, centre.snapped(Vector3.ONE * 0.01), size])
+		var reach := maxf(size.length() * 1.6, 2.5)
+		camera.look_at_from_position(centre + Vector3(reach * 0.6, reach * 0.4, reach * 0.8), centre)
+		var pose := camera.global_transform
+		var until := Time.get_ticks_msec() + 800
+		while Time.get_ticks_msec() < until:
+			camera.global_transform = pose
+			camera.current = true
+			await get_tree().process_frame
+		await _grab("%s_0_before" % material)
+		var dir := Vector3(0, 0, -1)
+		game.map.break_prop(index)
+		game.prop_broken.emit(index, dir)
+		var t0 := Time.get_ticks_msec()
+		for mark in [0.1, 0.3, 1.0, 4.0]:
+			while (Time.get_ticks_msec() - t0) < int(mark * 1000.0):
+				camera.global_transform = pose
+				camera.current = true
+				await get_tree().process_frame
+			await _grab("%s_%s" % [material, str(mark)])
+
+
+func _grab(tag: String) -> void:
+	await RenderingServer.frame_post_draw
+	var path := ProjectSettings.globalize_path(_out.get_basename() + "_" + tag + ".png")
+	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
+	print("saved %s: %s" % [path, error_string(get_viewport().get_texture().get_image().save_png(path))])
+
+
 func _finish() -> void:
 	if _board:
 		var menu: Variant = _client.get("settings").menu
