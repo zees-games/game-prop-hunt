@@ -73,6 +73,7 @@ var _aiming: bool = false
 var base_fov: float = 90.0
 var _reloading: bool = false
 var _slot: int = 0
+var _wheel: DotWeaponWheel
 
 ## The last whole second of the hide a beep was played for.
 var _beeped: int = -1
@@ -1752,43 +1753,16 @@ func _unhandled_input(event: InputEvent) -> void:
 ## The wheel (or whatever the Controls page moved it to) walks a hunter's carried slots. Props
 ## carry nothing and have no item switching, so for them it does nothing.
 func _wheel_pressed(event: InputEvent) -> bool:
-	var step := 0
-
-	if event.is_action_pressed(&"dot_menu_weapon_next"):
-		step = 1
-	elif event.is_action_pressed(&"dot_menu_weapon_previous"):
-		step = -1
-	else:
-		return false
-
-	if not _pointer_ours() or player == null or not player.is_alive() or is_spectating() or not is_hunter():
-		return false
-
-	var to := _cycled_slot(step)
-
-	if to > 0:
-		_slot = to
-
-	return true
-
-
-## The carried slot [param step] places along from the one chosen, wrapping, skipping empty
-## slots. 0 when there is nothing else to go to.
-func _cycled_slot(step: int) -> int:
-	if weapons == null or weapons.arsenal == null:
-		return 0
-
-	var carried := weapons.arsenal.slots()
-
-	if carried.size() < 2:
-		return 0
-
-	var at := carried.find(_slot if _slot != 0 else weapons.arsenal.current_slot())
-
-	if at < 0:
-		return carried[0]
-
-	return carried[posmod(at + step, carried.size())]
+	if _wheel == null:
+		_wheel = DotWeaponWheel.new()
+		_wheel.ring_provider = func() -> Array:
+			return weapons.arsenal.slots() if weapons != null and weapons.arsenal != null else []
+		_wheel.current_provider = func() -> Variant:
+			return _slot if _slot != 0 else weapons.arsenal.current_slot()
+		_wheel.blocked = func() -> bool:
+			return not _pointer_ours() or player == null or not player.is_alive() or is_spectating() or not is_hunter()
+		_wheel.chosen.connect(func(slot: Variant) -> void: _slot = int(slot))
+	return _wheel.handle_event(event)
 
 
 ## The game's own keys, from the bindings. True when one was used.

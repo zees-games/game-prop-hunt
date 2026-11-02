@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 190
+const CHECKS := 191
 
 
 func _ready() -> void:
@@ -1118,6 +1118,21 @@ func _test_hunter_weapons() -> void:
 	_check(same, "the drawn gun holds exactly the server's weapons, slot for slot", " ".join(held))
 	_check(drawn != null and drawn.arsenal.current_slot() == me.weapons.arsenal.current_slot(),
 		"and holds the same one")
+	var ring: Array = drawn.arsenal.slots()
+	var step := InputEventAction.new()
+	step.action = &"dot_menu_weapon_next"
+	step.pressed = true
+	# The pointer is never captured headless, so only that one clause of the block is lifted.
+	client.call("_wheel_pressed", InputEventAction.new())
+	var wheel: DotWeaponWheel = client.get(&"_wheel")
+	wheel.blocked = func() -> bool: return false
+	var slot_before: int = client.get(&"_slot")
+	var took: bool = client.call("_wheel_pressed", step)
+	var slot_after: int = client.get(&"_slot")
+	client.set(&"_slot", slot_before)
+	var want: int = ring[posmod(ring.find(drawn.arsenal.current_slot()) + 1, ring.size())] if ring.size() > 1 else 0
+	_check(ring.size() < 2 or (took and slot_after == want),
+		"the wheel steps a hunter to the next carried slot", "took %s, slot %s, want %d" % [took, slot_after, want])
 	await _shots_and_walls(world, me, drawn)
 
 	# Blindfolded through the hide, the counter is under the cover with everything else; seeking.
