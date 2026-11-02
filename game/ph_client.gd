@@ -647,6 +647,7 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 	weapons.name = "Weapons"
 	weapons.role = ZeeWeaponRig.Role.LOCAL
 	weapons.authority = false
+	weapons.catalogue = PhGame.weapon_catalogue()
 	weapons.tick_rate = game.tick_rate
 	# The held weapon lowers at every brush that stops the player, fences and clip included.
 	weapons.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0

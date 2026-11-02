@@ -424,7 +424,7 @@ func _build_combat() -> void:
 
 	projectiles = PhProjectiles.new()
 	projectiles.setup(combat, config.gravity)
-	projectiles.catalogue = ZeeWeaponPack.catalogue()
+	projectiles.catalogue = weapon_catalogue()
 	projectiles.blasted.connect(_on_blast)
 	projectiles.detonated.connect(func(at: Vector3, spawn: DotWeaponSpawn) -> void:
 		blast_drawn.emit(at, spawn.id if spawn != null else &""))
@@ -1126,6 +1126,18 @@ func _build_loadouts() -> void:
 		return await rearm_if_allowed(player_id_of_key(key)))
 
 
+static var _weapon_catalogue: DotWeaponCatalogue = null
+
+
+## The weapon table, built once; every rig shares it so its behaviour scripts load once.
+static func weapon_catalogue() -> DotWeaponCatalogue:
+	if _weapon_catalogue == null:
+		_weapon_catalogue = ZeeWeaponPack.catalogue()
+		# Built under the loading cover; the first spawn then loads no script.
+		_weapon_catalogue.warm_scripts()
+	return _weapon_catalogue
+
+
 ## The loadout key of [param player_id]: `ph-hunter-<id>`, with anything a key may not hold made
 ## an underscore (dot-loadout keys are letters, digits and `-_.:`, at least eight long).
 static func storage_key(player_id: StringName) -> String:
@@ -1631,6 +1643,7 @@ func arm(player: PhPlayer, weapon_id: StringName) -> bool:
 		rig.role = ZeeWeaponRig.Role.SERVER
 		rig.authority = authoritative
 		rig.tick_rate = tick_rate
+		rig.catalogue = weapon_catalogue()
 		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
 		player.add_child(rig)
