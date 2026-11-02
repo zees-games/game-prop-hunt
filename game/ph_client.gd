@@ -1505,7 +1505,8 @@ func _drive_spectator_camera() -> bool:
 
 ## The HUD line, with the free-camera key named only while the server offers one.
 func _watching_line() -> String:
-	return game.spectate.line_for(player.player_id, _key(PhBindings.ROAM))
+	game.spectate.roam_key = _key(PhBindings.ROAM)
+	return game.spectate.line_for(player.player_id)
 
 
 func _refresh_watching_line() -> void:

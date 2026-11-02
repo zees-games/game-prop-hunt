@@ -1,153 +1,58 @@
-extends Node
+extends DotSpectatorHost
 
 const PhPlayer := preload("ph_player.gd")
 
-## Where somebody who is out looks, and what the server lets them see.
-## Most of a server is out before a round ends, and the policy (may this person watch, whom, through which camera) is the server's: on a server this runs an authoritative [DotSpectatorManager], on a client a MIRROR told each change in a `SPECTATE` event.
-## No delay: every client already receives every player's live position, so one would hide nothing. No `class_name`; reached by preload from [PhGame], which hands it two dictionaries and a phase callable so there is no cycle.
+## Where somebody who is out looks, and what the server lets them see: [DotSpectatorHost] with this game's numbers.
+## No delay: every client already receives every player's live position, so one would hide nothing. No `class_name`; reached by preload from [PhGame], which hands it two dictionaries so there is no cycle.
 
 const CHANNEL := "ph.spectate"
-
-## Seconds the death camera holds before handing over; not a killcam, only long enough to see who found you.
-const DEATH_CAM_SECONDS := 1.5
-
-## Seconds the freeze camera holds on whoever put you out.
-const FREEZE_CAM_SECONDS := 1.5
 
 ## How far above the floor a faller's death camera hangs, looking straight down the drop.
 ## A fall is recorded at the kill height, where nothing is worth seeing, so the camera goes back up over the point they left.
 const DROP_CAM_RISE := 6.0
 
-## The overview camera, and a second slot this game fills with the same view. See
-## [method set_overviews].
-const OVERVIEW_FIELD := 0
-const OVERVIEW_SHOWDOWN := 1
-
-## A viewer's camera changed: a death, a hand-over, a target leaving, a step through the
-## list. [param player_id] is theirs. What the bridge tells that one client about.
-signal view_changed(player_id: StringName)
-
-var manager: DotSpectatorManager = null
-
-## player id -> PhPlayer. The world's own dictionary, shared rather than copied, so a join
-## is visible here the moment the world has it.
+## player id -> PhPlayer. The world's own dictionary, shared rather than copied, so a join is visible here the moment the world has it.
 var players: Dictionary = {}
 
 ## player id -> team id. Also the world's own.
 var sides: Dictionary = {}
 
-## [code]() -> int[/code], the world's phase. See [method camera_for].
-var phase_fn: Callable = Callable()
-
-## [code](phase) -> bool[/code]: whether the second overview is the one to use. Unset here.
-var in_showdown_fn: Callable = Callable()
-
-## Whether this decides anything. A connected client's world is a mirror.
-var authoritative: bool = true
-
-## Set while a viewer is stepping through the list themselves. See [method _prefer_side].
-var _stepping: bool = false
-
-## Set while [method _prefer_side] is moving somebody, so its own watch does not re-enter.
-var _preferring: bool = false
+## [member PhConfig.spectate_camera], applied when the rules are built.
+var force_camera: int = 0
 
 
-## Builds the manager. [param force_camera] is [member PhConfig.spectate_camera].
-func setup(p_authoritative: bool, tick_rate: int, force_camera: int) -> DotResult:
-	authoritative = p_authoritative
-
-	manager = DotSpectatorManager.new()
-	manager.name = "SpectatorManager"
-	manager.authoritative = authoritative
-	manager.rules = rules_for(tick_rate, force_camera)
-	manager.participants_fn = _participants
-	manager.team_fn = func(key: String) -> int: return int(sides.get(StringName(key), 0))
-	manager.alive_fn = _alive
-	manager.pose_fn = _pose_of
-	add_child(manager)
-
-	var ready_now := manager.setup()
-
-	if not ready_now.ok:
-		return ready_now.wrap("prophunt spectating")
-
-	manager.view_changed.connect(_on_view_changed)
-	manager.retargeted.connect(_on_retargeted)
-
-	# DEBUG rather than INFO: the world is built once per process on a server but once per
-	# test in every suite, and the policy it logs is already in `ph_status`.
-	DotLog.debug(CHANNEL, "spectating is set up", {
-		"authoritative": authoritative,
-		"force_camera": manager.rules.force_camera,
-	})
-	return DotResult.success(null)
+func _init() -> void:
+	death_cam_seconds = 1.5
+	freeze_cam_seconds = 1.5
+	chase_distance = 4.6
+	chase_height = 1.2
+	history_seconds = 0.0
+	eye_height = 0.0
+	prefer_own_side = true
+	fixed_index_fn = func(_key: String) -> int: return 0
 
 
-## The policy, as a document.
-##
-## Static so a suite can read the numbers without a world.
-static func rules_for(tick_rate: int, force_camera: int) -> DotSpectatorRules:
-	var rules := DotSpectatorRules.new()
-	rules.force_camera = clampi(force_camera, 0, 2)
-		# Free roam is the family default and follows the cvars: `mp_freeroam` 0, or `mp_forcecamera` 1 or 2, switches it off.
-		# Hardcoding it off here would be overwritten by the cvar's default once the module bound it.
-		# Dead players stay dead until the next round, so a list including them would be bodies at the kill height.
-	rules.cycle_includes_dead = false
-	rules.death_cam_ticks = int(DEATH_CAM_SECONDS * float(maxi(tick_rate, 1)))
-	rules.freeze_cam_ticks = int(FREEZE_CAM_SECONDS * float(maxi(tick_rate, 1)))
-	rules.chase_distance = 4.6
-	rules.chase_height = 1.2
-	rules.delay_ticks = 0
-	rules.history_ticks = 2
-	return rules
+func _channel() -> String:
+	return CHANNEL
 
 
-## Changes who may watch whom, from the next decision on. What `ph_spectate_camera` writes.
-func set_force_camera(force_camera: int) -> void:
-	if manager == null or manager.rules == null:
-		return
-
-	manager.rules.force_camera = clampi(force_camera, 0, 2)
-
-	# INFO: a rule an admin changed and a player is going to ask about.
-	DotLog.info(CHANNEL, "the spectator policy changed", {
-		"force_camera": manager.rules.force_camera,
-	})
+func _tune_rules(r: DotSpectatorRules) -> DotSpectatorRules:
+	r.force_camera = clampi(force_camera, 0, 2)
+	# Dead players stay dead until the next round, so a list including them would be bodies at the kill height.
+	r.cycle_includes_dead = false
+	r.delay_ticks = 0
+	return r
 
 
-## The free-camera key: into a free camera, or back onto a player. A refusal (roaming off,
-## `mp_forcecamera` set) is a failed result for a notice.
-func toggle_roam(player_id: StringName) -> DotResult:
+## The free-camera key. A mirror is told, not asked; a refusal (roaming off, `mp_forcecamera` set) is the manager's own.
+func toggle_roam(key: String) -> DotResult:
 	if manager == null:
-		return DotResult.fail(DotError.CODE_STATE, "Spectating is not set up.")
+		return _unset()
 
 	if not authoritative:
 		return DotResult.fail(DotError.CODE_STATE, "A mirror is told, not asked.")
 
-	var res := manager.toggle_roam(String(player_id))
-	DotLog.debug(CHANNEL, "free roam toggled" if res.ok else "free roam was refused", {
-		"player": String(player_id), "roaming": is_roaming(player_id),
-	})
-	return res
-
-
-func is_roaming(player_id: StringName) -> bool:
-	return manager != null and manager.view(String(player_id)).mode == DotSpectatorView.Mode.ROAMING
-
-
-## Whether the key should be offered to this viewer now (`mp_freeroam`, `mp_forcecamera`).
-func can_roam(player_id: StringName) -> bool:
-	return manager != null and manager.can_roam(String(player_id))
-
-
-## Where nobody-left-to-watch looks from: over the map. Two slots, both the same view here.
-## A viewer whose whole side is out has nobody the "own side" rule lets them follow, and dot-spectate falls back to a fixed camera.
-func set_overviews(field: Transform3D, showdown: Transform3D) -> void:
-	if manager == null:
-		return
-
-	var cameras: Array[Transform3D] = [field, showdown]
-	manager.fixed_cameras = cameras
+	return manager.toggle_roam(key)
 
 
 ## Somebody is out. Starts the death camera; the server's tick hands it over.
@@ -163,152 +68,16 @@ func on_died(
 	if fell:
 		where = Vector3(at.x, deck_height + DROP_CAM_RISE - 2.0, at.z)
 
-	manager.on_death(String(player_id), where, String(by), tick)
-
-	# DEBUG: a transition. "My camera went somewhere odd when I fell" is answered by what
-	# it was put on.
-	DotLog.debug(CHANNEL, "somebody who is out is watching", {
-		"player": String(player_id), "by": String(by), "fell": fell,
-	})
+	death(String(player_id), where, String(by), tick)
 
 
-## Somebody is back in the world — a new round, or a join. They stop watching.
-func on_spawned(player_id: StringName) -> void:
-	if manager == null:
-		return
-
-	if manager.is_spectating(String(player_id)):
-		DotLog.debug(CHANNEL, "a new round ends watching", {"player": String(player_id)})
-
-	manager.on_spawn(String(player_id))
-
-
-## Somebody left. Called AFTER the world has dropped them, which is dot-spectate's rule:
-## the replacement is chosen from the roster, and a roster still holding the leaver picks
-## the leaver.
-func on_left(player_id: StringName) -> void:
-	if manager != null:
-		manager.on_leave(String(player_id))
-
-
-func advance(tick: int) -> void:
-	if manager != null:
-		manager.advance(tick)
-
-
-## The next or the previous person this viewer may watch, or 0 for the other camera.
-## Asked of the server and answered by it (a refusal goes back as a notice), so a client can never step onto somebody the policy forbids.
-func step(player_id: StringName, direction: int) -> DotResult:
-	if manager == null:
-		return DotResult.fail(DotError.CODE_STATE, "Spectating is not set up.")
-
-	if not authoritative:
-		return DotResult.fail(DotError.CODE_STATE, "A mirror is told, not asked.")
-
-	var key := String(player_id)
-
-	if not manager.is_spectating(key):
-		return DotResult.fail(DotError.CODE_STATE, "You are playing, not watching.")
-
-	if direction == 0:
-		return _cycle_camera(key)
-
-	_stepping = true
-	var moved := manager.next_target(key) if direction > 0 else manager.previous_target(key)
-	_stepping = false
-	return moved
-
-
-## First person, then behind them, when the policy allows it.
-func _cycle_camera(key: String) -> DotResult:
-	var view := manager.view(key)
-
-	if not view.follows_target() or view.mode == DotSpectatorView.Mode.FREEZE_CAM:
-		return DotResult.fail(DotError.CODE_STATE, "There is nobody in front of this camera.")
-
-	var wanted := DotSpectatorView.Mode.CHASE
-	if view.mode == DotSpectatorView.Mode.CHASE:
-		wanted = DotSpectatorView.Mode.FIRST_PERSON
-
-	var set_to := manager.set_mode(key, wanted)
-
-	if not set_to.ok:
-		return set_to
-
-	if int(set_to.value) != wanted:
-		# dot-spectate downgrades rather than refuses, and says so at DEBUG; the viewer who
-		# pressed the key is the one who needs to hear it.
-		return DotResult.fail(
-			DotError.CODE_FORBIDDEN, "This server only lets you watch through their eyes."
-		)
-
-	return set_to
-
-
-## Adopts a view the server decided. The client half.
-func apply_view(
-	player_id: StringName, mode: int, target: StringName, killer: StringName, death_at: Vector3
-) -> void:
-	if manager == null:
-		return
-
-	var view := manager.view(String(player_id))
-	view.mode = clampi(mode, 0, DotSpectatorView.Mode.size() - 1) as DotSpectatorView.Mode
-	view.target = String(target)
-	view.killer = String(killer)
-		# Carried by this game's own event: dot-spectate's wire now has a death position (`"d"`), but this event is bit-packed and session-keyed.
-		# A mirror without one puts every death camera at the world origin, under the floor.
-	view.death_position = death_at
-	view.until_tick = -1
-	view_changed.emit(player_id)
-
-
-func is_spectating(player_id: StringName) -> bool:
-	return manager != null and manager.is_spectating(String(player_id))
-
-
-func mode_of(player_id: StringName) -> int:
-	return int(manager.view(String(player_id)).mode) if manager != null else 0
-
-
-## Who a viewer is watching, or an empty name.
-func watching(player_id: StringName) -> StringName:
-	if manager == null or not manager.is_spectating(String(player_id)):
-		return &""
-
-	return StringName(manager.view(String(player_id)).target)
-
-
-## Where [param player_id]'s camera goes this frame. Identity when they are playing.
-## The fixed camera is chosen by the phase on both ends: this game has two and which is right is a fact about the round, so it is read from the phase a client already has rather than sent.
-func camera_for(player_id: StringName) -> Transform3D:
-	if manager == null:
-		return Transform3D.IDENTITY
-
-	var key := String(player_id)
-
-	if not manager.is_spectating(key):
-		return Transform3D.IDENTITY
-
-	var view := manager.view(key)
-
-	if view.mode == DotSpectatorView.Mode.FIXED:
-		var showdown := false
-		if phase_fn.is_valid() and in_showdown_fn.is_valid():
-			showdown = bool(in_showdown_fn.call(int(phase_fn.call())))
-		view.fixed_index = OVERVIEW_SHOWDOWN if showdown else OVERVIEW_FIELD
-
-	return manager.camera_of(key)
-
-
-## One line for the HUD, or an empty string while playing.
-func line_for(player_id: StringName, roam_key: String = "") -> String:
-	if not is_spectating(player_id):
+## The HUD line, with the free-camera key named only while the server offers one.
+func line_for(key: String) -> String:
+	if not is_spectating(key):
 		return ""
 
-	var view := manager.view(String(player_id))
-
-	var roam_hint := ("   %s: free camera" % roam_key) if roam_key != "" and can_roam(player_id) else ""
+	var view := manager.view(key)
+	var roam_hint := ("   %s: free camera" % roam_key) if roam_key != "" and can_roam(key) else ""
 
 	match view.mode:
 		DotSpectatorView.Mode.ROAMING:
@@ -318,22 +87,18 @@ func line_for(player_id: StringName, roam_key: String = "") -> String:
 		DotSpectatorView.Mode.DEATH_CAM:
 			return "you are out"
 		DotSpectatorView.Mode.FREEZE_CAM:
-			return "shot by %s" % _name_of(StringName(view.target))
+			return "shot by %s" % _name_of(view.target)
 		DotSpectatorView.Mode.FIXED:
 			return "nobody left to watch"
 		DotSpectatorView.Mode.CHASE:
-			return "watching %s  (behind)   click: next   F5: their eyes%s" % [
-				_name_of(StringName(view.target)), roam_hint
-			]
+			return "watching %s  (behind)   click: next   F5: their eyes%s" % [_name_of(view.target), roam_hint]
 		_:
-			return "watching %s   click: next   F5: behind them%s" % [
-				_name_of(StringName(view.target)), roam_hint
-			]
+			return "watching %s   click: next   F5: behind them%s" % [_name_of(view.target), roam_hint]
 
 
-func _name_of(player_id: StringName) -> String:
-	var body: PhPlayer = players.get(player_id)
-	return body.display_name if body != null else String(player_id)
+func _name_of(key: String) -> String:
+	var body: PhPlayer = players.get(StringName(key))
+	return body.display_name if body != null else key
 
 
 func _participants() -> PackedStringArray:
@@ -345,16 +110,18 @@ func _participants() -> PackedStringArray:
 	return out
 
 
-func _alive(key: String) -> bool:
+func _team_of(key: String) -> int:
+	return int(sides.get(StringName(key), 0))
+
+
+func _is_alive(key: String) -> bool:
 	var body: PhPlayer = players.get(StringName(key))
-	# Somebody in the gallery is up and is not in the fight; a camera on them is a camera on
-	# a wall of other spectators.
+	# Somebody in the gallery is up and is not in the fight; a camera on them is a camera on a wall of other spectators.
 	return body != null and is_instance_valid(body) and body.is_alive() and not body.watching
 
 
 ## Where somebody's eyes are, from where this process DRAWS them.
-## The drawn position, not the node, on a world that simulates: a node moves once a tick, so a camera hung on it jitters (fixed for the player's own camera via `render_state`).
-## A mirror's remote players are written every frame by the interpolator, so there the node is right, and a rider's controller is not simulated.
+## The drawn position, not the node, on a world that simulates: a node moves once a tick, so a camera hung on it jitters. A mirror's remote players are written every frame by the interpolator, so there the node is right, and a rider's controller is not simulated.
 func _pose_of(key: String) -> Transform3D:
 	var body: PhPlayer = players.get(StringName(key))
 
@@ -367,54 +134,6 @@ func _pose_of(key: String) -> Transform3D:
 		at = body.controller.render_state().position
 
 	var state := body.controller.state
-	var basis := Basis.from_euler(Vector3(deg_to_rad(state.pitch), deg_to_rad(state.yaw), 0.0))
-	# A prop's eyes are near the top of what it is, not a person's height above the floor: a
-	# camera a metre and a half above a bottle is a camera over the room, not in the bottle.
-	var eye := body.eye_position() - body.controller.state.position
-	return Transform3D(basis, at + eye)
-
-
-func _on_view_changed(key: String, mode: int, target: String) -> void:
-	_prefer_side(key, mode, target)
-	view_changed.emit(StringName(key))
-
-
-func _on_retargeted(key: String, _from: String, to: String, _reason: StringName) -> void:
-	_prefer_side(key, int(manager.view(key).mode), to)
-	view_changed.emit(StringName(key))
-
-
-## When the server picks somebody for a viewer, it picks a team-mate if there is one.
-## dot-spectate chooses the first allowed name in key order, which under "anybody" is a stranger, so an AUTOMATIC choice moves to the first living team-mate the policy allows.
-## A viewer stepping through the list themselves is left where they asked to be.
-func _prefer_side(key: String, mode: int, target: String) -> void:
-	if not authoritative or _stepping or _preferring or target == "":
-		return
-
-	if mode != DotSpectatorView.Mode.FIRST_PERSON and mode != DotSpectatorView.Mode.CHASE:
-		return
-
-	var mine := int(sides.get(StringName(key), 0))
-
-	if mine <= 0 or int(sides.get(StringName(target), 0)) == mine:
-		return
-
-	for candidate in manager.targets_for(key):
-		if int(sides.get(StringName(candidate), 0)) != mine:
-			continue
-
-		_preferring = true
-		var _moved := manager.watch(key, candidate, mode)
-		_preferring = false
-		return
-
-
-func describe() -> Dictionary:
-	return manager.describe() if manager != null else {}
-
-
-func describe_lines() -> PackedStringArray:
-	if manager == null:
-		return PackedStringArray(["spectate: not set up"])
-
-	return manager.describe_lines()
+	# A prop's eyes are near the top of what it is, not a person's height above the floor.
+	var eye := body.eye_position() - state.position
+	return eye_pose(at + eye, state.pitch, state.yaw)

@@ -522,10 +522,12 @@ func _build_spectate() -> void:
 	spectate.name = "Spectate"
 	spectate.players = players
 	spectate.sides = sides
-	spectate.phase_fn = func() -> int: return phase
+	spectate.authoritative = authoritative
+	spectate.tick_rate = tick_rate
+	spectate.force_camera = config.spectate_camera
 	add_child(spectate)
 
-	var ready_now := spectate.setup(authoritative, tick_rate, config.spectate_camera)
+	var ready_now := spectate.setup()
 
 	if not ready_now.ok:
 		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
@@ -685,7 +687,7 @@ func place_one(player: PhPlayer) -> void:
 	if authoritative and phase == Phase.SEEK:
 		_bench(player)
 	elif spectate != null:
-		spectate.on_spawned(player.player_id)
+		spectate.spawned(player.player_id)
 
 
 func _bench(player: PhPlayer) -> void:
@@ -724,7 +726,7 @@ func remove_player(player_id: StringName) -> void:
 		block_rules.call(&"forget", player_id)
 
 	if spectate != null:
-		spectate.on_left(player_id)
+		spectate.left(player_id)
 
 	if progress != null:
 		progress.leave(player_id)
@@ -1017,7 +1019,7 @@ func build_map(doc: Dictionary) -> DotResult:
 	map_doc = map.doc
 
 	if spectate != null:
-		spectate.set_overviews(map.overview(), map.overview())
+		spectate.set_overviews([map.overview(), map.overview()] as Array[Transform3D])
 
 	world_rebuilt.emit()
 	bots.prepare_ahead()
@@ -1049,7 +1051,7 @@ func _place_everybody() -> void:
 		player.place_at(spot[0], spot[1])
 
 		if spectate != null:
-			spectate.on_spawned(player.player_id)
+			spectate.spawned(player.player_id)
 
 		disguise_changed.emit(player.player_id)
 

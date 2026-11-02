@@ -1251,7 +1251,10 @@ func _test_the_map_menu() -> void:
 ## mp_forcecamera, and a free view survives the wire with nobody in it.
 func _test_free_roam() -> void:
 	_section("free roam: on by default, mp_freeroam and mp_forcecamera refuse it, the mode crosses the wire")
-	var stock := (load("res://game/ph_spectate.gd") as GDScript).call(&"rules_for", TICK_RATE, PhConfig.new().spectate_camera) as DotSpectatorRules
+	var stock_host: DotSpectatorHost = (load("res://game/ph_spectate.gd") as GDScript).new()
+	stock_host.tick_rate = TICK_RATE
+	var stock := stock_host.tune_rules(DotSpectatorRules.new())
+	stock_host.free()
 	_check(stock.allow_roaming and stock.force_camera == 0 and stock.roaming_permitted(),
 		"the stock policy allows roaming: the config's spectate_camera gives force_camera 0")
 
@@ -1298,8 +1301,10 @@ func _test_free_roam() -> void:
 		"a free view crosses the wire as ROAMING with nobody in it")
 
 	var mirror: Node = (load("res://game/ph_spectate.gd") as GDScript).new()
+	mirror.set(&"authoritative", false)
+	mirror.set(&"tick_rate", TICK_RATE)
 	add_child(mirror)
-	var made: DotResult = mirror.call(&"setup", false, TICK_RATE, 0)
+	var made: DotResult = mirror.call(&"setup")
 	mirror.call(&"apply_view", &"u301", DotSpectatorView.Mode.ROAMING, &"", &"", Vector3.ZERO)
 	_check(made.ok and bool(mirror.call(&"is_roaming", &"u301")) and bool(mirror.call(&"is_spectating", &"u301")),
 		"a mirror told ROAMING with no target is roaming, not 'stopped watching'")
