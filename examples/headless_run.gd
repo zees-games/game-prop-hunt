@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 30
 
-const CHECKS := 184
+const CHECKS := 185
 
 
 func _ready() -> void:
@@ -270,6 +270,9 @@ func _test_disguise() -> void:
 		"a disguised player has no figure for an avatar action, an undisguised one does")
 	client.free()
 	# The figure steps its clip by game time (DotHumanoidFigure.frame_delta), which stamps the frame it ran in.
+	# In the tree, as a live player's figure is: posing one outside it reads a global transform that is not there.
+	hunter.add_child(hunter.figure)
+	_check(hunter.figure.is_inside_tree(), "the figure being posed is in the tree")
 	hunter.figure.pose(hunter.global_position, 0.0, 3.0)
 	_check(int(hunter.figure.person.get("_posed_frame")) == Engine.get_process_frames(),
 		"a posed figure animates by game time, not the wall clock")
