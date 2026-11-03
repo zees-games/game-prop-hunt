@@ -92,8 +92,8 @@ func _net_config() -> DotNetConfig:
 	# A hunter shooting a prop running across a room is the ordinary reason to want it.
 	config.enable_lag_compensation = true
 	# Everybody playing, and nothing else: the furniture is the map document, not entities, so
-	# a snapshot is a full server's players and room to spare.
-	config.max_entities_per_snapshot = 64
+	# a snapshot is a full server's players; 0 is no cap.
+	config.max_entities_per_snapshot = 0
 	return config
 
 
