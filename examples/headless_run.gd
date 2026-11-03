@@ -1205,19 +1205,19 @@ func _hunter_weapons_rest(client: Node, world: PhGame, hud: Node, counter: DotAm
 func _check_hunter_icons(hud: Node, counter: DotAmmoCounter, def: DotWeaponDef) -> void:
 	var icon_script: Script = load("res://game/ph_weapon_icons.gd")
 	var icons: DotWeaponIconStyle = icon_script.get("shared")
-	var icon_rect: TextureRect = hud.get("weapon_icon")
+	var icon_rect: DotWeaponIconPlate = hud.get("weapon_icon")
 	var unmapped := PackedStringArray()
 	for weapon in icon_script.get("TAGS"):
 		if not icons.icon_set().has_icon(weapon):
 			unmapped.append(String(weapon))
-	_check(unmapped.is_empty() and icon_rect != null and icon_rect.visible and icon_rect.texture != null and icon_rect.texture == icons.texture(def.id),
+	_check(unmapped.is_empty() and icon_rect != null and icon_rect.texture != null and icon_rect.texture == icons.texture(def.id),
 		"the HUD draws the held gun's sprite over the counter, and every mapped weapon has one", ", ".join(unmapped))
 	var _silhouette := icons.set_style(&"silhouette")
 	hud.call("_process", 0.0)
-	_check(icon_rect != null and not icon_rect.visible, "cl_weapon_icons silhouette hides the sprite")
+	_check(icon_rect != null and icon_rect.texture == null, "cl_weapon_icons silhouette hides the sprite")
 	var _pixel := icons.set_style(&"pixel")
 	hud.call("_process", 0.0)
-	_check(icon_rect != null and icon_rect.visible and icon_rect.get_global_rect().end.y <= counter.get_global_rect().position.y + 4.0,
+	_check(icon_rect != null and icon_rect.texture != null and icon_rect.get_global_rect().end.y <= counter.get_global_rect().position.y + 4.0,
 		"the sprite sits above the ammunition plate, not on it")
 
 
