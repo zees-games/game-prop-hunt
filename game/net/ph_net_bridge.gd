@@ -56,9 +56,8 @@ signal notice_received(text: String)
 ## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
 signal spectate_received(viewer: int, mode: int, target: int)
 
-## Client side: somebody else used their weapon [param times] times since the last
-## snapshot. [param kind] is one of `ZeeWeaponNet.KIND_*`. Relayed from that player's own
-## behaviour, because a client builds those one per JOIN and nothing else could find them.
+## Client side: somebody else used their weapon [param times] times since the last snapshot; [param kind] is a `ZeeWeaponNet.KIND_*`.
+## Relayed from that player's own behaviour, the only place a client builds them per JOIN.
 signal weapon_used_by(session_id: int, times: int, kind: int)
 
 ## Client side: the map was rebuilt from what the server sent. The HUD names it.

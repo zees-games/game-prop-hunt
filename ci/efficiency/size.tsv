@@ -1,17 +1,16 @@
 # size
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-examples/dedicated.gd	928
-examples/dedicated.gd::_test_map_rotation_file	110
-examples/dedicated.gd::_test_the_map_vote	106
+examples/dedicated.gd	822
+examples/dedicated.gd::_test_the_map_vote	101
 examples/headless_bots.gd::_round	163
 examples/headless_bots.gd::_run	174
 examples/headless_maps.gd::_test_map	97
-examples/headless_net.gd	882
-examples/headless_net.gd::_build	89
-examples/headless_net.gd::_test_the_codec	92
-examples/headless_run.gd	1511
-examples/headless_run.gd::_test_hunter_weapons	95
-examples/headless_run.gd::_test_the_client	142
+examples/headless_net.gd	854
+examples/headless_net.gd::_build	87
+examples/headless_net.gd::_test_the_codec	87
+examples/headless_run.gd	1334
+examples/headless_run.gd::_test_hunter_weapons	93
+examples/headless_run.gd::_test_the_client	140
 game/net/ph_net_bridge.gd	1559
 game/net/ph_net_bridge.gd::_on_event	150
 game/net/ph_net_bridge.gd::attach	119
@@ -19,7 +18,6 @@ game/ph_bots.gd::_pick_spot	81
 game/ph_catalogue.gd::practice	97
 game/ph_client.gd	1863
 game/ph_client.gd::_build_netcode	84
-game/ph_game.gd	2239
-game/ph_module.gd	899
-game/ph_module.gd::_game_load	99
-game/ph_vote.gd::setup	88
+game/ph_game.gd	2186
+game/ph_module.gd::_game_load	90
+game/ph_vote.gd::setup	81
