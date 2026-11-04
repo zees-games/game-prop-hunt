@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+const PhTouch := preload("ph_touch.gd")
 const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhBindings := preload("ph_bindings.gd")
@@ -243,7 +244,8 @@ func _build_bottom() -> void:
 func _build_status_labels() -> void:
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_as.offset_left = 24.0
+	# 124 clears the touch Menu button, which a short phone screen puts at the same height.
+	_as.offset_left = 124.0 if PhTouch.wanted() else 24.0
 	_as.offset_right = 600.0
 	_as.offset_top = -356.0
 	_as.offset_bottom = -328.0
