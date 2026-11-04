@@ -150,3 +150,5 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 2. **Try it in a browser**, with people: how long a hide should be and how much a decoy should cost are numbers only play settles.
 
 **Per-map settings** (`PhModule._map_config_keys`, dot-game's `DotGameMapConfig`): `cfg/game/mg-prop-hunt/dot_map/map/<map>.yml` (globs such as `ph_%.yml`; `cfg/server/...` overrides) may set the `ph_*` round tunables and `mp_killcam_time`; the next map restores them. The client predicts with none of them, so it wires nothing. `examples/headless_mapcfg` checks it. No `ph_*` BSP is in dot-map's store, so the shipped `ph_%.yml` is a commented template, not converter output.
+
+- Publish: `tools/publish.sh --version V` (or `--bump patch`) wraps dot-cloud's publish_pack.sh with this pack's id, exclusions and lock; pass `--site` and `--token-file`.
