@@ -11,6 +11,10 @@ const _SUBJECT := preload("res://examples/killcam_subject.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
 const CHECKS := 41
+const SECTIONS := 6
+
+var _entered := 0
+var _finished := 0
 
 
 func _ready() -> void:
@@ -23,6 +27,7 @@ func _run() -> void:
 		_probe()
 		return
 	print("mg-prop-hunt: config binder")
+	_entered += 1
 	var config := PhConfig.new()
 	var binder := PhConfig.make_binder(config)
 	binder.strict = true
@@ -48,11 +53,17 @@ func _run() -> void:
 	_check(binder.write_schema(schema_path).ok and FileAccess.file_exists(schema_path), "write_schema writes the schema")
 	DirAccess.remove_absolute(schema_path)
 
-	_strict_refuses_an_unknown_key()
+	_finished += 1
 
+	_entered += 5
+	_strict_refuses_an_unknown_key()
+	_finished += 1
 	_layers()
+	_finished += 1
 	_templates(binder)
+	_finished += 1
 	_killcam_icon()
+	_finished += 1
 
 	var wb := DotGameWorkbench.new()
 	wb.panel_mode = 1
@@ -84,15 +95,8 @@ func _run() -> void:
 
 	wb.free()
 	console.free()
-	print("")
-	print("%d passed, %d failed" % [_passed, _failed])
-	for line in _failures:
-		print("  FAIL  %s" % line)
-	if _passed + _failed != CHECKS:
-		print("ERROR: %d checks ran, %d expected." % [_passed + _failed, CHECKS])
-		get_tree().quit(1)
-		return
-	get_tree().quit(1 if _failed > 0 else 0)
+	_finished += 1
+	_report_sections(_entered, _finished, SECTIONS, CHECKS)
 
 
 func _strict_refuses_an_unknown_key() -> void:

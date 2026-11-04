@@ -5,6 +5,9 @@ extends DotGameCheckSuite
 
 const CHECKS := 7
 
+var _entered := 0
+var _finished := 0
+
 
 func _ready() -> void:
 	DotLog.set_level(DotLog.Level.ERROR)
@@ -17,6 +20,7 @@ func _run() -> void:
 		print("SKIPPED: dot-map is not linked")
 		get_tree().quit(0)
 		return
+	_entered += 1
 	var module = load("res://game/ph_module.gd").new()
 	var keys: Dictionary = module._map_config_keys()
 	var game_id: String = module._map_config_game()
@@ -38,4 +42,5 @@ func _run() -> void:
 	_check(console.find_cvar("ph_hide_seconds").get_float() == 30.0, "and the hide time")
 	_check(console.find_cvar("sv_cheats") == null, "a key outside the whitelist is never set")
 
-	_report(CHECKS)
+	_finished += 1
+	_report_sections(_entered, _finished, 1, CHECKS)
