@@ -10,8 +10,8 @@ const PhKillcam := preload("../game/ph_killcam.gd")
 const _SUBJECT := preload("res://examples/killcam_subject.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
-const CHECKS := 41
-const SECTIONS := 6
+const CHECKS := 45
+const SECTIONS := 7
 
 var _entered := 0
 var _finished := 0
@@ -96,7 +96,60 @@ func _run() -> void:
 	wb.free()
 	console.free()
 	_finished += 1
+	_space_query_audit()
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
+
+
+
+## Every function in game/ that asks the physics space a question, by grep. With physics on its own
+## thread a query only works inside the physics step: the server's are reached from the tick or from
+## a request handler, and the client's roof probe runs in _process (client only). A new caller fails
+## here until it is added and listed in dot-physics docs/threading.md.
+const QUERY_FUNCS := {
+	"game/ph_game.gd": ["_clear_between", "_look", "_make_room"],
+	"game/ph_client.gd": ["_process"],
+}
+const QUERY_NEEDLES: Array[String] = ["direct_space_state", "space.intersect_", "space.cast_motion(", "space.get_rest_info("]
+
+
+func _audit_files(dir: String, out: Array[String]) -> void:
+	for f in DirAccess.get_files_at(dir):
+		if f.ends_with(".gd"):
+			out.append(dir.path_join(f))
+	for d in DirAccess.get_directories_at(dir):
+		_audit_files(dir.path_join(d), out)
+
+
+func _space_query_audit() -> void:
+	_entered += 1
+	print("space-query audit")
+	var files: Array[String] = []
+	_audit_files("res://game", files)
+	var found := {}
+	for path in files:
+		for chunk in FileAccess.get_file_as_string(path).split("\nfunc "):
+			var hit := false
+			for n in QUERY_NEEDLES:
+				hit = hit or chunk.contains(n)
+			if hit:
+				var rel := path.trim_prefix("res://")
+				var name := chunk.get_slice("(", 0).replace("static ", "").strip_edges()
+				if not found.has(rel):
+					found[rel] = []
+				(found[rel] as Array).append(name)
+	for rel in found:
+		(found[rel] as Array).sort()
+	var want := {}
+	for rel in QUERY_FUNCS:
+		var names: Array = (QUERY_FUNCS[rel] as Array).duplicate()
+		names.sort()
+		want[rel] = names
+	_check(files.size() > 10, "the audit found the game's scripts")
+	_check(found == want, "the functions that query the space are exactly the documented ones", str(found))
+	var game_text := FileAccess.get_file_as_string("res://game/ph_game.gd")
+	_check(game_text.contains("func _physics_process("), "the world steps in _physics_process")
+	_check(not game_text.contains("call_deferred(&\"_look\"") and not game_text.contains("call_deferred(&\"_make_room\""), "no query function of the world is deferred")
+	_finished += 1
 
 
 func _strict_refuses_an_unknown_key() -> void:
