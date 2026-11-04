@@ -128,12 +128,15 @@ var _ready_unseated: Dictionary = {}
 var _tick: int = 0
 var _game_ticked_for: int = -1
 
+const MAX_FILLED_TICKS := 8
+
 ## Server only: whether [method DotNetManager.server_tick] is on the stack, and the net ids released during it.
 ## An entity released mid-tick would leak a lag-compensation track, because `server_tick` still holds the identity list it took earlier.
 ## The ids are forgotten again here once the manager lets go of that list.
 var _in_server_tick := false
 var _unregistered_in_tick: Array[int] = []
 var _client_ticked_for: int = -1
+var _last_packet: PhNetCommand
 
 ## The map the clients were last sent, so a late joiner is sent the same bytes.
 var _map_body: PackedByteArray = PackedByteArray()
@@ -723,6 +726,14 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0) -> void:
 
 		# Through the predictor, which remembers each tick: a snapshot can only skip its replay when the
 		# tick it describes was remembered.
+		# A tick the clock stepped over (a lead correction, a catch-up) is one the server still simulated, on the previous command, and a snapshot can describe it: predict it too, or that snapshot replays.
+		if _last_packet != null:
+			var gap := mini(tick - _last_packet.tick - 1, MAX_FILLED_TICKS)
+
+			for back in range(gap, 0, -1):
+				net.predict_tick(tick - back, _last_packet)
+
+		_last_packet = packet
 		net.predict_tick(tick, packet)
 
 		# The grenades the server announced, flown here as copies (they decide nothing).
