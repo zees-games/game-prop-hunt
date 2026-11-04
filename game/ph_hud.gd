@@ -134,8 +134,10 @@ func _build() -> void:
 	_blindfold_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_blindfold_label.offset_left = -520.0
 	_blindfold_label.offset_right = 520.0
-	_blindfold_label.offset_top = -60.0
-	_blindfold_label.offset_bottom = 60.0
+	# Touch: a short screen puts the health plate over a centred label, so it sits lower.
+	var drop := 50.0 if PhTouch.wanted() else 0.0
+	_blindfold_label.offset_top = -60.0 + drop
+	_blindfold_label.offset_bottom = 60.0 + drop
 	_blindfold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_blindfold_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.45))
 
