@@ -174,14 +174,18 @@ func pull() -> void:
 		net_max_health = player.health.max_health
 
 	net_points = clampi(player.points, 0, 65535)
-	net_ping = clampi(player.ping_ms, 0, 1023)
+	# Server-owned: a predicted client's local player only knows its own guess.
+	var server_owned := identity == null or identity.is_authoritative
+	if server_owned:
+		net_ping = clampi(player.ping_ms, 0, 1023)
 	net_watching = player.watching
 	net_taunt_meter = player.taunt_meter
 	net_reveal_wait = clampi(int(ceilf(player.reveal_wait)), 0, 1023)
 	net_blind = player.blinded
 	net_beacon = player.beacon or player.marked
 	net_marked = player.marked and not player.beacon
-	net_warp = player.warps & 0xF
+	if server_owned:
+		net_warp = player.warps & 0xF
 
 	# [b]After the arsenal has simulated, which on this end it has: the whole world ticks
 	# before anything is pulled.[/b] A prop has no rig and leaves these at zero, and zero is a
