@@ -14,6 +14,7 @@ const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
 const PhProjectiles := preload("ph_projectiles.gd")
+const PhGameReport := preload("ph_game_report.gd")
 
 ## The simulation: headless, authoritative, and the only thing that decides anything.
 ## A round is hiding then seeking: hunters stand blindfolded for [member PhConfig.hide_seconds] while props turn into furniture, then hunt.
@@ -2097,21 +2098,8 @@ func _bot_shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, 
 	return bots.shoot(player, command, id, at, velocity)
 
 
-## Whether nothing solid is between two points: the walls, and with [param furniture] the
-## map's props as well.
 func _clear_between(from: Vector3, to: Vector3, furniture: bool = false) -> bool:
-	var world := get_world_3d()
-
-	if world == null:
-		return true
-
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.collision_mask = physics.layer_mask(&"world") if physics != null else 1
-
-	if furniture and physics != null:
-		query.collision_mask |= physics.layer_mask(&"prop")
-
-	return world.direct_space_state.intersect_ray(query).is_empty()
+	return PhGameReport.clear_between(get_world_3d(), physics, from, to, furniture)
 
 
 func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
@@ -2145,21 +2133,10 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	DotLog.debug(CHANNEL, "player died", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 
-## The fall a death gets: dot-player-char's reaction rule over the server's weights, seeded from
-## the player and the tick. A hunter's gun is a weapon def (a shotgun may launch); the
-## furniture's cost and a fall carry no direction, and push nothing.
+## The fall a death gets, decided once here; see [code]PhGameReport.decide_death[/code].
 func decide_death(player: PhPlayer, damage: DotDamage) -> DotPlayerDeath:
-	var weapon: Object = null
 	var shooter: PhPlayer = players.get(entities.key_for_id(damage.attacker)) if damage.attacker != 0 else null
-	if shooter != null and shooter.weapons != null and shooter.weapons.arsenal != null and damage.weapon_id != &"":
-		weapon = shooter.weapons.arsenal.catalogue.get_def(damage.weapon_id)
-	var direction := damage.direction
-	if direction.length_squared() < 0.0001 and shooter != null and shooter != player:
-		direction = (player.controller.state.position - shooter.controller.state.position) * Vector3(1, 0, 1)
-	return DotPlayerDeath.decide(
-		ragdoll_rules.reactions(), damage.is_headshot(), damage.amount, direction,
-		DotPlayerDeath.seed_of(player.entity_id, _tick), weapon
-	)
+	return PhGameReport.decide_death(player, damage, shooter, ragdoll_rules, _tick)
 
 
 func seconds_left() -> float:
@@ -2188,35 +2165,14 @@ func describe() -> Dictionary:
 
 
 func describe_lines() -> PackedStringArray:
-	var lines := PackedStringArray(["prophunt, round %d" % round_number])
-	var facts := describe()
-
-	for key: String in facts:
-		lines.append("  %-10s %s" % [key, facts[key]])
-
-	for id: StringName in players:
-		var player: PhPlayer = players[id]
-		lines.append("  %-8s %-18s %s%s" % [
-			side_name(team_of(id)), player.display_name,
-			props_catalogue.title_of(player.disguise.prop_id) if player.is_disguised() else "-",
-			"" if player.is_alive() else " (out)",
-		])
-
-	if map != null:
-		lines.append_array(map.describe_lines())
-
-	return lines
+	return PhGameReport.describe_lines(self)
 
 
-## Every damage a weapon's shot did to somebody else, as [signal hit_landed] for the shooter.
-## Only what took health and only on the authority: a refused hit, a dead body or the
-## shooter's own splash is no confirmation anybody wants a marker for.
+## Every damage a weapon's shot did to somebody else, as [signal hit_landed] for the shooter, on the authority only.
 func _note_hits(shooter: PhPlayer, shot: DotShot) -> void:
 	if not authoritative or shot == null or shooter == null:
 		return
-	for damage: DotDamage in shot.damages:
-		if damage == null or damage.refused or damage.health_lost <= 0.0 or damage.victim == shooter.entity_id:
-			continue
+	for damage in PhGameReport.confirmed_hits(shooter, shot):
 		var victim := entities.key_for_id(damage.victim) as StringName
 		if progress != null and players.has(victim):
 			progress.report_hit(shooter.player_id, victim, damage)

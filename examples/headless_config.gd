@@ -89,9 +89,7 @@ func _run() -> void:
 	var text: String = files.get("cfg/game/mg-prop-hunt/config_round/game.yml", "")
 	_check(text.contains("hide_seconds: 90"), "the export holds the edit in the cfg layout")
 
-	var move := config.movement_floats()
-	var hello := PhEvents.read_hello(DotNetReader.new(PhEvents.write_hello(3, 64, 10, 30.0, 300.0, 2.0, 60.0, move, true)))
-	_check(bool(hello["ok"]) and hello["move"] == move and bool(hello["auto_hop"]), "the HELLO carries the movement numbers")
+	_hello_carries_movement(config)
 
 	wb.free()
 	console.free()
@@ -100,11 +98,17 @@ func _run() -> void:
 	_report_sections(_entered, _finished, SECTIONS, CHECKS)
 
 
+func _hello_carries_movement(config: PhConfig) -> void:
+	var move := config.movement_floats()
+	var hello := PhEvents.read_hello(DotNetReader.new(PhEvents.write_hello(3, 64, 10, 30.0, 300.0, 2.0, 60.0, move, true)))
+	_check(bool(hello["ok"]) and hello["move"] == move and bool(hello["auto_hop"]), "the HELLO carries the movement numbers")
+
 
 ## Every function in game/ that asks the physics space a question, by grep. On a physics thread a
 ## query only works inside the step; a new caller fails here until listed in dot-physics docs/threading.md.
 const QUERY_FUNCS := {
-	"game/ph_game.gd": ["_clear_between", "_look", "_make_room"],
+	"game/ph_game.gd": ["_look", "_make_room"],
+	"game/ph_game_report.gd": ["clear_between"],
 	"game/ph_client.gd": ["_process"],
 }
 const QUERY_NEEDLES: Array[String] = ["direct_space_state", "space.intersect_", "space.cast_motion(", "space.get_rest_info("]
@@ -125,7 +129,7 @@ func _space_query_audit() -> void:
 	_audit_files("res://game", files)
 	var found := {}
 	for path in files:
-		for chunk in FileAccess.get_file_as_string(path).split("\nfunc "):
+		for chunk in FileAccess.get_file_as_string(path).replace("\nstatic func ", "\nfunc ").split("\nfunc "):
 			var hit := false
 			for n in QUERY_NEEDLES:
 				hit = hit or chunk.contains(n)
