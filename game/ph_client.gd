@@ -872,6 +872,9 @@ func _on_touch_button(id: StringName, down: bool) -> void:
 		&"taunt":
 			if down and _prop_acts():
 				ask_taunt()
+		&"loadout":
+			if down and loadout_menu != null:
+				loadout_menu.call(&"open")
 
 
 func _prop_acts() -> bool:
@@ -918,6 +921,8 @@ func _use_loadout_menu() -> void:
 		return
 	loadout_menu = settings.call(&"use_loadout", loadout_offer, choose_loadout, decorate_loadout_choice)
 	if loadout_menu != null:
+		if touch != null:
+			touch.offer_loadout(true)
 		loadout_menu.set(&"title", "Hunter's loadout")
 		loadout_menu.call(&"remember_as", "prophunt" if remember_loadout else "", "local")
 		if hud != null:
