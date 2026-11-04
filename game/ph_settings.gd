@@ -31,6 +31,9 @@ func _init() -> void:
 	schema = schema_for()
 	config = DotMenuConfig.new()
 	config.brand_name = "Prop Hunt"
+	# By name: older dot-menu has no such property. Top right is clear of the hints and the round strip.
+	if &"menu_button_corner" in config:
+		config.set(&"menu_button_corner", &"top_right")
 	# Help and Leave are dot-menu's stock: H opens help, Leave leaves the server or quits a
 	# solo game. Every game in the family has both (the first play test found this one without
 	# Leave).

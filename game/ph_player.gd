@@ -135,7 +135,7 @@ func _ready() -> void:
 	add_child(controller)
 
 	if samples_input:
-		sampler = DotFpsSampler.new(controller.tunables)
+		sampler = make_sampler(controller.tunables)
 		register_actions(sampler)
 
 
@@ -166,6 +166,16 @@ static func tunables_for(config: PhConfig) -> DotFpsTunables:
 	t.crouch_height = BODY_CROUCH
 	t.step_height = BODY_STEP
 	return t
+
+
+## Touch on a phone (a stick and a look drag; the client holds its buttons), the keyboard and mouse elsewhere.
+static func make_sampler(p_tunables: DotFpsTunables) -> DotFpsSampler:
+	if not DotPlatform.has_touch():
+		return DotFpsSampler.new(p_tunables)
+
+	var touch := DotFpsTouchSampler.new(p_tunables)
+	touch.set_screen_width(1152.0)
+	return touch
 
 
 ## The movement actions, and the slow walk on shift.

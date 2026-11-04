@@ -3,6 +3,7 @@ extends "ph_client_round.gd"
 const PhAudio := preload("ph_audio.gd")
 const PhBreakFx := preload("ph_break_fx.gd")
 const PhBindings := preload("ph_bindings.gd")
+const PhTouch := preload("ph_touch.gd")
 const PhServices := preload("ph_services.gd")
 const PhNetCommand := preload("net/ph_net_command.gd")
 const PhPlayerNet := preload("net/ph_player_net.gd")
@@ -62,6 +63,8 @@ var _arm: DotCameraBoom = null
 var _fade: DotCameraFade = null
 var _rig_height: float = 0.0
 
+## The phone's buttons; null on a device without touch.
+var touch: PhTouch = null
 var _firing: bool = false
 var _alt: bool = false
 ## The Aim key held (`PhBindings.AIM`, right mouse): a hunter's view model comes up and the
@@ -127,10 +130,11 @@ func _ready() -> void:
 	_build_ragdolls()
 	_build_projectile_view()
 
-	_sampler = DotFpsSampler.new(PhPlayer.tunables_for(config))
+	_sampler = PhPlayer.make_sampler(PhPlayer.tunables_for(config))
 	PhPlayer.register_actions(_sampler)
 
 	_build_hud()
+	_build_touch()
 	_build_chat()
 	_build_audio()
 	_build_settings()
@@ -392,6 +396,8 @@ func _adopt(candidate: PhPlayer) -> void:
 
 	if hud != null:
 		hud.bind(game, player)
+
+	_bind_touch_sampler(player.sampler)
 
 	_restore_loadout.call_deferred()
 
@@ -818,6 +824,58 @@ func _on_view_rules_changed() -> void:
 		third_person = allowed
 		if not is_spectating():
 			_place_camera()
+
+
+## The phone's buttons, over the HUD. Not built elsewhere.
+func _build_touch() -> void:
+	if not PhTouch.wanted():
+		return
+
+	touch = PhTouch.new()
+	touch.build()
+	touch.pressed.connect(_on_touch_button.bind(true))
+	touch.released.connect(_on_touch_button.bind(false))
+	add_child(touch)
+	_bind_touch_sampler(_sampler)
+
+
+## A touch sampler leaves a finger on a button to the button, and knows the screen's width.
+func _bind_touch_sampler(sampler: DotFpsSampler) -> void:
+	if touch == null or not sampler is DotFpsTouchSampler:
+		return
+
+	var touch_sampler := sampler as DotFpsTouchSampler
+	touch_sampler.ignore_fn = touch.contains_point
+	touch_sampler.set_screen_width(get_viewport().get_visible_rect().size.x)
+
+
+## A button press does what its key does: the same asks, the same held states.
+func _on_touch_button(id: StringName, down: bool) -> void:
+	var sampler := player.sampler if _offline and player != null and player.sampler != null else _sampler
+
+	match id:
+		&"jump":
+			if sampler is DotFpsTouchSampler:
+				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_JUMP, down)
+		&"fire":
+			_firing = down and is_hunter() and not is_spectating()
+		&"reload":
+			_reloading = down and is_hunter()
+		&"aim":
+			_aiming = down and is_hunter()
+		&"disguise":
+			if down and _prop_acts():
+				ask_disguise()
+		&"lock":
+			if down and _prop_acts():
+				ask_turn(PhGame.Turn.LOCK)
+		&"taunt":
+			if down and _prop_acts():
+				ask_taunt()
+
+
+func _prop_acts() -> bool:
+	return player != null and player.is_alive() and not is_spectating() and not is_hunter()
 
 
 func _build_hud() -> void:
@@ -1379,6 +1437,10 @@ func _on_hit(point: Vector3, killed: bool, headshot: bool) -> void:
 
 
 func _process(delta: float) -> void:
+	if touch != null:
+		touch.show_for(is_hunter())
+		touch.buttons.visible = not _covered() and not (platform != null and platform.is_input_blocked())
+
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
 	_present_hide()
 	_killcam_frame()
@@ -1743,7 +1805,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Every event, not only motion: the sampler latches a press that a wheel tick sends with its
 	# release in the same frame, and reads its own actions off the events it is shown.
-	if _pointer_ours():
+	if _pointer_ours() or touch != null:
 		if _offline and player.sampler != null:
 			player.sampler.handle_event(event)
 		elif _sampler != null:
