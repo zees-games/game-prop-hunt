@@ -1,0 +1,4 @@
+[
+  {"paths": [""], "licence": "MIT", "author": "TMC", "url": "https://github.com/zees-games/mg-prop-hunt", "title": "mg-prop-hunt (original content; bundled addons carry their own licences in their repositories)"},
+  {"paths": ["assets/props"], "licence": "CC0-1.0", "author": "Kenney", "url": "https://kenney.nl", "title": "Props modified from Kenney Furniture, Food, Survival and Nature Kits"}
+]
