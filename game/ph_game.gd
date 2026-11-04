@@ -213,6 +213,10 @@ var remote_playable: bool = false
 var hunter_history: Dictionary = {}
 
 var _tick: int = 0
+## Scratch for _make_room, reused so a request allocates nothing.
+var _spots: Array[Vector3] = []
+## A refusal with a formatted reason; held as a Callable because it is a rare request refusal, not per-frame work.
+var _refuse_fmt: Callable = _refuse_formatted
 var _round_seed: int = 0
 var _rounds_on_map: int = 0
 var _map_unplayed: bool = false
@@ -1353,7 +1357,7 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 		return false
 
 	if not props_catalogue.may_disguise(prop_id):
-		refused.emit(id, "You cannot hide as a %s." % props_catalogue.title_of(prop_id).to_lower())
+		_refuse_fmt.call(id, "You cannot hide as a %s.", props_catalogue.title_of(prop_id).to_lower())
 		return false
 
 	var size := props_catalogue.size_of(prop_id)
@@ -1370,7 +1374,7 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 	next.yaw = player.controller.state.yaw
 
 	if not _make_room(player, next):
-		refused.emit(id, "There is no room to be a %s here." % props_catalogue.title_of(prop_id).to_lower())
+		_refuse_fmt.call(id, "There is no room to be a %s here.", props_catalogue.title_of(prop_id).to_lower())
 		return false
 
 	_wear(player, next)
@@ -1401,14 +1405,15 @@ func _make_room(player: PhPlayer, next: DotPropDisguise) -> bool:
 	query.shape = capsule
 	query.collision_mask = mask
 
-	var spots: Array[Vector3] = [at]
+	_spots.clear()
+	_spots.append(at)
 
 	for ring in [0.3, 0.6]:
 		for k in range(8):
 			var a := TAU * float(k) / 8.0
-			spots.append(at + Vector3(cos(a), 0.0, sin(a)) * ring)
+			_spots.append(at + Vector3(cos(a), 0.0, sin(a)) * ring)
 
-	for spot in spots:
+	for spot in _spots:
 		query.transform = Transform3D(Basis.IDENTITY, spot + Vector3(0.0, hull.y * 0.5 + 0.02, 0.0))
 
 		if not space.intersect_shape(query, 1).is_empty():
@@ -1427,6 +1432,10 @@ func _make_room(player: PhPlayer, next: DotPropDisguise) -> bool:
 		return true
 
 	return false
+
+
+func _refuse_formatted(id: StringName, template: String, arg: Variant) -> void:
+	refused.emit(id, template % arg)
 
 
 func _may_hide(player: PhPlayer, id: StringName) -> bool:
@@ -1479,7 +1488,7 @@ func reveal(id: StringName) -> bool:
 		var wait := player.reveal_ready_at - _now()
 
 		if wait > 0.0:
-			refused.emit(id, "You can show yourself again in %d s." % int(ceilf(wait)))
+			_refuse_fmt.call(id, "You can show yourself again in %d s.", int(ceilf(wait)))
 			return false
 
 		var body := DotPropDisguise.new()
