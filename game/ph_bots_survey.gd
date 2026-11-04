@@ -67,6 +67,12 @@ var _nav_places: bool = false
 ## Slices of the annotator stepped each tick: a fixed number, so a seeded round replays the same.
 const SLICES_PER_TICK := 48
 var _survey_at: int = 0
+## What the survey needs that no random draw changes, made before its tick: the stages done for `_baked`, the nav answer for each side of each surveyed piece, and the kin counts.
+var _ahead_stage: int = 0
+var _ahead_sides: Array = []
+var _ahead_usable: Array[int] = []
+var _ahead_kin: PackedInt32Array = PackedInt32Array()
+var _ahead_near: PackedInt32Array = PackedInt32Array()
 
 ## player id -> the bot's own state.
 var _state: Dictionary = {}
@@ -140,6 +146,8 @@ func prepare_ahead() -> void:
 			var key := "%s|%d" % [str(doc.get("id", "")), map.get_instance_id()]
 			if key != _baked:
 				_bake(map, doc, key)
+			while nav.is_ready() and _ahead_stage < AHEAD_STAGES:
+				_prepare_ahead_step(map)
 			return
 
 
@@ -150,6 +158,11 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	spots.clear()
 	_places.clear()
 	_nav_places = false
+	_ahead_stage = 0
+	_ahead_sides.clear()
+	_ahead_usable.clear()
+	_ahead_kin = PackedInt32Array()
+	_ahead_near = PackedInt32Array()
 	var still: Array = [map.get("_solid"), map.get("_furniture")]
 	nav.cache_dir = "user://nav_cache"
 	nav.cache_id = str(doc.get("id", ""))
@@ -198,10 +211,29 @@ func _usable_furniture(props: Array, catalogue: Object, rules: DotPropDisguiseRu
 	return usable
 
 
-## A place beside the furniture, on the nav mesh, per surveyed piece: `[positions, owner indices]`.
-func _places_beside(props: Array, usable: Array[int], stream: DotRandomStream) -> Array:
-	var candidates := PackedVector3Array()
-	var owners: Array[int] = []
+const AHEAD_STAGES := 3
+
+
+## One stage of the survey's stream-free work, so the survey tick only draws and casts rays.
+func _prepare_ahead_step(map: Node3D) -> void:
+	var props: Array = map.get("props")
+	if _ahead_stage == 0:
+		_ahead_usable = _usable_furniture(props, game.get("props_catalogue"), game.get("rules"))
+		_ahead_sides = _sides_beside(props, _ahead_usable)
+	elif _ahead_stage == 1:
+		_ahead_kin.resize(props.size())
+		for i in range(props.size()):
+			_ahead_kin[i] = _kin_count(props, props[i]["id"], (props[i]["transform"] as Transform3D).origin, KIN_RADIUS)
+	else:
+		_ahead_near.resize(props.size())
+		for i in range(props.size()):
+			_ahead_near[i] = _kin_count(props, props[i]["id"], (props[i]["transform"] as Transform3D).origin) - 1
+	_ahead_stage += 1
+
+
+## For each surveyed piece, the nav place beside each of its four sides, or none: `[{prop, on: [Vector3 or null]}]`.
+func _sides_beside(props: Array, usable: Array[int]) -> Array:
+	var out := []
 	var step := maxf(1.0, float(usable.size()) / float(SURVEY_PLACES))
 	var k := 0.0
 	while int(k) < usable.size():
@@ -212,15 +244,30 @@ func _places_beside(props: Array, usable: Array[int], stream: DotRandomStream) -
 		var size: Vector3 = prop["size"]
 		var sides := [Vector3(size.x * 0.5 + BESIDE, 0.0, 0.0), Vector3(-size.x * 0.5 - BESIDE, 0.0, 0.0),
 			Vector3(0.0, 0.0, size.z * 0.5 + BESIDE), Vector3(0.0, 0.0, -size.z * 0.5 - BESIDE)]
-		var first := stream.next_range_i(0, 3)
-		for j in range(4):
-			var local: Vector3 = sides[(first + j) % 4]
+		var ons := []
+		for local: Vector3 in sides:
 			var beside := frame.origin + frame.basis * local
 			beside.y = frame.origin.y
 			var on := nav.closest(beside)
 			if Vector2(on.x - beside.x, on.z - beside.z).length() < 0.35 and absf(on.y - beside.y) < 0.5:
+				ons.append(on)
+			else:
+				ons.append(null)
+		out.append({"prop": i, "on": ons})
+	return out
+
+
+## A place beside the furniture, on the nav mesh, per surveyed piece: `[positions, owner indices]`.
+func _places_beside(sides: Array, stream: DotRandomStream) -> Array:
+	var candidates := PackedVector3Array()
+	var owners: Array[int] = []
+	for piece: Dictionary in sides:
+		var first := stream.next_range_i(0, 3)
+		for j in range(4):
+			var on: Variant = (piece["on"] as Array)[(first + j) % 4]
+			if on != null:
 				candidates.append(on)
-				owners.append(i)
+				owners.append(piece["prop"])
 				break
 	return [candidates, owners]
 
@@ -246,7 +293,12 @@ func _prepare() -> void:
 		_set_survey_tick()
 		return
 
-	if int(game.get("_tick")) < _survey_at or not nav.is_ready():
+	if not nav.is_ready():
+		return
+	if _ahead_stage < AHEAD_STAGES:
+		_prepare_ahead_step(map)
+		return
+	if int(game.get("_tick")) < _survey_at:
 		return
 
 	_first_survey = key
@@ -257,8 +309,8 @@ func _prepare() -> void:
 	var rules: DotPropDisguiseRules = game.get("rules")
 	var props: Array = map.get("props")
 
-	var usable := _usable_furniture(props, catalogue, rules)
-	var placed := _places_beside(props, usable, stream)
+	var usable := _ahead_usable
+	var placed := _places_beside(_ahead_sides, stream)
 	var candidates: PackedVector3Array = placed[0]
 	var owners: Array[int] = placed[1]
 
@@ -266,18 +318,13 @@ func _prepare() -> void:
 	for _i in range(WATCHERS):
 		watchers.append(nav.random_point(stream) + Vector3(0.0, PhPlayer.EYE_HEIGHT, 0.0))
 
-	_kin_near.resize(props.size())
-	for i in range(props.size()):
-		_kin_near[i] = _kin_count(props, props[i]["id"], (props[i]["transform"] as Transform3D).origin) - 1
+	_kin_near = _ahead_near
 
 	var surveyed := DotBotHiding.survey(candidates, watchers, _los, DotBotHiding.REACH, 0.5)
 	for n in range(surveyed.size()):
 		var prop: Dictionary = props[owners[n]]
 		var frame: Transform3D = prop["transform"]
-		var kin := 0
-		for other: Dictionary in props:
-			if other["id"] == prop["id"] and (other["transform"] as Transform3D).origin.distance_to(frame.origin) < KIN_RADIUS:
-				kin += 1
+		var kin := _ahead_kin[owners[n]]
 		var spot := surveyed[n]
 		spot["prop"] = owners[n]
 		spot["kind"] = prop["id"]
