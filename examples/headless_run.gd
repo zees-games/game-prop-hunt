@@ -5,9 +5,9 @@ extends "headless_run_base.gd"
 ## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. dot-settings has the story.
 ## Every number about the map is the built-in practice house's ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 30
+const SECTIONS := 31
 
-const CHECKS := 191
+const CHECKS := 197
 
 
 func _ready() -> void:
@@ -27,6 +27,7 @@ func _run() -> void:
 	await _test_the_hide()
 	await _test_disguise()
 	await _test_reveal()
+	await _test_requests_wait_for_the_tick()
 	await _test_turning()
 	await _test_lean_on_the_floor()
 	await _test_room()
@@ -318,6 +319,33 @@ func _test_reveal() -> void:
 
 	_check(game.reveal(prop.player_id) and prop.disguise.prop_id == &"furniture_chair", "the same key puts the chair back on")
 	_check(not game.reveal(prop.player_id), "and it cannot show itself again straight away")
+	_finished()
+
+
+func _test_requests_wait_for_the_tick() -> void:
+	_section("disguise and reveal requests wait for the next tick")
+	var game := await _hide_round()
+	var prop: PhPlayer = game.players_on(PhGame.PROPS)[0]
+	_stand_facing(prop, CHAIR_AT + Vector3(-2.0, 0.05, 0.0), CHAIR_AT + Vector3(0.0, 0.6, 0.0))
+	await _step(game, 1)
+
+	game.queue_disguise(prop.player_id)
+	_check(not prop.is_disguised(), "a queued disguise has not looked yet")
+	await _step(game, 1)
+	_check(prop.is_disguised() and prop.disguise.prop_id == &"furniture_chair", "the next tick looks and disguises")
+
+	game.queue_reveal(prop.player_id)
+	_check(prop.is_disguised(), "a queued reveal has not run yet")
+	await _step(game, 1)
+	_check(not prop.is_disguised() and prop.set_aside != null, "the next tick shows the prop's face")
+
+	var refusals: Array[String] = []
+	game.refused.connect(func(_id: StringName, why: String) -> void: refusals.append(why))
+	_stand_facing(prop, CHAIR_AT + Vector3(-2.0, 0.05, 0.0), CHAIR_AT + Vector3(8.0, 0.6, 20.0))
+	game.queue_disguise(prop.player_id)
+	_check(refusals.is_empty(), "a refusal is not sent before the tick")
+	await _step(game, 1)
+	_check(refusals.size() == 1, "the tick sends it through the refused signal", str(refusals))
 	_finished()
 
 

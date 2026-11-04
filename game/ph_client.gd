@@ -1186,14 +1186,14 @@ func ask_disguise() -> void:
 	if bridge != null:
 		bridge.ask_disguise()
 	elif player != null:
-		var _became := game.request_disguise(player.player_id)
+		game.queue_disguise(player.player_id)
 
 
 func ask_reveal() -> void:
 	if bridge != null:
 		bridge.ask_reveal()
 	elif player != null:
-		var _shown := game.reveal(player.player_id)
+		game.queue_reveal(player.player_id)
 
 
 func ask_turn(how: int) -> void:

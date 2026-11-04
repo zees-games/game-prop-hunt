@@ -1299,7 +1299,34 @@ func _decide(winner: int, why: String) -> void:
 	DotLog.info(CHANNEL, "the round is decided", {"winner": winner, "why": why})
 
 
-## A prop asks to become what they are looking at. Server side.
+## Queues a disguise request for the next tick; what the net bridge and an offline client call.
+## The look and the room check are space queries, which may only run in the physics step, and a request arrives between ticks.
+## The outcome reaches the player through [signal refused] and [signal disguise_changed], as it did.
+func queue_disguise(id: StringName) -> void:
+	_pending_hide.append({"id": id, "reveal": false})
+
+
+## Queues a reveal request for the next tick; see [method queue_disguise].
+func queue_reveal(id: StringName) -> void:
+	_pending_hide.append({"id": id, "reveal": true})
+
+
+## Requests waiting for the next tick.
+var _pending_hide: Array[Dictionary] = []
+
+
+func _run_pending_hide() -> void:
+	var work := _pending_hide
+	_pending_hide = []
+
+	for entry in work:
+		if bool(entry["reveal"]):
+			var _shown := reveal(entry["id"])
+		else:
+			var _became := request_disguise(entry["id"])
+
+
+## A prop asks to become what they are looking at. Server side, inside the tick: from outside it, use [method queue_disguise].
 ## The server looks, not the client: a ray from the server's copy of their eyes through the server's map,
 ## because a client that named a prop could name one across the map.
 func request_disguise(id: StringName) -> bool:
@@ -1869,6 +1896,7 @@ func _now() -> float:
 
 func _step(delta: float) -> void:
 	_advance_phase(delta)
+	_run_pending_hide()
 	_drive_bots()
 
 	for id: StringName in players:

@@ -873,9 +873,9 @@ func _on_request(message: DotNetMessage) -> void:
 			if bool(step["ok"]):
 				_spectate_step(peer_id, int(step["direction"]), bool(step["roam"]))
 		PhEvents.Ask.DISGUISE:
-			var _became := game.request_disguise(player_key(player_for_peer(peer_id)))
+			game.queue_disguise(player_key(player_for_peer(peer_id)))
 		PhEvents.Ask.REVEAL:
-			var _shown := game.reveal(player_key(player_for_peer(peer_id)))
+			game.queue_reveal(player_key(player_for_peer(peer_id)))
 		PhEvents.Ask.TURN:
 			var turned := PhEvents.read_turn(ask.reader())
 			if bool(turned["ok"]):
