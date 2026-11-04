@@ -151,6 +151,8 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	_places.clear()
 	_nav_places = false
 	var still: Array = [map.get("_solid"), map.get("_furniture")]
+	nav.cache_dir = "user://nav_cache"
+	nav.cache_id = str(doc.get("id", ""))
 	var agent := {"radius": PhPlayer.BODY_RADIUS, "height": PhPlayer.BODY_CROUCH, "climb": PhPlayer.BODY_STEP}
 	var failed := _bake_failed.bind(key, str(doc.get("id", "")))
 	# Off the tick only on a live server: a harness that ticks by hand needs the mesh on the tick for a seeded round to replay.
