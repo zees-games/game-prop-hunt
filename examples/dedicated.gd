@@ -14,8 +14,8 @@ const SECTIONS := 14
 const CHECKS := 116
 
 const SERVER_DIR := "user://ph_dedicated"
-const PORT := 28931
-const QUERY_PORT := 28932
+var PORT := PHTestPorts.free_port(2)
+var QUERY_PORT := PORT + 1
 const TICK_RATE := 60
 
 
