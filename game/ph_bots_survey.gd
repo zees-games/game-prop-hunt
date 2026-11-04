@@ -64,8 +64,8 @@ var annotations: DotNpcAiNavAnnotations = null
 var _job: PhNavAnnotator = null
 ## True once the annotations replaced the first survey's places.
 var _nav_places: bool = false
-## Slices of the annotator stepped each tick: a fixed number, so a seeded round replays the same.
-const SLICES_PER_TICK := 48
+## Slice budget of the annotator each tick (see slice_cost): fixed, so a seeded round replays the same.
+const SLICES_PER_TICK := 8
 var _survey_at: int = 0
 ## What the survey needs that no random draw changes, made before its tick: the stages done for `_baked`, the nav answer for each side of each surveyed piece, and the kin counts.
 var _ahead_stage: int = 0
@@ -369,7 +369,7 @@ func _start_annotator(map: Node3D, props: Array, usable: Array[int], _catalogue:
 		var frame: Transform3D = prop["transform"]
 		piece_list.append({
 			"i": i, "frame": frame, "size": prop["size"], "kind": prop["id"],
-			"kin": _kin_count(props, prop["id"], frame.origin, KIN_RADIUS),
+			"kin": _ahead_kin[i],
 			"yaw": rad_to_deg(frame.basis.get_euler(EULER_ORDER_YXZ).y),
 		})
 	job.pieces = piece_list
@@ -384,7 +384,12 @@ var _annotate_ms: float = 0.0
 
 func _step_annotator(key: String) -> void:
 	var started := Time.get_ticks_usec()
-	for _i in range(SLICES_PER_TICK):
+	var budget := SLICES_PER_TICK
+	while budget > 0:
+		var cost := _job.slice_cost()
+		if cost > budget and budget < SLICES_PER_TICK:
+			break
+		budget -= cost
 		if not _job.step():
 			break
 	_annotate_ms += (Time.get_ticks_usec() - started) / 1000.0

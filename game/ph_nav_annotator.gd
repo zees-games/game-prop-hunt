@@ -74,3 +74,8 @@ func _hide_score(spot: Dictionary) -> float:
 	var score := (1.0 - float(spot["exposure"])) * 2.0 + float(spot["enclosure"]) * 1.5 + fit_of(best_kin) * 2.0
 	spot["score"] = score
 	return score
+
+
+## How many of a tick's slice budget one slice spends: a route or chokepoint slice costs several times the rest. A phase count, not a clock, so a seeded round replays the same.
+func slice_cost() -> int:
+	return 8 if _phase == Phase.ROUTES or _phase == Phase.CHOKEPOINTS else 1
