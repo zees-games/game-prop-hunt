@@ -1099,5 +1099,92 @@ MODELS.update({"bottle-ketchup": "food", "bottle-musterd": "food", "wine-red": "
                "pepper-mill": "food", "pot-stew": "food", "banana": "food"})
 BEVEL.update({"bottle-ketchup": 0.0015, "bottle-musterd": 0.0015, "wine-red": 0.0015, "soda-bottle": 0.0015, "pepper-mill": 0.002, "banana": 0.002})
 
+# ---- pass 10: bar stool, laptop, small speaker, radio, cactus, mushroom, campfire logs, stone ------------------
+
+_palette9 = palette
+
+def palette():
+    _palette9()
+    PAL["stoneDark"] = mat("stoneDark", (0.16, 0.15, 0.14), 0.0, 0.9)
+    PAL["ember"] = mat("ember", (0.9, 0.25, 0.02), 0.0, 0.6)
+    PAL["cream"] = mat("cream", (0.42, 0.33, 0.2), 0.0, 0.7)
+
+def do_stoolBarSquare(by):
+    o = by["stoolBarSquare(Clone)"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    hx, hy = (hi.x - lo.x) / 2, (hi.y - lo.y) / 2
+    for i in range(6):
+        t = (i + 0.5) / 6 * 2 - 1
+        for sx, sy in ((t * hx * 0.85, -hy), (t * hx * 0.85, hy)):
+            pass
+    z = hi.z - 0.065
+    for i in range(7):
+        x = c.x + (i / 6 * 2 - 1) * hx * 0.8
+        add_sphere(o, (x, c.y - hy * 0.98, z), 0.004, "brass", 0.8)
+        add_sphere(o, (x, c.y + hy * 0.98, z), 0.004, "brass", 0.8)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            add_cyl(o, (c.x + sx * hx * 0.78, c.y + sy * hy * 0.78, lo.z + 0.006), 0.012, 0.012, "brass", verts=10)
+
+def do_laptop(by):
+    o = by["laptop(Clone)"]
+    lo, hi = world_box([o])
+    add_cyl(o, (lo.x + 0.132, lo.y + 0.12, lo.z + 0.003), 0.007, 0.003, "glow", verts=10)
+
+def do_speakerSmall(by):
+    o = by["speakerSmall(Clone)"]
+    lo, hi = world_box([o])
+    c = (lo + hi) / 2
+    add_cyl(o, (c.x, lo.y - 0.001, hi.z - 0.03), 0.01, 0.006, "brass", axis="Y", verts=12)
+
+def do_radio(by):
+    o = by["radio(Clone)"]
+    lo, hi = world_box([o])
+    add_cyl(o, (lo.x + 0.04, lo.y - 0.001, lo.z + 0.05), 0.012, 0.01, "brass", axis="Y", verts=12)
+    add_cyl(o, (hi.x - 0.04, lo.y - 0.001, lo.z + 0.05), 0.012, 0.01, "brass", axis="Y", verts=12)
+
+def do_cactustall(by):
+    o = by["cactus_tall"]
+    lo, hi = world_box([o])
+    rnd = random.Random(5)
+    for i in range(26):
+        a = rnd.random() * 6.283
+        r = 0.05
+        add_sphere(o, (math.cos(a) * r, math.sin(a) * r, rnd.uniform(0.05, hi.z - 0.1)), 0.004, "cream")
+    add_sphere(o, (0, 0, hi.z + 0.004), 0.025, "enamel", 0.5)
+
+def do_mushroomredTall(by):
+    o = by["mushroom_redTall"]
+    lo, hi = world_box([o])
+    rnd = random.Random(3)
+    for i in range(7):
+        a = rnd.random() * 6.283
+        r = rnd.uniform(0.0, 0.03)
+        add_sphere(o, (math.cos(a) * r, math.sin(a) * r, hi.z - 0.006), 0.007, "cream", 0.5)
+
+def do_campfirelogs(by):
+    o = by["campfire_logs"]
+    lo, hi = world_box([o])
+    for i in range(5):
+        a = i * 1.2566
+        add_sphere(o, (math.cos(a) * 0.04, math.sin(a) * 0.04, hi.z - 0.004), 0.012, "ember", 0.5)
+    for i in range(9):
+        a = i * 0.698
+        add_sphere(o, (math.cos(a) * 0.17, math.sin(a) * 0.17, lo.z + 0.012), 0.022, "stoneDark", 0.7)
+
+def do_stonesmallA(by):
+    o = by["stone_smallA"]
+    lo, hi = world_box([o])
+    add_sphere(o, (0.02, -0.03, hi.z - 0.015), 0.045, "olive", 0.35)
+
+MODELS.update({"stoolBarSquare": "furniture", "laptop": "furniture", "speakerSmall": "furniture", "radio": "furniture",
+               "cactus_tall": "nature", "mushroom_redTall": "nature", "campfire_logs": "nature", "stone_smallA": "nature"})
+OVERRIDES.update({"cactus_tall": {"leafsGreen": "plant"}, "mushroom_redTall": {"colorRed": "enamel", "_defaultMat": "cream"},
+                  "campfire_logs": {"wood": "walnut", "woodDark": "walnutDark"}, "stone_smallA": {"stone": "stoneDark"},
+                  "stoolBarSquare": {"carpet": "velvet"}, "speakerSmall": {"metalMedium": "gunmetalDark"},
+                  "radio": {"metalMedium": "gunmetal", "metal": "brass"}, "laptop": {"metalDark": "gunmetalDark", "metalMedium": "gunmetal", "metal": "steel"}})
+BEVEL.update({"cactus_tall": 0.006, "mushroom_redTall": 0.003, "stone_smallA": 0.008, "campfire_logs": 0.004, "laptop": 0.002})
+
 for n in (names or list(MODELS)):
     build(n)
