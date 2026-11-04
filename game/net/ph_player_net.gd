@@ -101,15 +101,16 @@ func _register_net_vars() -> void:
 		if spec["property"] == &"net_crouch":
 			declaration.range_of(0.0, 1.0)
 
-	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(12)
+	# Only the game writes these, never the owner's prediction: server-driven, so a server bump is not a misprediction.
+	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(12).server_driven()
 	# 14 bits, not 12: a disguise's health is a fraction, and at 12 the client drew a chair's
 	# 98 as 97.9 (headless_net, "and the chair's health").
-	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(14)
-	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
-	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
-	replicate(&"net_watching", DotNetVar.Type.BOOL)
-	var _meter := replicate(&"net_taunt_meter", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).to_owner_only()
-	var _wait := replicate(&"net_reveal_wait", DotNetVar.Type.UINT).bits(10).to_owner_only()
+	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(14).server_driven()
+	replicate(&"net_points", DotNetVar.Type.UINT).bits(16).server_driven()
+	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_watching", DotNetVar.Type.BOOL).server_driven()
+	var _meter := replicate(&"net_taunt_meter", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).to_owner_only().server_driven()
+	var _wait := replicate(&"net_reveal_wait", DotNetVar.Type.UINT).bits(10).to_owner_only().server_driven()
 
 	for spec in ZeeWeaponNet.all_specs():
 		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
@@ -126,10 +127,10 @@ func _register_net_vars() -> void:
 		# Per-player state rather than an event, so a late joiner, a lost snapshot or a re-laid field is corrected by the next snapshot where an event is missed.
 		# The blind goes to its owner alone: an opponent who received it would know the moment somebody could not see.
 		# No relevance change for a beacon: every player is already always relevant (`PhNetBridge`), and turning `always_relevant` off would drop the player from snapshots.
-	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only()
-	replicate(&"net_beacon", DotNetVar.Type.BOOL)
-	replicate(&"net_marked", DotNetVar.Type.BOOL)
-	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4)
+	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only().server_driven()
+	replicate(&"net_beacon", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_marked", DotNetVar.Type.BOOL).server_driven()
+	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4).server_driven()
 
 
 func _net_apply_input(input: DotNetInput, _tick: int) -> void:
