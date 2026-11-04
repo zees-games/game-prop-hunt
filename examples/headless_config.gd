@@ -101,10 +101,8 @@ func _run() -> void:
 
 
 
-## Every function in game/ that asks the physics space a question, by grep. With physics on its own
-## thread a query only works inside the physics step: the server's are reached from the tick or from
-## a request handler, and the client's roof probe runs in _process (client only). A new caller fails
-## here until it is added and listed in dot-physics docs/threading.md.
+## Every function in game/ that asks the physics space a question, by grep. On a physics thread a
+## query only works inside the step; a new caller fails here until listed in dot-physics docs/threading.md.
 const QUERY_FUNCS := {
 	"game/ph_game.gd": ["_clear_between", "_look", "_make_room"],
 	"game/ph_client.gd": ["_process"],
