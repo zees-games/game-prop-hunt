@@ -12,6 +12,7 @@ const EDGE_MARGIN := 20.0
 
 var buttons: DotTouchButtons = null
 var _hunter: bool = false
+var _loadout: bool = false
 
 
 ## Whether this device wants them.
@@ -20,19 +21,22 @@ static func wanted() -> bool:
 
 
 ## Offsets are from the bottom-right corner, towards the middle. The set is small and packed to the corner: at 390 px tall a phone has little to spare.
-static func layout(hunter: bool) -> Array[Dictionary]:
+static func layout(hunter: bool, loadout: bool = false) -> Array[Dictionary]:
 	if hunter:
-		return [
+		var set: Array[Dictionary] = [
 			{"id": &"fire", "label": "FIRE", "offset": Vector2(66, 76), "radius": 46.0},
 			{"id": &"jump", "label": "JUMP", "offset": Vector2(160, 40), "radius": 32.0},
 			{"id": &"reload", "label": "R", "offset": Vector2(40, 160), "radius": 26.0},
-			{"id": &"aim", "label": "AIM", "offset": Vector2(122, 122), "radius": 28.0},
+			{"id": &"aim", "label": "AIM", "offset": Vector2(132, 130), "radius": 28.0},
 		]
+		if loadout:
+			set.append({"id": &"loadout", "label": "GEAR", "offset": Vector2(216, 96), "radius": 26.0})
+		return set
 	return [
 		{"id": &"disguise", "label": "SWAP", "offset": Vector2(66, 76), "radius": 46.0},
 		{"id": &"jump", "label": "JUMP", "offset": Vector2(160, 40), "radius": 32.0},
 		{"id": &"lock", "label": "LOCK", "offset": Vector2(40, 160), "radius": 26.0},
-		{"id": &"taunt", "label": "TAUNT", "offset": Vector2(122, 122), "radius": 28.0},
+		{"id": &"taunt", "label": "TAUNT", "offset": Vector2(132, 130), "radius": 28.0},
 	]
 
 
@@ -48,7 +52,7 @@ func build() -> void:
 	buttons.margin = EDGE_MARGIN
 	buttons.set_anchors_preset(Control.PRESET_FULL_RECT)
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	buttons.set_buttons(layout(_hunter))
+	buttons.set_buttons(layout(_hunter, _loadout))
 	buttons.button_down.connect(func(id: StringName) -> void: pressed.emit(id))
 	buttons.button_up.connect(func(id: StringName) -> void: released.emit(id))
 	add_child(buttons)
@@ -59,9 +63,18 @@ func contains_point(screen_pos: Vector2) -> bool:
 	return buttons != null and buttons.contains_point(screen_pos)
 
 
+## Adds the button that opens the loadout menu, on a host that has one.
+func offer_loadout(on: bool) -> void:
+	if on == _loadout:
+		return
+	_loadout = on
+	if buttons != null:
+		buttons.set_buttons(layout(_hunter, _loadout))
+
+
 ## Swaps the set when the side changes; a held button is let go, so nothing stays down under another label.
 func show_for(hunter: bool) -> void:
 	if buttons == null or hunter == _hunter:
 		return
 	_hunter = hunter
-	buttons.set_buttons(layout(hunter))
+	buttons.set_buttons(layout(hunter, _loadout))

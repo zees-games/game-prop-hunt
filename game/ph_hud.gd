@@ -463,7 +463,7 @@ func _draw_hints(side: int) -> void:
 		lines.append("Shoot the props. Shooting furniture hurts you.")
 		lines.append(_weapon_hint())
 		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
-		if loadout_offered:
+		if loadout_offered and not DotPlatform.has_touch():
 			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
 
 	_hints.text = "\n".join(lines)
@@ -544,7 +544,7 @@ func present_blind(delta: float) -> void:
 			# the second one rounds down and the other up.
 			_blindfold_label.text = "Blindfolded while the props hide\n%s" % DotScoreStrip.clock_text(left)
 			# The hide is when a new loadout goes straight into the hands (PhGame.rearm_if_allowed).
-			if loadout_offered:
+			if loadout_offered and not DotPlatform.has_touch():
 				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"dot_menu_loadout")
 
 
