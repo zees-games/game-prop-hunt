@@ -49,15 +49,7 @@ func _test_map_rotation_file() -> void:
 		"an unlisted map is out of rotation and still installed")
 	_check(not game.shuffles_maps(), "a cycle rotation does not shuffle the draw")
 
-	var drawn: Array = []
-	var previous: StringName = &""
-	for _i in 6:
-		var doc := catalogue.next_map(PackedStringArray(), game.shuffles_maps(), game.random.stream(&"map"), previous)
-		previous = StringName(str(doc["id"]))
-		drawn.append(String(previous))
-	var alternates: bool = drawn.size() == 6 and drawn[0] != drawn[1] and drawn[0] == drawn[2] and drawn[1] == drawn[3] and drawn[0] == drawn[4]
-	_check(alternates and drawn.all(func(d: String) -> bool: return d == "ph_house" or d == "ph_office"),
-		"six draws cycle the two written maps in turn and never leave them", str(drawn))
+	_check_cycle_draws()
 
 	var ids := (vote.get("source") as DotVoteListSource).choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
 	_check(ids.has(&"ph_office") and ids.has(&"ph_house") and not ids.has(&"ph_school"),
@@ -91,12 +83,19 @@ func _test_map_rotation_file() -> void:
 	var vote_commands: DotVoteCommands = vote.get("commands")
 	_check(vote_commands != null and vote_commands.spec_fn.is_valid(), "and the game's vote hands its commands the file")
 
+	_rotation_switch_and_reset(vote, kept_file)
+	_finished()
+
+
+## The second half of the maps.yml checks: a rotation switch, then no file at all, then the file as it was.
+func _rotation_switch_and_reset(vote: Node, kept_file: DotMapRotationFile) -> void:
+	var catalogue := game.catalogue
 	var switched := game.rotation_file.switch(game._rot, "alt")
 	game.apply_rotation()
 	vote.call("refresh_maps")
 	_check(switched.ok and game.in_rotation(&"ph_office") and not game.in_rotation(&"ph_house"),
 		"switching to the alt rotation takes effect")
-	ids = (vote.get("source") as DotVoteListSource).choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
+	var ids := (vote.get("source") as DotVoteListSource).choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
 	_check(not ids.has(&"ph_house") and ids.has(&"ph_office"), "and the ballot follows it")
 	_check(not game.rotation_file.switch(game._rot, "nope").ok, "an unknown rotation is refused")
 
@@ -114,7 +113,20 @@ func _test_map_rotation_file() -> void:
 	game.rotation_file = kept_file
 	game.apply_rotation()
 	vote.call("refresh_maps")
-	_finished()
+
+
+
+func _check_cycle_draws() -> void:
+	var catalogue := game.catalogue
+	var drawn: Array = []
+	var previous: StringName = &""
+	for _i in 6:
+		var doc := catalogue.next_map(PackedStringArray(), game.shuffles_maps(), game.random.stream(&"map"), previous)
+		previous = StringName(str(doc["id"]))
+		drawn.append(String(previous))
+	var alternates: bool = drawn.size() == 6 and drawn[0] != drawn[1] and drawn[0] == drawn[2] and drawn[1] == drawn[3] and drawn[0] == drawn[4]
+	_check(alternates and drawn.all(func(d: String) -> bool: return d == "ph_house" or d == "ph_office"),
+		"six draws cycle the two written maps in turn and never leave them", str(drawn))
 
 
 func _module() -> DotModule:

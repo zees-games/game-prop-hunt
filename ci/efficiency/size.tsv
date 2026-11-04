@@ -8,7 +8,7 @@ examples/headless_maps.gd::_test_map	97
 examples/headless_net.gd	854
 examples/headless_net.gd::_build	87
 examples/headless_net.gd::_test_the_codec	87
-examples/headless_run.gd	1334
+examples/headless_run.gd	1263
 examples/headless_run.gd::_test_hunter_weapons	93
 examples/headless_run.gd::_test_the_client	140
 game/net/ph_net_bridge.gd	1559
@@ -18,6 +18,6 @@ game/ph_bots.gd::_pick_spot	81
 game/ph_catalogue.gd::practice	97
 game/ph_client.gd	1863
 game/ph_client.gd::_build_netcode	84
-game/ph_game.gd	2186
+game/ph_game.gd	2179
 game/ph_module.gd::_game_load	90
 game/ph_vote.gd::setup	81
