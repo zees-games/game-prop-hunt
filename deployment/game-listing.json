@@ -1,0 +1,14 @@
+{
+  "format": "tmc-game-listing",
+  "version": 1,
+  "listing": {
+    "name": "Prop Hunt",
+    "description": "Hide as the furniture. The props pick something in the room to become and stay still; the hunters, blindfolded while they hide, then have a few minutes to find them, and every wrong guess costs them health.",
+    "tags": ["3D", "Multiplayer", "Teams", "Minigame"],
+    "graphicsType": "THREE_D",
+    "tmcKind": "MINIGAME"
+  },
+  "pack": {
+    "id": "gamemann/mg-prop-hunt"
+  }
+}
