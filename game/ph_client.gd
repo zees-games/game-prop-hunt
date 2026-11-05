@@ -836,6 +836,9 @@ func _build_touch() -> void:
 	touch.pressed.connect(_on_touch_button.bind(true))
 	touch.released.connect(_on_touch_button.bind(false))
 	add_child(touch)
+	if platform != null:
+		touch.fit_fn = func(set: Array) -> void: platform.fit_touch_buttons(touch.buttons, set)
+		touch.fit_fn.call(PhTouch.layout(false))
 	_bind_touch_sampler(_sampler)
 
 

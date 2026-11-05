@@ -47,6 +47,8 @@ func _ready() -> void:
 			_view = arg.trim_prefix("--view=")
 		elif arg.begins_with("--lean="):
 			_lean = arg.trim_prefix("--lean=").to_int()
+		elif arg == "--touch":
+			DotPlatform.touch_override = 1
 		elif arg == "--board":
 			_board = true
 		elif arg.begins_with("--seconds="):
@@ -302,6 +304,12 @@ func _finish() -> void:
 		tab.pressed = true
 		menu.handle_event(tab)
 
+	# The loading cover lifts a moment after the player exists; capturing early shows only the cover.
+	var platform: DotGameClient = _client.get("platform")
+	var waited := 0
+	while platform != null and not platform.is_shown() and waited < 600:
+		await get_tree().process_frame
+		waited += 1
 	await _frames(3)
 	var image := get_viewport().get_texture().get_image()
 	var path := ProjectSettings.globalize_path(_out)

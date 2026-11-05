@@ -11,6 +11,8 @@ signal released(id: StringName)
 const EDGE_MARGIN := 20.0
 
 var buttons: DotTouchButtons = null
+## Called with the layout each time the set changes (the client's screen fit sizes the buttons for it).
+var fit_fn: Callable = Callable()
 var _hunter: bool = false
 var _loadout: bool = false
 
@@ -69,7 +71,7 @@ func offer_loadout(on: bool) -> void:
 		return
 	_loadout = on
 	if buttons != null:
-		buttons.set_buttons(layout(_hunter, _loadout))
+		_apply()
 
 
 ## Swaps the set when the side changes; a held button is let go, so nothing stays down under another label.
@@ -77,4 +79,11 @@ func show_for(hunter: bool) -> void:
 	if buttons == null or hunter == _hunter:
 		return
 	_hunter = hunter
-	buttons.set_buttons(layout(hunter, _loadout))
+	_apply()
+
+
+func _apply() -> void:
+	var set := layout(_hunter, _loadout)
+	buttons.set_buttons(set)
+	if fit_fn.is_valid():
+		fit_fn.call(set)

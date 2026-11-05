@@ -17,6 +17,7 @@
 #   tools/shot.sh --view=hunter --aim --name=hunter_aimed        # down the sights (compare --view=hunter)
 #   tools/shot.sh --view=loadout                                  # B open in the hide: a hunter's loadout
 #   tools/shot.sh --view=maps --seconds=0.5                       # M: the solo map list with a Workshop fixture map (Name [Pack])
+#   tools/shot.sh --view=hunter --touch --resolution=844x390      # a phone: touch buttons
 #   tools/shot.sh --view=cover                                    # the loading cover, before it lifts
 #   tools/shot.sh --view=grenade --seconds=0.4                    # a frag thrown from slot five, in flight (--seconds=2: its burst)
 #   tools/shot.sh --view=overview --out=res://screenshots/x.png   # any --ph-* is the game's config
@@ -32,6 +33,7 @@ seconds="3"
 out=""
 config=("--ph-warmup-seconds=0" "--ph-hide-seconds=3")
 extra=()
+res=1280x720
 
 take=0
 for arg in "$@"; do
@@ -41,8 +43,9 @@ for arg in "$@"; do
         --view=*)    view="${arg#*=}" ;;
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
+        --resolution=*) res="${arg#*=}" ;;
         --ph-*)      config+=("$arg") ;;
-        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop|--aim|--victim=*) extra+=("$arg") ;;
+        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop|--aim|--victim=*|--touch) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -53,5 +56,5 @@ for e in "${extra[@]}"; do
 done
 [ -n "$out" ] || out="res://screenshots/${name}.png"
 
-exec xvfb-run -a -s "-screen 0 1280x720x24" "${GODOT:-godot}" --path . --resolution 1280x720 \
+exec xvfb-run -a -s "-screen 0 1280x720x24" "${GODOT:-godot}" --path . --resolution "$res" \
     res://tools/shot.tscn -- "--seconds=$seconds" "--view=$view" "--out=$out" "${extra[@]}" "${config[@]}"
