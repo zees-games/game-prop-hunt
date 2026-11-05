@@ -185,15 +185,25 @@ func _set_survey_tick() -> void:
 ## Indices of the floor furniture a prop may become.
 func _usable_furniture(props: Array, catalogue: Object, rules: DotPropDisguiseRules) -> Array[int]:
 	var usable: Array[int] = []
+	var floor_y := _ground_floor(game.get("map_doc"))
 	for i in range(props.size()):
 		var prop: Dictionary = props[i]
 		var frame: Transform3D = prop["transform"]
-		if frame.origin.y > 0.3:
+		if frame.origin.y > floor_y + 0.3:
 			continue
 		if not bool(catalogue.call("may_disguise", prop["id"])) or not DotPropDisguise.may_take(prop["size"], rules).ok:
 			continue
 		usable.append(i)
 	return usable
+
+
+## The ground floor the furniture stands on: 0, or the props' lowest start (feet 0.05 m up) when that is
+## above 0. ph_library's ground floor is at 1.2 m, so no piece was usable and its props never left the start.
+static func _ground_floor(doc: Dictionary) -> float:
+	var lowest := INF
+	for spawn: Dictionary in ((doc.get("spawns", {}) as Dictionary).get("props", []) as Array):
+		lowest = minf(lowest, float((spawn["at"] as Array)[1]) - 0.05)
+	return maxf(0.0, lowest) if lowest < INF else 0.0
 
 
 ## A place beside the furniture, on the nav mesh, per surveyed piece: `[positions, owner indices]`.

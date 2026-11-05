@@ -7,7 +7,7 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 ## Every map the game can be sent, built as a server builds it and checked for what a map document gets wrong without any error: a spawn inside a wall or over nothing, an unknown prop (built as nothing), a prop sunk or floating, too few things to hide as, a document too big to send.
 ## Apart from `headless_run` because none of those stops a round (a prop floating over a table is the one every hunter shoots first). Sections and checks are both counted; a map adds a section and CHECKS_PER_MAP checks.
 
-const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church", "ph_abandoned_hotel", "ph_elementary_school", "ph_autumngetaway", "ph_bank", "ph_volcano", "ph_westerncity", "ph_gas_station", "ph_bikinibottom", "ph_swimmingpool", "ph_restaurant_os", "ph_oceanwaves", "ph_midwestapartment", "ph_cyber_dinner", "ph_islandhouse"]
+const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church", "ph_abandoned_hotel", "ph_elementary_school", "ph_autumngetaway", "ph_bank", "ph_volcano", "ph_westerncity", "ph_gas_station", "ph_bikinibottom", "ph_swimmingpool", "ph_restaurant_os", "ph_oceanwaves", "ph_midwestapartment", "ph_cyber_dinner", "ph_islandhouse", "ph_library"]
 const CHECKS_PER_MAP := 11
 
 ## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not linked in (CI clones this repository alone).
