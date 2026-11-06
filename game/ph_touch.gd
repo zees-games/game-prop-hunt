@@ -8,11 +8,9 @@ extends CanvasLayer
 signal pressed(id: StringName)
 signal released(id: StringName)
 
-const EDGE_MARGIN := 20.0
-
 var buttons: DotTouchButtons = null
-## Called with the layout each time the set changes (the client's screen fit sizes the buttons for it).
-var fit_fn: Callable = Callable()
+## The DotGameClient that fits the buttons each time the set changes.
+var client: Object = null
 var _hunter: bool = false
 var _loadout: bool = false
 
@@ -22,24 +20,24 @@ static func wanted() -> bool:
 	return DotPlatform.has_touch()
 
 
-## Offsets are from the bottom-right corner, towards the middle. The set is small and packed to the corner: at 390 px tall a phone has little to spare.
-static func layout(hunter: bool, loadout: bool = false) -> Array[Dictionary]:
+## dot-game's fps preset, cut to what the side uses. A hunter keeps fire and reload and adds aim (and gear on a host with a loadout menu); a prop swaps fire for swap, lock and taunt. Jump keeps its home for both.
+static func touch_layout(hunter: bool, loadout: bool = false) -> DotGameTouchLayout:
+	var cut := {&"alt": null, &"crouch": null, &"use": null, &"next": null, &"prev": null, &"board": null, &"chat": null}
 	if hunter:
-		var set: Array[Dictionary] = [
-			{"id": &"fire", "label": "FIRE", "offset": Vector2(66, 76), "radius": 46.0},
-			{"id": &"jump", "label": "JUMP", "offset": Vector2(160, 40), "radius": 32.0},
-			{"id": &"reload", "label": "R", "offset": Vector2(40, 160), "radius": 26.0},
-			{"id": &"aim", "label": "AIM", "offset": Vector2(132, 130), "radius": 28.0},
-		]
+		cut[&"aim"] = {"slot": &"secondary", "label": "AIM"}
 		if loadout:
-			set.append({"id": &"loadout", "label": "GEAR", "offset": Vector2(216, 96), "radius": 26.0})
-		return set
-	return [
-		{"id": &"disguise", "label": "SWAP", "offset": Vector2(66, 76), "radius": 46.0},
-		{"id": &"jump", "label": "JUMP", "offset": Vector2(160, 40), "radius": 32.0},
-		{"id": &"lock", "label": "LOCK", "offset": Vector2(40, 160), "radius": 26.0},
-		{"id": &"taunt", "label": "TAUNT", "offset": Vector2(132, 130), "radius": 28.0},
-	]
+			cut[&"loadout"] = {"slot": &"inner", "label": "GEAR"}
+	else:
+		cut[&"fire"] = null
+		cut[&"reload"] = null
+		cut[&"disguise"] = {"slot": &"primary", "label": "SWAP"}
+		cut[&"lock"] = {"slot": &"secondary", "label": "LOCK"}
+		cut[&"taunt"] = {"slot": &"inner", "label": "TAUNT"}
+	var res := DotGameTouchLayout.build(DotGameTouchLayout.FPS, cut)
+	if not res.ok:
+		push_error("mg-prop-hunt touch layout refused: %s" % str(res.error))
+		return DotGameTouchLayout.custom()
+	return res.value
 
 
 func _init() -> void:
@@ -51,10 +49,9 @@ func build() -> void:
 	buttons = DotTouchButtons.new()
 	buttons.name = "Buttons"
 	buttons.only_on_touch = false
-	buttons.margin = EDGE_MARGIN
 	buttons.set_anchors_preset(Control.PRESET_FULL_RECT)
 	buttons.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	buttons.set_buttons(layout(_hunter, _loadout))
+	touch_layout(_hunter, _loadout).apply(buttons, client)
 	buttons.button_down.connect(func(id: StringName) -> void: pressed.emit(id))
 	buttons.button_up.connect(func(id: StringName) -> void: released.emit(id))
 	add_child(buttons)
@@ -83,7 +80,4 @@ func show_for(hunter: bool) -> void:
 
 
 func _apply() -> void:
-	var set := layout(_hunter, _loadout)
-	buttons.set_buttons(set)
-	if fit_fn.is_valid():
-		fit_fn.call(set)
+	touch_layout(_hunter, _loadout).apply(buttons, client)
