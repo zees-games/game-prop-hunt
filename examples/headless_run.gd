@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 32
 
-const CHECKS := 204
+const CHECKS := 205
 
 
 func _ready() -> void:
@@ -237,6 +237,7 @@ func _test_the_hide() -> void:
 	_check(walked.length() < 0.05, "a blindfolded hunter does not move", "%.2f m" % walked.length())
 	_check(prop.controller.state.position.distance_to(prop_from) > 1.0, "a prop does")
 	_check(hunter.weapons != null, "a hunter is armed from the start")
+	_check(hunter.weapons.ads_rules == game.ads_rules and hunter.weapons.ads_move_scale() == 1.0, "its rig takes the game's zee_ads_rules and is not slowed unaimed")
 
 	await _step(game, TICK_RATE)
 	_check(game.phase == PhGame.Phase.SEEK and not hunter.controller.has_modifier(PhController.BLINDFOLD),

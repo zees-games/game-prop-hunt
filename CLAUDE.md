@@ -91,6 +91,7 @@ Short forms; the reasoning is in the linked file.
 - Breakable furniture (`props/kits.json` "breaks") breaks once the shots add up (`PhMap.break_prop`), still charged as a decoy; BROKEN tells every client, a round restores it; debris is the client's own (`ph_debris.gd`, world layer only). [design](docs/design.md#breakable-furniture)
 
 - A death's fall is the server's (`PhGame.decide_death`, last and optional on DEATH); the client draws it (`PhClient._fall`): a person as a ragdoll under `sv_ragdoll*`, a disguised prop pops (`prop_death`), a hunter the furniture finished breaks (`hunter_break`). [design](docs/design.md#a-death)
+- Aim-down-sights rules are zee-dot-weapons' `ZeeAdsRules`: one per game (`game.ads_rules`, `ZeeAdsRules.load_config()`), handed to the server rig and to the client's rig, bound by the module as the REPLICATED `zee_ads_rules` cvar and followed by the client. `cfg/addon/zee_weapons/ads.yml` ships the view numbers at the art's own size. The command carries no aim bit yet, so spread and walk pace are untouched; binding an aim input is the remaining step.
 
 **Taunts, beacons, sides**
 

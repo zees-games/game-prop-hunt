@@ -154,6 +154,10 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropToyRules = DotPropToyRules.new()
 
+## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every weapon
+## rig. Bound by the module and followed by a client, so its prediction agrees. Nothing sets the aim bit yet.
+var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
+
 ## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
 var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
 
@@ -1729,6 +1733,7 @@ func arm(player: PhPlayer, weapon_id: StringName) -> bool:
 		rig.catalogue = weapon_catalogue()
 		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
 		rig.player_ref = DotNodeRef.of_path(player.get_path())
+		rig.ads_rules = ads_rules
 		player.add_child(rig)
 
 		var ready_now := rig.setup()

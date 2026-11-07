@@ -233,6 +233,9 @@ func _bind_rule_cvars(world: PhGame) -> void:
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
 	)
 
+	# zee_ads_rules: spread and pace while aimed are part of the prediction, so the numbers cross as one JSON cvar.
+	var _ads := world.ads_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+
 	# ph_ambient*: REPLICATED, because each client plays its own ambience under the server's intent; the directory cvar stays local.
 	var _ambient := world.ambient_rules.bind_cvars(
 		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
