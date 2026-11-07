@@ -1,10 +1,10 @@
-extends DotMenuSettings
+extends DotMenuGameSettings
 
 const PhBindings := preload("ph_bindings.gd")
 
-## A player's own settings and the menu that changes them: dot-menu's `DotMenuSettings` with this game's schema.
-## [codeblock]var s := PhSettings.new(); add_child(s); s.setup(); s.bind_look(sampler.tunables); s.bind_camera(camera); s.bind_audio(audio.manager); s.open()[/codeblock]
+## A player's own settings and the menu that changes them: dot-menu's `DotMenuGameSettings` with this game's spec (names, field of view, keys, help).
 ## Scopes are the family's: `sensitivity` is ACCOUNT (`tmc_account`), `field_of_view` SERVER_CLAMPED (a server may cap a wide view but cannot READ it), volumes this machine's.
+## Use: `add_child(s); s.setup(); s.bind_look(...); s.bind_camera(...); s.bind_audio(...); s.open()`.
 
 const SCHEMA_VERSION := 1
 
@@ -25,47 +25,26 @@ const NOT_APPLIED: Array[StringName] = [
 
 
 func _init() -> void:
-	name = "Settings"
-	directory = SETTINGS_DIR
-	app_namespace = APP_NAMESPACE
-	schema = schema_for()
-	config = DotMenuConfig.new()
-	config.brand_name = "Prop Hunt"
-	# Help and Leave are dot-menu's stock: H opens help, Leave leaves the server or quits a
-	# solo game. Every game in the family has both (the first play test found this one without
-	# Leave).
-	bindings = PhBindings.make()
-	var _layered := config.load_layered()
+	super(spec_for())
 
 
-## The document: this game's field of view first, so it keeps its own default, then the
-## stock settings it applies.
-static func schema_for() -> DotSettingsSchema:
-	var s := DotSettingsSchema.new()
-	s.version = SCHEMA_VERSION
-	s.add(DotSettingsDef.integer(&"field_of_view", DEFAULT_FOV, 70, 120, &"video").with_scope(
-		DotSettingsDef.Scope.SERVER_CLAMPED
-	))
-	s.add(DotSettingsDef.boolean(&"reduce_motion", false, &"accessibility").with_scope(DotSettingsDef.Scope.ACCOUNT)
-		.with_description("The end-of-round announcement appears at once, with nothing sliding, rising or bursting."))
-	s.add(DotSettingsDef.boolean(&"ambient", true, &"audio").with_description("Quiet sounds under the map."))
-	s.add(DotSettingsDef.number(&"ambient_volume", 1.0, 0.0, 1.0, &"audio"))
-	return DotMenuStock.declare(s, DotMenuStock.DEFAULT_GROUPS, null, NOT_APPLIED)
-
-
-func setup(store: DotSettingsStore = null, with_menu: bool = true) -> DotResult:
-	var made := super.setup(store, with_menu)
-	if menu != null:
-		var general := menu.page(&"general")
-		if general != null:
-			general.section("Comfort").add(DotMenuRow.toggle(&"reduce_motion", "Reduce motion",
-				"The end-of-round announcement appears at once."))
-	return made
-
-
-## The help screen's goal and rules; the keys come from [PhBindings].
-func _fill_help(help: DotMenuHelp) -> void:
-	help.about = "Most players are props: look at something on the map, press E to become it, and keep still. The rest are hunters, blindfolded while the props hide, then given a few minutes to find them. Props win if anybody is left when the clock runs out."
-	help.add_text("Props", "Your health is the size of what you became. Taunt for points, lock your rotation so you stop turning with the view, and tilt to sit the way the real ones do. A prop that keeps quiet too long taunts on its own.")
-	help.add_text("Hunters", "Shooting real furniture costs you health, so read the room for the thing that is slightly wrong before you fire. Near the end the last props give themselves away with a beacon.")
-	help.add_section("Mouse", [["Left", "Fire (hunters); watch the next player while out"], ["Right", "Alternate fire; watch the one before while out"]], &"keys")
+## The game's settings as data: names, field of view, extra settings, keys and the help screen's goal and rules.
+static func spec_for() -> DotMenuGameSpec:
+	var s := DotMenuGameSpec.new()
+	s.schema_version = SCHEMA_VERSION
+	s.brand_name = "Prop Hunt"
+	s.settings_dir = SETTINGS_DIR
+	s.app_namespace = APP_NAMESPACE
+	s.default_fov = DEFAULT_FOV
+	s.reduce_motion_text = "The end-of-round announcement appears at once, with nothing sliding, rising or bursting."
+	s.comfort_row_text = "The end-of-round announcement appears at once."
+	s.ambient_text = "Quiet sounds under the map."
+	s.not_applied = NOT_APPLIED
+	s.bindings_maker = func() -> DotMenuBindings: return PhBindings.make()
+	s.help_about = "Most players are props: look at something on the map, press E to become it, and keep still. The rest are hunters, blindfolded while the props hide, then given a few minutes to find them. Props win if anybody is left when the clock runs out."
+	s.help_cards = [
+		["Props", "Your health is the size of what you became. Taunt for points, lock your rotation so you stop turning with the view, and tilt to sit the way the real ones do. A prop that keeps quiet too long taunts on its own."],
+		["Hunters", "Shooting real furniture costs you health, so read the room for the thing that is slightly wrong before you fire. Near the end the last props give themselves away with a beacon."],
+	]
+	s.help_sections = [["Mouse", [["Left", "Fire (hunters); watch the next player while out"], ["Right", "Alternate fire; watch the one before while out"]], &"keys"]]
+	return s
