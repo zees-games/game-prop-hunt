@@ -1,4 +1,4 @@
-extends Node
+extends DotGameNetIo
 
 const PhEvent := preload("ph_event.gd")
 const PhEvents := preload("ph_events.gd")
@@ -86,15 +86,9 @@ signal chat_received(wire: Dictionary)
 signal voice_arrived(payload: PackedByteArray)
 
 var game: PhGame = null
-var net: DotNetManager = null
-var link: PhNetLink = null
 
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
-
-## Where the clock learns the link's length in milliseconds ([method DotClientLink.ping_ms]).
-## Fed nothing, the clock assumes an instant link and every command is stamped for a tick already simulated, then discarded as late.
-var rtt_source: Callable = Callable()
 
 ## Where a voice frame goes on the server. Assigned by [DotGameModule] to the services
 ## layer's `relay_voice`, because the bridge is the only thing that names both ends.
@@ -298,22 +292,6 @@ func open_link(parent: Node) -> void:
 	# die with this bridge. A bare add_child left a second link after every module reload, and
 	# Godot renamed the live one `@Node@n`, so RPCs to real clients were silently lost.
 	DotGameLink.attach(link, parent, self, PhNetLink.NODE_NAME)
-
-
-## How every dot-net message reaches a peer, routed by DELIVERY rather than kind.
-## Snapshots are unreliable; everything else is reliable, as an event on the server or a request on the client.
-## Sending all as events silently drops every client request.
-func _send(peer_id: int, payload: PackedByteArray, delivery: int) -> void:
-	if link == null:
-		return
-
-	if delivery == DotNetMessage.Delivery.UNRELIABLE:
-		link.send_snapshot(peer_id, payload)
-	elif net.is_server:
-		link.send_event(peer_id, payload)
-	else:
-		link.send_request(payload)
-
 
 
 static func player_key(session_id: int) -> StringName:
@@ -738,16 +716,6 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0) -> void:
 
 
 
-func receive_snapshot(payload: PackedByteArray) -> DotResult:
-	if net == null or net.is_server:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only a client receives these.")
-
-	if rtt_source.is_valid():
-		net.stats.note_rtt(float(rtt_source.call()))
-
-	return net.receive_snapshot(payload)
-
-
 ## [param packet] and the commands before it from the local replay history, oldest first,
 ## for one input packet. See [constant INPUT_COPIES].
 func _input_copies(packet: DotNetInput) -> Array:
@@ -827,21 +795,6 @@ func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 
 	voice_arrived.emit(payload)
 	return DotResult.success(null)
-
-
-func receive_event(payload: PackedByteArray) -> DotResult:
-	if net == null:
-		return DotResult.fail(DotError.CODE_STATE, "No manager.")
-
-	return net.receive(payload, 1)
-
-
-func receive_request(peer_id: int, payload: PackedByteArray) -> DotResult:
-	if net == null:
-		return DotResult.fail(DotError.CODE_STATE, "No manager.")
-
-	return net.receive(payload, peer_id)
-
 
 
 func _on_request(message: DotNetMessage) -> void:
