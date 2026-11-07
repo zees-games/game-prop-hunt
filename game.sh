@@ -11,8 +11,8 @@
 #   ./game.sh server -- ARGS       ARGS go to dot-server-deploy's ./server (e.g. -- --port 7000)
 #   ./game.sh test                 parse every script, then run every test suite
 #   ./game.sh test NAME...         run only these suites (e.g. ./game.sh test headless_net)
-#   ./game.sh suites               list the test suites
 #   ./game.sh soak [MAP] [MIN]     bot soak on tools/soak.tscn (report in .godot/test-logs/soak-MAP.json)
+#   ./game.sh suites               list the test suites
 #   ./game.sh shot [ARGS]          save a screenshot to screenshots/ (tools/shot.sh or tools/screenshot.sh)
 #
 # Options (before the command):
@@ -24,7 +24,10 @@
 # $DOT_SERVER_DEPLOY). dot-bootstrap puts it there. Both rebuild this game's pack first, so
 # what you play is what is on disk now.
 #
-# The same script is in every game repository; only the settings below differ.
+# The same script is in every game repository; only the settings below differ. It is
+# GENERATED from dot-game-template/tools/game.sh.in and this repository's game.conf by
+# dot-game-template/tools/gen-game-sh.py: edit those, never this file (the generator's
+# --check mode fails when they disagree).
 
 # --- This game ------------------------------------------------------------------
 # PACK is the game's id in dot-server-deploy (empty if it has no server), EXTRA_PACKS
@@ -34,11 +37,6 @@ GAME_NAME="Prop Hunt"
 PACK="prophunt"
 EXTRA_PACKS="prophunt_maps:mg-prop-hunt-maps"
 SUITES="headless_config headless_workbench headless_run headless_mapcfg headless_workshop headless_maps headless_bots headless_net dedicated"
-# A suite that legitimately runs longer than the default, as name=seconds. headless_bots plays 96
-# rounds and took 814 s under `heavy` on dev02 (2026-10-20) and under 800 s on 2026-10-22 (no regression), but 1443 s on the
-# staging laptop, so 900 s was its edge.
-# An explicit --timeout still wins for every suite.
-SUITE_TIMEOUTS="headless_bots=1800"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail
@@ -48,14 +46,17 @@ cd "$ROOT" || exit 1
 
 GODOT="${GODOT:-godot}"
 TIMEOUT=900
-TIMEOUT_GIVEN=0
 PARSE=1
+TIMEOUT_GIVEN=0
+# A suite that legitimately runs longer than the default, as name=seconds. An explicit
+# --timeout still wins for every suite.
+SUITE_TIMEOUTS="headless_bots=1800"
 RED=$'\033[31m'; GRN=$'\033[32m'; YLW=$'\033[33m'; OFF=$'\033[0m'
 CR=$'\r\033[K'
 [ -t 1 ] || { RED=""; GRN=""; YLW=""; OFF=""; CR=""; }
 
 die() { printf '%s%s%s\n' "$RED" "$1" "$OFF" >&2; exit "${2:-1}"; }
-usage() { sed -n '3,24p' "$ROOT/$(basename "${BASH_SOURCE[0]}")" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '3,/^#   --no-parse/p' "$ROOT/$(basename "${BASH_SOURCE[0]}")" | sed 's/^# \{0,1\}//'; }
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -281,7 +282,7 @@ case "$cmd" in
         [ -n "${1:-}" ] && { soak_args+=(--minutes "$1"); shift; }
         mkdir -p .godot/test-logs
         timeout "$TIMEOUT" "$GODOT" --headless --path . res://tools/soak.tscn -- "${soak_args[@]}" "$@" \
-            2>&1 | tee .godot/test-logs/soak.log | grep -E '^SOAK|^soak|SCRIPT ERROR|Parse Error|ERROR|FAIL'
+            2>&1 | tee .godot/test-logs/soak.log | grep -E '^SOAK|^soak|^TRACE|SCRIPT ERROR|Parse Error|ERROR|FAIL'
         exit "${PIPESTATUS[0]}"
         ;;
     suites)
