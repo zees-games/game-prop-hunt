@@ -5,9 +5,9 @@ extends "headless_run_base.gd"
 ## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. dot-settings has the story.
 ## Every number about the map is the built-in practice house's ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 31
+const SECTIONS := 32
 
-const CHECKS := 197
+const CHECKS := 204
 
 
 func _ready() -> void:
@@ -32,6 +32,7 @@ func _run() -> void:
 	await _test_lean_on_the_floor()
 	await _test_room()
 	await _test_taunts()
+	await _test_the_flashlight()
 	await _test_shots()
 	await _test_toys()
 	await _test_decoys()
@@ -319,6 +320,34 @@ func _test_reveal() -> void:
 
 	_check(game.reveal(prop.player_id) and prop.disguise.prop_id == &"furniture_chair", "the same key puts the chair back on")
 	_check(not game.reveal(prop.player_id), "and it cannot show itself again straight away")
+	_finished()
+
+
+func _test_the_flashlight() -> void:
+	_section("the flashlight: the map sets it, either side switches it, a map may forbid it")
+	var game := await _hide_round()
+	var cfg := game.flashlight_conf()
+	var prop: PhPlayer = game.players_on(PhGame.PROPS)[0]
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	_check(cfg.key == "L" and game.flashlight_binder != null, "the key is L (F is the quick melee) and the config has a binder", cfg.key)
+
+	cfg.default_state = DotFlashlightConfig.START_ON
+	prop.flashlight_ready = false
+	await _step(game, 2)
+	_check(prop.flashlight, "a map that starts lit lights the player")
+	cfg.default_state = DotFlashlightConfig.START_OFF
+	prop.flashlight_ready = false
+	await _step(game, 2)
+	_check(not prop.flashlight, "and one that starts dark does not")
+
+	_check(game.toggle_flashlight(prop.player_id) and prop.flashlight, "the switch turns a prop's light on")
+	_check(game.toggle_flashlight(hunter.player_id) and hunter.flashlight, "and a hunter's, who is blindfolded")
+	_check(game.toggle_flashlight(prop.player_id) and not prop.flashlight, "and the next press turns it off")
+
+	cfg.allowed_maps = PackedStringArray(["no_such_map"])
+	_check(not game.toggle_flashlight(prop.player_id) and not prop.flashlight, "a map outside allowed_maps has no light")
+	cfg.allowed_maps = PackedStringArray()
+	cfg.default_state = DotFlashlightConfig.START_DARK
 	_finished()
 
 
@@ -894,7 +923,7 @@ func _test_the_client() -> void:
 	client_game.prop_broken.emit(99999, Vector3.UP)
 	_check(fx.spawned == 1, "an index past the map's props draws nothing", fx.last_refusal)
 
-	_check(InputMap.has_action(&"ph_disguise") and InputMap.has_action(&"ph_taunt_menu"),
+	_check(InputMap.has_action(&"ph_disguise") and InputMap.has_action(&"ph_taunt_menu") and InputMap.has_action(&"ph_flashlight"),
 		"the game's keys are actions, from the bindings table")
 	_check(client.get("player") != null and client.get("hud") != null and (client.get("hud") as Node).get("game") != null,
 		"a player and a HUD bound to the world")

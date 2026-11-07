@@ -323,6 +323,10 @@ var _killcam_cvar: DotConVar = null
 
 ## Every [PhConfig] field as a `ph_<field>` cvar, a cfg/ yml key and a workbench set, the cfg/ diff commands, and the older names as aliases that follow the field.
 func _bind_config(world: PhGame) -> void:
+	var _fl := world.flashlight_conf()
+	if world.flashlight_binder != null:
+		var _flash_cvars := world.flashlight_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+		world.flashlight_binder.bind_commands(add_command)
 	var binder := world.config_binder
 	if binder == null:
 		return
@@ -335,6 +339,9 @@ func _bind_config(world: PhGame) -> void:
 			and bool(server.admins.uid_has_permission(actor, flag))
 	for set: DotProfileSet in binder.profile_sets():
 		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	if world.flashlight_binder != null:
+		for set: DotProfileSet in world.flashlight_binder.profile_sets():
+			workbench.add_set(set, "Flashlight")
 	var ambient_set := DotGameWorkbench.cvar_set(console, PhAmbience.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (ph_ambient*)")
@@ -354,6 +361,8 @@ func _bind_config(world: PhGame) -> void:
 	binder.field_changed.connect(_on_config_field)
 	if runtime != null:
 		binder.attach(runtime)
+		if world.flashlight_binder != null:
+			world.flashlight_binder.attach(runtime)
 		if ambient_set != null:
 			var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, runtime, console)
 

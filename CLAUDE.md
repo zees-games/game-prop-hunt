@@ -38,6 +38,7 @@ game/
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
   ph_client.gd       one local player, alone or against a server; third person as a prop; its platform wiring (loading cover, settings, console, Tab, M, pointer, input block) is dot-game's `DotGameClient` (`platform`)
+  ph_flashlight.gd   dot-flashlight's config and binder (`ph_flashlight_*`, key L: F is the hunter's melee) and the map-ambient start rule; either side may use it, the server owns it, a lit beam gives a prop away
   ph_bindings.gd     every key, as dot-menu bindings; ph_settings.gd the Escape menu
   ph_module.gd       the DotGameModule: cvars, ph_status / ph_maps / ph_taunts / ph_map, stand-ins
   ph_services.gd     chat, voice and moderation over dot-game's base

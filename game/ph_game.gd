@@ -15,6 +15,7 @@ const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
 const PhProjectiles := preload("ph_projectiles.gd")
 const PhGameReport := preload("ph_game_report.gd")
+const PhFlashlight := preload("ph_flashlight.gd")
 
 ## The simulation: headless, authoritative, and the only thing that decides anything.
 ## A round is hiding then seeking: hunters stand blindfolded for [member PhConfig.hide_seconds] while props turn into furniture, then hunt.
@@ -158,6 +159,10 @@ var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by the server scene or the client.
 var config_binder: DotGameConfigBinder = null
+
+## The flashlight's config and binder, made on first use so a suite that builds a game by hand still has one.
+var flashlight_config: DotFlashlightConfig = null
+var flashlight_binder: DotGameConfigBinder = null
 
 ## The workbench's profile rows, made on first ask: the bridge's profile link must exist before the netcode seals, the workbench after.
 var profile_runtime: DotProfileRuntime = null
@@ -1023,6 +1028,9 @@ func build_map(doc: Dictionary) -> DotResult:
 
 	map_doc = map.doc
 
+	for p: PhPlayer in players.values():
+		p.flashlight_ready = false
+
 	if spectate != null:
 		spectate.set_overviews([map.overview(), map.overview()] as Array[Transform3D])
 
@@ -1559,6 +1567,42 @@ func turn(id: StringName, how: int) -> bool:
 	return true
 
 
+## The flashlight config, made on first use.
+func flashlight_conf() -> DotFlashlightConfig:
+	if flashlight_config == null:
+		flashlight_config = PhFlashlight.make_config()
+		flashlight_binder = PhFlashlight.make_binder(flashlight_config)
+		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
+	return flashlight_config
+
+
+## A new map sets everybody's light by the map (dark ones start lit). Server side.
+func _advance_flashlights() -> void:
+	if not authoritative:
+		return
+
+	var cfg := flashlight_conf()
+	var map_id := str(map_doc.get("id", ""))
+
+	for player: PhPlayer in players.values():
+		if not player.flashlight_ready:
+			player.flashlight_ready = true
+			player.flashlight = PhFlashlight.starts_on(cfg, map_id, map_doc)
+
+
+## A living player switches their light, either side. Refused where the map or the config disallows it. Server side.
+func toggle_flashlight(id: StringName) -> bool:
+	var player: PhPlayer = players.get(id)
+	var cfg := flashlight_conf()
+
+	if player == null or not player.is_alive() or player.watching \
+			or not DotFlashlightRules.allowed_on(cfg, str(map_doc.get("id", ""))):
+		return false
+
+	player.flashlight = not player.flashlight
+	return true
+
+
 ## A prop taunts, by choice. [param taunt_id] empty picks one. Server side.
 func taunt(id: StringName, taunt_id: StringName = &"") -> bool:
 	var player: PhPlayer = players.get(id)
@@ -1927,6 +1971,7 @@ func _step(delta: float) -> void:
 	_advance_reveals(delta)
 	_advance_taunts()
 	_advance_beacons()
+	_advance_flashlights()
 
 	if combat != null:
 		combat.tick(_tick, delta)

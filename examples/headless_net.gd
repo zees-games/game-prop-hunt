@@ -5,8 +5,8 @@ extends "headless_net_base.gd"
 ## It asserts the two claims the game rests on over a wire: a disguise is a HULL as well as a look (both ends must agree what somebody wears, or the client walks through a doorway the server's chair does not fit and is pulled back every tick),
 ## and the blindfold is true on the wire (a hunter's snapshots carry no prop while the props hide, `PhInterest`). Then everything else that crosses. Sections and checks are both counted (mg-smash-copter's notes say why).
 
-const SECTIONS := 17
-const CHECKS := 91
+const SECTIONS := 18
+const CHECKS := 95
 
 
 func _ready() -> void:
@@ -30,6 +30,7 @@ func _run() -> void:
 		await _test_the_local_player_is_predicted()
 		await _test_a_disguise_is_a_hull_on_both_ends()
 		await _test_turning_and_taunting()
+		await _test_the_flashlight_crosses()
 		await _test_a_joiner_is_told_what_everybody_wears()
 		await _test_a_decoy_is_charged()
 		await _test_the_drawn_gun_takes_the_server_count()
@@ -377,6 +378,22 @@ func _test_turning_and_taunting() -> void:
 		"a taunt is played, and everybody is told who and which", str(_heard.get("taunt")))
 	_check(server_me.points - points == _server_game.config.taunt_points, "and is paid for",
 		"+%d" % (server_me.points - points))
+	_finished()
+
+
+func _test_the_flashlight_crosses() -> void:
+	_section("the flashlight is asked for, and the server's state comes back to everybody")
+	var server_me := _server_me()
+	var was := server_me.flashlight
+	_client_bridge.ask_flashlight()
+	await _steps(8)
+	_check(server_me.flashlight != was, "the server switched it")
+	_check(_mine().flashlight == server_me.flashlight, "and the owner is told")
+	var theirs: PhPlayer = _client_game.players[_stand_in.player_id]
+	_check(theirs.flashlight == _stand_in.flashlight, "and the others' flag is the server's")
+	_client_bridge.ask_flashlight()
+	await _steps(8)
+	_check(server_me.flashlight == was and _mine().flashlight == was, "the next ask switches it back")
 	_finished()
 
 

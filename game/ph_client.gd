@@ -52,6 +52,12 @@ var workbench: DotGameWorkbench = null
 ## Whether the camera hangs behind the player. Follows the side; F5 swaps it.
 var third_person: bool = false
 
+## The flashlight on the eye and the others' beams (dot-flashlight); the server owns on/off.
+var flash: DotFlashlight = null
+var flash_crowd: DotFlashlightCrowd = null
+var _flash_msec := -100000
+var _flash_retain := 0.0
+
 ## Whether the player chose the view with F5 this round, which the side then leaves alone.
 var _view_chosen: bool = false
 
@@ -499,6 +505,9 @@ func is_hunter() -> bool:
 
 
 func _on_map(map_id: StringName) -> void:
+	if flash != null:
+		flash.allowed = DotFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
+
 	# The new map's toys are heard: a ball's bounce, a barrel's knock.
 	if game.map != null and game.map.toys != null and audio != null and not game.map.toys.sound.is_connected(_toy_sound):
 		var _c := game.map.toys.sound.connect(_toy_sound)
@@ -971,6 +980,10 @@ func _start_remote_workbench() -> void:
 	if game.config_binder != null:
 		for set: DotProfileSet in game.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := game.flashlight_conf()
+	if game.flashlight_binder != null:
+		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start(game.ensure_runtime())
 	DotLog.result(CHANNEL, "the remote workbench", started)
@@ -993,11 +1006,17 @@ func _add_noblock_and_workbench() -> void:
 	wb.config = {"enabled": false}
 	for set: DotProfileSet in game.config_binder.profile_sets():
 		wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
+	var _fl := game.flashlight_conf()
+	if game.flashlight_binder != null:
+		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start()
 	DotLog.result(CHANNEL, "the workbench", started)
 	if started.ok and wb.api != null:
 		game.config_binder.attach(wb.api.runtime as DotProfileRuntime)
+		if game.flashlight_binder != null:
+			game.flashlight_binder.attach(wb.api.runtime as DotProfileRuntime)
 	platform.add_workbench(wb)
 
 
@@ -1445,6 +1464,7 @@ func _present_hide() -> void:
 
 
 func _present_effects(delta: float) -> void:
+	_present_flashlights(delta)
 	if audio != null:
 		audio.listen_from(camera.global_position)
 		audio.keep_walkers(game.players.values())
@@ -1781,6 +1801,11 @@ func _key_pressed(event: InputEvent) -> bool:
 	if player == null or not player.is_alive() or is_spectating():
 		return false
 
+	if event.is_action_pressed(PhBindings.FLASHLIGHT):
+		if flash != null:
+			var _asked := flash.toggle()
+		return true
+
 	if is_hunter():
 		if event.is_action_pressed(PhBindings.RELOAD):
 			_reloading = true
@@ -1825,6 +1850,69 @@ func _key_pressed(event: InputEvent) -> bool:
 		return false
 
 	return true
+
+
+## The sound manager the flashlight clicks play through, or null before audio is up.
+func _flash_audio_ref() -> DotNodeRef:
+	if audio == null or audio.manager == null or not audio.manager.is_inside_tree():
+		return null
+	return DotNodeRef.of_path(audio.manager.get_path())
+
+
+## The light on the eye follows the server's state (but not for 0.4 s after our own switch); everybody else's beam, and ours when the camera is not our eye, comes from the crowd.
+func _present_flashlights(delta: float) -> void:
+	var cfg := game.flashlight_conf()
+	var map_id := str(game.map_doc.get("id", ""))
+
+	if flash == null or not is_instance_valid(flash):
+		flash = DotFlashlight.new()
+		flash.name = "Flashlight"
+		flash.config = cfg
+		flash.handle_input = false
+		flash.authoritative = false
+		flash.audio = _flash_audio_ref()
+		flash.switch_requested.connect(_on_flash_switch)
+		camera.add_child(flash)
+
+	flash.allowed = DotFlashlightRules.allowed_on(cfg, map_id)
+
+	if flash_crowd == null:
+		flash_crowd = DotFlashlightCrowd.new()
+		flash_crowd.name = "Flashlights"
+		flash_crowd.config = cfg
+		flash_crowd.audio = _flash_audio_ref()
+		add_child(flash_crowd)
+
+	var own_eye := not third_person and not is_spectating()
+	var lit := player.flashlight and player.is_alive() and not player.watching
+
+	if own_eye and Time.get_ticks_msec() - _flash_msec > 400:
+		flash.apply_state({"on": lit})
+	elif not own_eye:
+		flash.apply_state({"on": false})
+
+	flash_crowd.set_viewer(camera.global_position)
+
+	for key: Variant in game.players:
+		var other: PhPlayer = game.players[key]
+		var shown := other.flashlight and other.is_alive() and not other.watching and (other != player or not own_eye)
+		flash_crowd.set_lit(key, shown)
+		if shown:
+			flash_crowd.place(key, other.eye_position(), other.aim_direction())
+
+	_flash_retain -= delta
+	if _flash_retain <= 0.0:
+		_flash_retain = 2.0
+		flash_crowd.retain(game.players.keys())
+
+
+## Our own switch: shown at once, asked of the server (or done here, offline).
+func _on_flash_switch(_want: bool) -> void:
+	_flash_msec = Time.get_ticks_msec()
+	if bridge != null:
+		bridge.ask_flashlight()
+	elif game != null and player != null:
+		var _switched := game.toggle_flashlight(player.player_id)
 
 
 func describe() -> Dictionary:
