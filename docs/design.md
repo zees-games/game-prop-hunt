@@ -54,7 +54,7 @@ Every map places a few of dot-props' loose toys (the document's `toys`, `PhMap._
 
 **A grenade is the optional third slot** (`thrown`, empty by default, so the stand-ins and a hunter who never presses B carry none): zee's frag or sticky from `hunter_choices`, slot five. See "Grenades" below.
 
-**The right mouse button aims down the sights** (`PhBindings.AIM`, the family's Aim row): zee's `ZeeViewModel.aim`, the lens zoomed from `PhClient.base_fov` (the menu's field of view binds there, so a zoom never compounds), the dot faded by dot-ui's `DotCrosshair.opacity_for_aim` and a `ZeeScopeOverlay` through a scoped gun. Presentation only, as in the arena. zee's quick melee, which was the right button, is on F (`PhBindings.BASH`). `tools/shot.sh --view=hunter --aim` and `--view=loadout` render both.
+**The right mouse button aims down the sights** (`PhBindings.AIM`, the family's Aim row): zee's `ZeeViewModel.aim`, the lens zoomed from `PhClient.base_fov` (the menu's field of view binds there, so a zoom never compounds), the dot faded by dot-ui's `DotCrosshair.opacity_for_aim` and a `ZeeScopeOverlay` through a scoped gun. The zoom and the picture are presentation; the pace and the spread are not, see "Aim on the wire". zee's quick melee, which was the right button, is on F (`PhBindings.BASH`). `tools/shot.sh --view=hunter --aim` and `--view=loadout` render both.
 
 ## Grenades
 
@@ -83,3 +83,12 @@ The cost goes through the same path as a decoy (`PhGame._charge`: DECOY to the h
 ## Sides, points and stats
 
 `DotTeamRotation` (dot-team) draws the hunters: RANDOM (never the same person twice running when there is anybody else), QUEUE (everybody an equal share over time) or SWAP (last round's props hunt). `!hunter` / `!prop` / `!any` are wishes the draw honours where it can. Points: winning side 10, a find 5, surviving 5, taunts, and a point a second for a prop that shows its face (Q, `reveal_points_per_second`, paid for at most `reveal_paid_seconds`, then a `reveal_cooldown`). `PhProgress` keeps fourteen stats and eight achievements through dot-stats and dot-achievements, keyed by the player's TMC profile, and reports them when `report_progress` is on.
+
+## Aim on the wire
+
+Aiming down the sights is part of the simulation, because the rules slow the walk (`move_speed_multiplier`, 0.8 by default) and close the spread (0.6): the server decides both, the client predicts the pace. So the aim button travels in the command, as one bit after the slot in `PhNetCommand` (`aim`). It is not a `DotFpsCommand` button: all eight are taken (jump, crouch, sprint, walk, noclip and the three user bits fire, alt and reload).
+
+The path: `PhClient._aim_sent` (the view model's own aim state, and only where the sights may come up) -> `PhNetBridge.client_tick(..., aim)` -> the packet -> `PhPlayerNet.last_aim` -> `PhPlayer.aiming` -> `PhGame.weapon_command_for` (`BUTTON_AIM`) -> `ZeeWeaponRig` (spread, `ads_move_scale`) -> `PhPlayer.step_controller` (the motor's top speed for that one tick). Offline the client writes `PhPlayer.aiming` itself. The rig refuses an aim bit it should not honour (switching, reloading, sprinting under `sv_sprint_noaim`, a weapon that cannot aim), so a client that lies gains nothing the rules would not give it.
+
+**Compatibility.** The command grows from 52 to 53 bits, still seven bytes, but `DotNetInput.write_batch` packs the inputs of a batch back to back, so a server and a client of different builds misread every input after the first. There is no protocol version to catch it. This is the same position as the DEATH `weapon_id` field: a client plays the pack its server hands it (a game's pack is pinned to concrete versions by `install-games`, "two players, two packs under one game" is refused), so the two are one build in normal operation. A client holding an older cached pack against a newer server, or a game shell that connects before it has fetched the server's pack, is the case this would break; the shell's handshake was not exercised here.
+

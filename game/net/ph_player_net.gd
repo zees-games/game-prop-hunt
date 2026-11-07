@@ -88,6 +88,9 @@ var last_move: DotFpsCommand = DotFpsCommand.new()
 ## edge-triggered against it.
 var last_slot: int = 0
 
+## The aim button of the last command a peer sent (the sights up). The server hands it to the body, which the rig and the motor read.
+var last_aim: bool = false
+
 var last_state_tick: int = -1
 
 
@@ -142,9 +145,11 @@ func _net_apply_input(input: DotNetInput, _tick: int) -> void:
 	if command != null:
 		last_move = command.move
 		last_slot = command.slot
+		last_aim = command.aim
 
 		if player != null:
 			player.wanted_slot = command.slot
+			player.aiming = command.aim
 
 
 ## On the authority the whole game ticks as one, so the first behaviour through drives the world and the rest find it done.
@@ -161,7 +166,7 @@ func _net_simulate(tick: int, delta: float) -> void:
 		# the disguise's, written into the tunables when the DISGUISE event arrived — and the
 		# same blindfold modifier, which travels in the movement state.
 		player.controller.apply_command(last_move.duplicate_command())
-		player.controller.simulate_tick(tick, delta)
+		player.step_controller(tick, delta)
 
 	pull()
 

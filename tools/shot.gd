@@ -18,6 +18,9 @@ var _out := "res://screenshots/shot.png"
 var _at := Vector3.INF
 var _look := Vector3.INF
 var _as := &"furniture_chair"
+
+## --gun=<id>: the hunter is handed this weapon and holds it (marksman, carbine, rifle ...).
+var _gun := &""
 ## `--view=dead`: who is killed in front of the camera, `hunter` (a person) or `prop` (in `--as`).
 var _victim := "hunter"
 ## `--fire=N`: the hunter holds the trigger for the last N frames before the picture, so a muzzle
@@ -65,6 +68,8 @@ func _ready() -> void:
 			_fire_frames = arg.trim_prefix("--fire=").to_int()
 		elif arg.begins_with("--victim="):
 			_victim = arg.trim_prefix("--victim=")
+		elif arg.begins_with("--gun="):
+			_gun = StringName(arg.trim_prefix("--gun="))
 		elif arg.begins_with("--as="):
 			_as = StringName(arg.trim_prefix("--as="))
 
@@ -488,6 +493,12 @@ func _view_hunter(game: PhGame, local: PhPlayer) -> void:
 				best = far
 				_look = middle
 	_face(local, _look)
+	if _gun != &"":
+		var def := PhGame.weapon_catalogue().get_def(_gun)
+		var _armed := game.arm(local, _gun)
+		if def != null:
+			local.wanted_slot = def.slot
+			_client.set("_slot", def.slot)
 	await _seconds_of(_seconds)
 	if _aim:
 		# The pointer is never captured under xvfb; the client aims only while it is.
@@ -498,6 +509,10 @@ func _view_hunter(game: PhGame, local: PhPlayer) -> void:
 		var camera: Camera3D = _client.get("camera")
 		print("aimed: crosshair %.2f scope %.2f fov %.1f" % [(hud.get("_crosshair") as Control).modulate.a,
 			float((hud.get("scope") as Control).get("fraction")), camera.fov])
+		# What the command says, and what the body and its rig made of it (the aim bit, the pace).
+		await _frames(30)
+		print("aim bit: sent %s, body %s, rig pace %.2f" % [_client.call("_aim_sent"), local.aiming,
+			local.weapons.ads_move_scale() if local.weapons != null else 1.0])
 	# Still held when the picture is taken: a flash lasts a few frames.
 	# Slowed, because a software renderer draws a few frames a second and a flash lasts a
 	# few hundredths of one: at full speed every flash was over before a frame was drawn.

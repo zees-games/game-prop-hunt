@@ -15,6 +15,7 @@
 #   tools/shot.sh --view=hunter --board                           # with the Tab scoreboard open
 #   tools/shot.sh --view=hunter --fire=12 --aim-prop              # trigger held (slowed) at the nearest furniture: flash, tracers, impacts, the counter, a decoy's cost
 #   tools/shot.sh --view=hunter --aim --name=hunter_aimed        # down the sights (compare --view=hunter)
+#   tools/shot.sh --view=hunter --gun=marksman --aim --name=aim_marksman   # a chosen weapon (--gun=<id>), and the aim bit the command sent
 #   tools/shot.sh --view=loadout                                  # B open in the hide: a hunter's loadout
 #   tools/shot.sh --view=maps --seconds=0.5                       # M: the solo map list with a Workshop fixture map (Name [Pack])
 #   tools/shot.sh --view=cover                                    # the loading cover, before it lifts
@@ -42,7 +43,7 @@ for arg in "$@"; do
         --seconds=*) seconds="${arg#*=}" ;;
         --out=*)     out="${arg#*=}" ;;
         --ph-*)      config+=("$arg") ;;
-        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop|--aim|--victim=*) extra+=("$arg") ;;
+        --at=*|--look=*|--as=*|--lean=*|--board|--name=*|--fire=*|--aim-prop|--aim|--victim=*|--gun=*) extra+=("$arg") ;;
         *)           echo "unknown argument: $arg" >&2; exit 2 ;;
     esac
 done

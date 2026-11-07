@@ -22,15 +22,21 @@ var move: DotFpsCommand = DotFpsCommand.new()
 ## Which weapon the player has asked for, or zero for "leave it alone".
 var slot: int = 0
 
+## The aim button, held: the sights are up. One bit after the slot, so the command is still 53 bits and seven bytes, but a batch is bit-packed:
+## a server of a build before this one reads the next input from the wrong bit, so client and server must be the same build (see docs/design.md "Aim on the wire").
+var aim: bool = false
+
 func _write(writer: DotNetWriter) -> void:
 	move.write(writer)
 	writer.write_uint(clampi(slot, 0, (1 << SLOT_BITS) - 1), SLOT_BITS)
+	writer.write_bool(aim)
 
 
 func _read(reader: DotNetReader) -> void:
 	move = DotFpsCommand.new()
 	move.read(reader)
 	slot = reader.read_uint(SLOT_BITS)
+	aim = reader.read_bool()
 
 
 ## Not optional. Quantisation bounds each field; it cannot bound the relationship between
@@ -43,4 +49,4 @@ func _sanitise() -> void:
 
 func _equals(other: DotNetInput) -> bool:
 	var them := other as PhNetCommand
-	return them != null and slot == them.slot and move.equals(them.move)
+	return them != null and slot == them.slot and aim == them.aim and move.equals(them.move)

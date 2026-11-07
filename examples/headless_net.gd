@@ -5,8 +5,8 @@ extends "headless_net_base.gd"
 ## It asserts the two claims the game rests on over a wire: a disguise is a HULL as well as a look (both ends must agree what somebody wears, or the client walks through a doorway the server's chair does not fit and is pulled back every tick),
 ## and the blindfold is true on the wire (a hunter's snapshots carry no prop while the props hide, `PhInterest`). Then everything else that crosses. Sections and checks are both counted (mg-smash-copter's notes say why).
 
-const SECTIONS := 18
-const CHECKS := 95
+const SECTIONS := 19
+const CHECKS := 103
 
 
 func _ready() -> void:
@@ -34,6 +34,7 @@ func _run() -> void:
 		await _test_a_joiner_is_told_what_everybody_wears()
 		await _test_a_decoy_is_charged()
 		await _test_the_drawn_gun_takes_the_server_count()
+		await _test_the_aim_bit_crosses()
 		await _test_a_hit_is_the_shooters()
 		await _test_a_grenade_reaches_the_client()
 		await _test_the_round_ends()
@@ -56,6 +57,36 @@ func _run() -> void:
 ## inverses for you: dot-moderation once wrote "voice muted" and read back a warning.
 func _test_the_codec() -> void:
 	_section("every event decodes to what was encoded")
+
+	# The command: the aim bit rides after the slot, alone and in a batch with commands that do not carry it.
+	var sent_commands: Array = []
+	for i in range(3):
+		var sent := PhNetCommand.new()
+		sent.tick = 40 + i
+		sent.delta = 1.0 / 64.0
+		sent.slot = 2 + i
+		sent.aim = i != 1
+		sent.move.yaw = 10.0 * float(i)
+		sent.move.move = Vector2(0.0, 1.0)
+		sent.move.set_button(PhNetCommand.BUTTON_FIRE, i == 2)
+		sent_commands.append(sent)
+	var writer := DotNetWriter.new()
+	DotNetInput.write_batch(writer, sent_commands)
+	var got := DotNetInput.read_batch(writer.to_reader(), func() -> DotNetInput: return PhNetCommand.new())
+	var round_trip := got.size() == 3
+	for i in range(mini(got.size(), 3)):
+		var back_cmd := got[i] as PhNetCommand
+		round_trip = round_trip and back_cmd != null and back_cmd.aim == (i != 1) and back_cmd.slot == 2 + i \
+			and back_cmd.move.is_pressed(PhNetCommand.BUTTON_FIRE) == (i == 2) and absf(back_cmd.move.yaw - 10.0 * float(i)) < 1.0
+	_check(round_trip, "a batch of commands keeps each one's aim bit, slot and buttons", "%d back" % got.size())
+	var plain := PhNetCommand.new()
+	var bits_plain := DotNetWriter.new()
+	plain._write(bits_plain)
+	plain.aim = true
+	var bits_aim := DotNetWriter.new()
+	plain._write(bits_aim)
+	_check(bits_plain.to_bytes().size() == bits_aim.to_bytes().size() and plain._equals(plain) and not plain._equals(PhNetCommand.new()),
+		"the bit costs no byte, and a command with it is not equal to one without", "%d bytes" % bits_aim.to_bytes().size())
 
 	var hello := PhEvents.read_hello(DotNetReader.new(PhEvents.write_hello(SESSION, 64, 1234, 30.0, 300.0, 2.0, 60.0)))
 	_check(bool(hello["ok"]) and int(hello["player_id"]) == SESSION
@@ -524,6 +555,54 @@ func _test_the_drawn_gun_takes_the_server_count() -> void:
 	camera.queue_free()
 	client.free()
 	await _steps(2)
+	_finished()
+
+
+## The claim: the aim bit a client sends is the server body's `aiming`, the rig's `BUTTON_AIM` and the pace of the motor on both ends.
+## Armed: with `ensure_game_ticked` not copying `last_aim` onto the body, the aimed checks fail.
+func _test_the_aim_bit_crosses() -> void:
+	_section("the aim bit crosses the wire, slows the hunter and the prediction agrees")
+	var server_me := _server_me()
+	var rig: ZeeWeaponRig = server_me.weapons
+	var armed := rig != null and rig.current_def() != null and _mine() != null
+	_check(armed, "the server's hunter holds a gun (from the section before)")
+	if not armed:
+		_finished()
+		return
+
+	var paced := _server_game.ads_rules.move_speed_for(rig.current_def().id)
+
+	# How far the body gets in a second of walking from the same spot: the best of four directions (the practice room has walls), hip then aimed.
+	var run := func(direction: Vector2, aim: bool) -> float:
+		var walk := DotFpsCommand.new()
+		walk.move = direction
+		server_me.place_at(LOOK_FROM, 0.0)
+		await _steps(INPUT_LEAD + 8)
+		var from := server_me.controller.state.position
+		await _steps(SERVER_TICK_RATE / 2, walk, aim)
+		return server_me.controller.state.position.distance_to(from)
+	var best := Vector2.ZERO
+	var hip_run := 0.0
+	for direction: Vector2 in [Vector2(0.0, 1.0), Vector2(1.0, 0.0), Vector2(-1.0, 0.0), Vector2(0.0, -1.0)]:
+		var reach: float = await run.call(direction, false)
+		if reach > hip_run:
+			hip_run = reach
+			best = direction
+	_check(not server_me.aiming and rig.ads_move_scale() == 1.0, "unaimed, the server's body is not aiming and not slowed")
+
+	var aimed_run: float = await run.call(best, true)
+	var forward := DotFpsCommand.new()
+	forward.move = best
+	_check(server_me.aiming and _mine().aiming and absf(rig.ads_move_scale() - paced) < 0.001,
+		"aimed, the server's body and the client's both are, and the rig is at the rules' pace",
+		"server %s client %s scale %.2f of %.2f" % [server_me.aiming, _mine().aiming, rig.ads_move_scale(), paced])
+	_check(hip_run > 0.5 and absf(aimed_run / hip_run - paced) < 0.1,
+		"and the server's body walks at that pace", "hip %.2f m aimed %.2f m, ratio %.2f of %.2f" % [hip_run, aimed_run, aimed_run / maxf(hip_run, 0.001), paced])
+	var apart := _mine().controller.state.position.distance_to(server_me.controller.state.position)
+	_check(apart < 0.3, "the prediction, slowed alike, agrees with the server", "%.3f m" % apart)
+
+	await _steps(INPUT_LEAD + 8, forward, false)
+	_check(not server_me.aiming and rig.ads_move_scale() == 1.0, "let go, the pace comes back")
 	_finished()
 
 

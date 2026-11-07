@@ -1270,7 +1270,7 @@ func _physics_process(delta: float) -> void:
 		if not net.clock.is_synced():
 			continue
 
-		bridge.client_tick(net.clock.input_tick() - (ticks - 1 - i), move, _slot)
+		bridge.client_tick(net.clock.input_tick() - (ticks - 1 - i), move, _slot, _aim_sent())
 
 	_drive_view_model(move)
 
@@ -1284,6 +1284,7 @@ func _drive_offline() -> void:
 	if pending != null:
 		_stamp(pending)
 		player.wanted_slot = _slot
+		player.aiming = _aim_sent()
 
 	_drive_view_model(pending)
 
@@ -1302,6 +1303,7 @@ func _drive_view_model(command: DotFpsCommand) -> void:
 		return
 
 	var weapon_command := DotWeaponCommand.new()
+	weapon_command.set_button(DotWeaponCommand.BUTTON_AIM, _aim_sent())
 
 	if command != null:
 		weapon_command.set_button(DotWeaponCommand.BUTTON_ATTACK, command.is_pressed(PhNetCommand.BUTTON_FIRE))
@@ -1442,13 +1444,24 @@ func _process(delta: float) -> void:
 ## and the HUD fades its dot and shows a scope. Nobody aims as a prop, dead, blindfolded, watching, in third person or with the pointer free.
 func _present_aim() -> void:
 	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
-	var blind := hud != null and hud.is_blindfolded()
 	if hands != null:
-		hands.aim(_aiming and _pointer_ours() and is_hunter() and not third_person and not is_spectating()
-			and player.is_alive() and not blind)
+		hands.aim_input(_aiming and _aim_allowed())
 	camera.fov = base_fov * (hands.aim_fov_scale() if hands != null and not is_spectating() else 1.0)
 	if hud != null:
 		hud.follow_hands(hands)
+
+
+## Whether the sights may come up: not as a prop, dead, blindfolded, watching, in third person or with the pointer free.
+func _aim_allowed() -> bool:
+	var blind := hud != null and hud.is_blindfolded()
+	return _pointer_ours() and is_hunter() and not third_person and not is_spectating() and player != null and player.is_alive() and not blind
+
+
+## What the command says about the sights: the view model's own state (a toggle in the rules reaches the server's spread and pace as it does the
+## picture), and nothing when the sights may not come up.
+func _aim_sent() -> bool:
+	var hands := view_model if view_model != null and is_instance_valid(view_model) else null
+	return _aim_allowed() and (hands.is_aim_held() if hands != null else _aiming)
 
 
 ## The last seconds of the hide, beeped.

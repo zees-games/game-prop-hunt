@@ -5,9 +5,9 @@ extends "headless_run_base.gd"
 ## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. dot-settings has the story.
 ## Every number about the map is the built-in practice house's ([method PhCatalogue.practice]), whose comment lists where everything is.
 
-const SECTIONS := 32
+const SECTIONS := 33
 
-const CHECKS := 205
+const CHECKS := 209
 
 
 func _ready() -> void:
@@ -34,6 +34,7 @@ func _run() -> void:
 	await _test_taunts()
 	await _test_the_flashlight()
 	await _test_shots()
+	await _test_the_aim_button()
 	await _test_toys()
 	await _test_decoys()
 	await _test_breaking()
@@ -548,6 +549,74 @@ func _test_shots() -> void:
 			hunter.weapons.arsenal.current_def().id if hunter.weapons.arsenal.current_def() != null else &"-",
 			hunter.weapons.arsenal.magazine_of(hunter.weapons.arsenal.current_def().id) if hunter.weapons.arsenal.has_method("magazine_of") else -1])
 	_check(hunter.points >= points + game.config.find_points, "and the hunter is paid for it")
+	_finished()
+
+
+## The aim button, as the game reads it: `PhPlayer.aiming` (the client sets it offline, the wire sets it online) reaches the rig as BUTTON_AIM,
+## slows the motor to the rules' pace and closes the spread. Armed: with `PhGame.weapon_command_for` not setting BUTTON_AIM, the first,
+## second and fourth checks fail; with `PhPlayer.step_controller` calling the motor unscaled, the first.
+func _test_the_aim_button() -> void:
+	_section("the aim button slows a hunter's pace and closes the spread")
+	var game := await _seek_round()
+	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
+	var rig := hunter.weapons
+	var rules := game.ads_rules
+	var held := rig.current_def()
+	var paced := rules.move_speed_for(held.id)
+
+	# The pace: the same walk with the sights down and up, the steady speed at the end of each.
+	var walk := func(aim: bool) -> float:
+		hunter.place_at(Vector3(-6.0, 0.05, -4.0), 0.0)
+		_aim(hunter, Vector3(-6.0, 0.05, 8.0))
+		var command := hunter.controller.current_command
+		command.move = Vector2(0.0, 1.0)
+		hunter.controller.apply_command(command)
+		hunter.aiming = aim
+		await _step(game, TICK_RATE)
+		var v := hunter.controller.state.velocity
+		return Vector2(v.x, v.z).length()
+	var hip: float = await walk.call(false)
+	var hip_scale := rig.ads_move_scale()
+	var aimed: float = await walk.call(true)
+	var aimed_scale := rig.ads_move_scale()
+	_check(hip > 1.0 and absf(aimed / hip - paced) < 0.06 and absf(aimed_scale - paced) < 0.001 and hip_scale == 1.0,
+		"aimed, the hunter walks at the rules' pace and not otherwise", "hip %.2f aimed %.2f, ratio %.2f of %.2f, rig %.2f" % [hip, aimed, aimed / maxf(hip, 0.001), paced, aimed_scale])
+
+	# The wire to the rig: the server builds the weapon command from the body's flag.
+	hunter.aiming = true
+	var up := game.weapon_command_for(hunter)
+	hunter.aiming = false
+	var down := game.weapon_command_for(hunter)
+	hunter.controller.apply_command(DotFpsCommand.new())
+	_check(up.is_pressed(DotWeaponCommand.BUTTON_AIM) and not down.is_pressed(DotWeaponCommand.BUTTON_AIM),
+		"the body's flag is the weapon command's aim button")
+
+	# The spread: first shots of a held trigger with the sights down, then up for longer than they take to rise.
+	var spreads := func(aim: bool) -> float:
+		var command := DotWeaponCommand.new()
+		command.set_button(DotWeaponCommand.BUTTON_AIM, aim)
+		var tick := 100000
+		for i in range(TICK_RATE * 2):
+			tick += 1
+			var _o := rig.simulate_tick(command, tick)
+		command.set_button(DotWeaponCommand.BUTTON_ATTACK, true)
+		var total := 0.0
+		var shots := 0
+		for i in range(TICK_RATE):
+			tick += 1
+			rig.arsenal.current().magazine = held.magazine
+			var outcome := rig.simulate_tick(command, tick)
+			for shot in outcome.shots:
+				total += shot.spread
+				shots += 1
+			command.set_button(DotWeaponCommand.BUTTON_ATTACK, i % 2 == 1)
+		return total / float(maxi(shots, 1))
+	var hip_spread: float = spreads.call(false)
+	var aimed_spread: float = spreads.call(true)
+	_check(hip_spread > 0.0 and aimed_spread < hip_spread * 0.9,
+		"and the sights close the spread", "hip %.3f, aimed %.3f degrees, rule %.2f" % [hip_spread, aimed_spread, rules.spread_for(held.id)])
+	_check(rig.ads_progress() > 0.99 and rig.ads_move_scale() == paced, "fully raised, the rig is at full progress and the rules' pace",
+		"%.2f, %.2f" % [rig.ads_progress(), rig.ads_move_scale()])
 	_finished()
 
 
