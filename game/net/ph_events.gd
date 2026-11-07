@@ -66,6 +66,8 @@ enum Ask {
 	TURN,
 	## Taunt: one by index, or any.
 	TAUNT,
+	## Switch my flashlight.
+	FLASHLIGHT,
 }
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.

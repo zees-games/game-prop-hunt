@@ -40,6 +40,7 @@ There are five maps: a small practice house built into the game, and **Maple Gro
 | **Mouse 2** / **F** | Aim down the sights / quick melee (hunters) |
 | **B** | Loadout: your primary, secondary and a grenade (slot 5, if you want one) as a hunter |
 | **V** | Talk (voice) |
+| **L** | Flashlight, either side (off on a lit map; on at start where the map is dark) |
 | **F5** | First or third person |
 | **G** | While out: a free camera (WASD, Space / Ctrl up and down, Shift fast, Alt slow, mouse to look), and back onto a player |
 | **Tab** | Scoreboard (hold) |

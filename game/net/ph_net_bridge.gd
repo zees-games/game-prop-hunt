@@ -880,6 +880,8 @@ func _on_request(message: DotNetMessage) -> void:
 			var turned := PhEvents.read_turn(ask.reader())
 			if bool(turned["ok"]):
 				var _did := game.turn(player_key(player_for_peer(peer_id)), int(turned["how"]))
+		PhEvents.Ask.FLASHLIGHT:
+			var _switched := game.toggle_flashlight(player_key(player_for_peer(peer_id)))
 		PhEvents.Ask.TAUNT:
 			var asked := PhEvents.read_ask_taunt(ask.reader())
 			if bool(asked["ok"]):
@@ -1047,6 +1049,11 @@ func ask_reveal() -> void:
 ## Lock, tilt or straighten my prop: [enum PhGame.Turn].
 func ask_turn(how: int) -> void:
 	_ask(PhEvents.Ask.TURN, PhEvents.write_turn(how))
+
+
+## Switch the flashlight. The server owns on/off and answers in the player's replicated state.
+func ask_flashlight() -> void:
+	_ask(PhEvents.Ask.FLASHLIGHT, PackedByteArray([0]))
 
 
 ## Taunt: [param taunt_id] from the list, or empty for any.
