@@ -302,6 +302,7 @@ func _build_netcode() -> DotResult:
 	bridge.round_changed.connect(_on_round)
 	bridge.death_received.connect(_on_death)
 	bridge.armed_received.connect(_on_armed)
+	bridge.weapon_net.lost_received.connect(_on_weapon_lost)
 	bridge.hit_received.connect(_on_hit)
 	bridge.map_received.connect(_on_map)
 	bridge.disguise_received.connect(_on_disguise)
@@ -441,6 +442,12 @@ func _hear_the_world() -> void:
 			chat.notice(why)
 			if audio != null:
 				var _denied := audio.deny())
+	game.weapon_layer.lost.connect(func(id: StringName, weapon: StringName) -> void:
+		if id == &"local":
+			_on_weapon_lost(_watch_id, weapon))
+	game.weapon_layer.picked.connect(func(id: StringName, weapon: StringName) -> void:
+		if id == &"local":
+			_on_armed(_watch_id, weapon))
 	game.player_armed.connect(func(id: StringName, weapon: StringName) -> void:
 		if id == &"local":
 			_on_armed(_watch_id, weapon)
@@ -635,6 +642,16 @@ func _on_armed(session_id: int, weapon_id: StringName) -> void:
 
 	_arm_locally(weapon_id)
 
+
+
+## A gun left the watched player's hands (thrown, or left where they fell): the drawn rig lets go of it too.
+func _on_weapon_lost(session_id: int, weapon_id: StringName) -> void:
+	if session_id != _watch_id or weapons == null:
+		return
+	var def := weapons.arsenal.catalogue.get_def(weapon_id)
+	if def != null:
+		var empty: Array[int] = []
+		var _gone := weapons.arsenal.drop_from_slot(def.slot, empty)
 
 
 func _arm_locally(weapon_id: StringName = &"") -> void:
@@ -1212,6 +1229,14 @@ func ask_disguise() -> void:
 		bridge.ask_disguise()
 	elif player != null:
 		game.queue_disguise(player.player_id)
+
+
+## Throw the gun in hand (the hunters' Q).
+func ask_drop_weapon() -> void:
+	if bridge != null:
+		bridge.ask_drop_weapon()
+	elif player != null:
+		var _id := game.weapon_layer.throw_for(player.player_id)
 
 
 func ask_reveal() -> void:
@@ -1826,6 +1851,10 @@ func _key_pressed(event: InputEvent) -> bool:
 		return true
 
 	if is_hunter():
+		if event.is_action_pressed(PhBindings.DROP_WEAPON):
+			ask_drop_weapon()
+			return true
+
 		if event.is_action_pressed(PhBindings.RELOAD):
 			_reloading = true
 			return true
