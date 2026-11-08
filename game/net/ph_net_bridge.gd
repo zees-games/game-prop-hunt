@@ -6,6 +6,7 @@ const PhNetCommand := preload("ph_net_command.gd")
 const PhNetLink := preload("ph_net_link.gd")
 const PhPlayerNet := preload("ph_player_net.gd")
 const PhToyNet := preload("ph_toy_net.gd")
+const PhWeaponNet := preload("ph_weapon_net.gd")
 const PhInterest := preload("ph_interest.gd")
 const PhRequest := preload("ph_request.gd")
 
@@ -129,6 +130,9 @@ var _in_server_tick := false
 var _unregistered_in_tick: Array[int] = []
 var _client_ticked_for: int = -1
 
+## The guns on the floor, over the link; a client connects to its `lost_received`.
+var weapon_net := PhWeaponNet.new()
+
 ## The map the clients were last sent, so a late joiner is sent the same bytes.
 var _map_body: PackedByteArray = PackedByteArray()
 
@@ -157,6 +161,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 	game = world
 	net = p_net
+	weapon_net.attach(self)
 
 	_entities = Node.new()
 	_entities.name = "Entities"
@@ -254,6 +259,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 			game.spectate.view_changed.connect(_on_spectate_changed)
 
 		_wire_lag_compensation()
+		weapon_net.watch(game.weapon_layer)
 
 	return DotResult.success(true)
 
@@ -839,6 +845,8 @@ func _on_request(message: DotNetMessage) -> void:
 				var _did := game.turn(player_key(player_for_peer(peer_id)), int(turned["how"]))
 		PhEvents.Ask.FLASHLIGHT:
 			var _switched := game.toggle_flashlight(player_key(player_for_peer(peer_id)))
+		PhEvents.Ask.DROP_WEAPON:
+			var _thrown := game.weapon_layer.throw_for(player_key(player_for_peer(peer_id)))
 		PhEvents.Ask.TAUNT:
 			var asked := PhEvents.read_ask_taunt(ask.reader())
 			if bool(asked["ok"]):
@@ -898,6 +906,7 @@ func _admit(peer_id: int) -> void:
 		# The map's toys by net id in toy order, which the joiner's own copies are paired with.
 		if not _toys_body.is_empty():
 			_tell(peer_id, PhEvents.Kind.TOYS, _toys_body)
+		weapon_net.send_snapshot(peer_id, game.weapon_layer)
 		if game.map != null:
 			for index in game.map.broken_indices():
 				_tell(peer_id, PhEvents.Kind.BROKEN, PhEvents.write_broken(index, Vector3.ZERO, true))
@@ -1013,6 +1022,11 @@ func ask_flashlight() -> void:
 	_ask(PhEvents.Ask.FLASHLIGHT, PackedByteArray([0]))
 
 
+## Throw the gun in hand. The server decides whether it may.
+func ask_drop_weapon() -> void:
+	_ask(PhEvents.Ask.DROP_WEAPON, PackedByteArray([0]))
+
+
 ## Taunt: [param taunt_id] from the list, or empty for any.
 func ask_taunt(taunt_id: StringName = &"") -> void:
 	_ask(PhEvents.Ask.TAUNT, PhEvents.write_ask_taunt(taunt_id))
@@ -1038,6 +1052,9 @@ func _on_event(message: DotNetMessage) -> void:
 		return
 
 	var reader := event.reader()
+
+	if weapon_net.apply(event.kind, reader, game.weapon_layer):
+		return
 
 	match event.kind:
 		PhEvents.Kind.HELLO:
