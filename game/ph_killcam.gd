@@ -6,6 +6,8 @@ const PhWeaponIcons := preload("ph_weapon_icons.gd")
 ## The killcam at a round's end, client side: frames go into dot-replay's [DotKillcamBuffer], decisive moments are noted,
 ## and [DotKillcam] replays the last from the eyes of the player it happened to. Length is `mp_killcam_time`; 0 skips to [signal over].
 
+const KillPov := preload("ph_kill_pov.gd")
+
 const CHANNEL := "prophunt.killcam"
 
 ## Skip keys: jump, the use key and Escape.
@@ -34,6 +36,10 @@ var now_fn: Callable = func() -> float: return Time.get_ticks_usec() / 1000000.0
 
 ## Nodes hidden while the replay runs (the HUD): anything with `visible`.
 var hide_while_playing: Array = []
+
+## (view: Dictionary) -> void, each frame of the replay with {camera, aux, fov, behind} and once with {} at its end:
+## redraws the killer's screen.
+var present_fn: Callable = Callable()
 
 var buffer := DotKillcamBuffer.new()
 var killcam: DotKillcam = null
@@ -145,7 +151,9 @@ func _state_of(p: Node) -> Array:
 	var st: DotFpsState = controller.get(&"state")
 	var speed := Vector2(st.velocity.x, st.velocity.z).length()
 	var eye: float = (p.call(&"eye_position") as Vector3).y - st.position.y
-	return [feet_fn.call(p), st.yaw, st.pitch, bool(p.call(&"is_alive")), speed, eye, bool(p.call(&"is_disguised"))]
+	var row: Array = [feet_fn.call(p), st.yaw, st.pitch, bool(p.call(&"is_alive")), speed, eye, bool(p.call(&"is_disguised"))]
+	row.append_array(KillPov.aux_of(p))
+	return row
 
 
 func _on_started(_kill: Dictionary) -> void:
@@ -174,6 +182,7 @@ func _apply(s: Dictionary) -> void:
 	var eye := Transform3D.IDENTITY
 	var target: Variant = null
 	var seen := false
+	var aux := PackedFloat32Array()
 	if not camera.current:
 		camera.make_current()
 	for id: Variant in b:
@@ -189,6 +198,7 @@ func _apply(s: Dictionary) -> void:
 		if String(id) == subject:
 			eye = Transform3D(Basis.from_euler(Vector3(deg_to_rad(pitch), deg_to_rad(yaw), 0.0)), feet + Vector3(0.0, float(rb[5]), 0.0))
 			seen = true
+			aux = PackedFloat32Array(rb.slice(7))
 			# Behind the subject its own body is in shot, so it is drawn.
 			_place_body(p, feet, yaw, behind and alive, pitch if behind else 0.0, lerpf(ra[4], rb[4], alpha) if behind else 0.0, behind and bool(rb[6]))
 		else:
@@ -202,6 +212,8 @@ func _apply(s: Dictionary) -> void:
 		var v := _framing.place(int(camera_mode_fn.call()), eye, _base_fov, target, get_process_delta_time())
 		camera.global_transform = v["transform"]
 		camera.fov = v["fov"]
+		if present_fn.is_valid():
+			present_fn.call({"camera": camera, "aux": aux, "fov": camera.fov, "behind": behind})
 
 
 func _place_body(p: Node, feet: Vector3, yaw: float, shown: bool, pitch: float, speed: float, as_prop: bool) -> void:
@@ -232,6 +244,8 @@ func _place_body(p: Node, feet: Vector3, yaw: float, shown: bool, pitch: float, 
 
 
 func _on_finished(skipped: bool) -> void:
+	if present_fn.is_valid():
+		present_fn.call({})
 	for p: Variant in _touched:
 		if is_instance_valid(p):
 			var figure: Node3D = (p as Node).get(&"figure")
