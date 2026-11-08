@@ -352,6 +352,7 @@ func _follow_server_cvars() -> void:
 	var _ads := game.ads_rules.follow_cvars(link)
 	if link.has_method(&"replicated_cvar"):
 		_on_killcam_cvar("mp_killcam_time", String(link.call(&"replicated_cvar", "mp_killcam_time", "")))
+		_on_killcam_cvar("mp_killview_camera", String(link.call(&"replicated_cvar", "mp_killview_camera", "")))
 		if link.has_signal(&"replicated_cvar_changed"):
 			link.connect(&"replicated_cvar_changed", _on_killcam_cvar)
 
@@ -933,6 +934,8 @@ func _build_killcam() -> void:
 	killcam.feet_fn = func(p: PhPlayer) -> Vector3: return drawn_position(p, net != null and net.is_running() and p != player)
 	killcam.colour_fn = func(p: PhPlayer) -> Color: return game.side_colour(game.team_of(p.player_id))
 	killcam.seconds_fn = func() -> float: return _killcam_sec if _killcam_sec >= 0.0 else game.config.killcam_seconds
+	killcam.camera_mode_fn = func() -> int: return _killcam_camera
+	killcam.world_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") if game.physics != null else 1
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_round())
 	add_child(killcam)
 	winner_reveal = DotWinnerReveal.new()
