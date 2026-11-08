@@ -31,6 +31,8 @@ const FORCED_TAUNTS := &"ph.forced_taunts"
 const DECOYS_SHOT := &"ph.decoys_shot"
 const DECOY_DEATHS := &"ph.decoy_deaths"
 const DEATHS := &"ph.deaths"
+## The published skill figure the site orders by (dot-stats' DotStatsRank).
+const RANK_SCORE := &"rank_score"
 
 signal earned(player_id: StringName, title: String, points: int)
 
@@ -39,6 +41,9 @@ const REPORT_INTERVAL := 60.0
 var _report_timer: Timer
 
 var stats: DotStatsTracker = null
+
+## The skill rank: weighted lifetime figures, filed when a round ends.
+var rank: DotStatsRank = null
 
 ## Kills and hits by body zone, through dot-stats' event feed.
 var feed: DotStatsEventFeed = null
@@ -69,7 +74,7 @@ static func ids() -> Array[StringName]:
 	return [
 		ROUNDS_PLAYED, ROUNDS_WON, PROP_ROUNDS, HUNTER_ROUNDS, SURVIVED, PROPS_FOUND,
 		BEST_ROUND_FOUND, TIMES_FOUND, DISGUISES, TAUNTS, FORCED_TAUNTS, DECOYS_SHOT,
-		DECOY_DEATHS, DEATHS,
+		DECOY_DEATHS, DEATHS, RANK_SCORE,
 	]
 
 
@@ -92,6 +97,7 @@ static func schema() -> DotStatsSchema:
 	_add(out, DECOY_DEATHS, DotStatsDef.Kind.COUNTER, "Beaten by the furniture", "deaths", true)
 	_add(out, DEATHS, DotStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
 	DotStatsHitzones.declare(out)
+	DotStatsRank.declare(out, RANK_SCORE, "Rank score")
 	return out
 
 
@@ -239,6 +245,18 @@ func setup(directory: String, report: bool) -> DotResult:
 	link.stats = stats
 	add_child(link)
 
+	rank = DotStatsRank.new()
+	rank.stat_id = RANK_SCORE
+	rank.terms = [
+		{"stat": String(PROPS_FOUND), "weight": 1.0},
+		{"stat": String(SURVIVED), "weight": 1.5},
+		{"stat": String(ROUNDS_WON), "weight": 2.0},
+		{"stat": String(DECOY_DEATHS), "weight": -0.25},
+		{"stat": String(DEATHS), "weight": -0.05},
+	]
+	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(StringName(str(who)), stat, value)
+	rank.key_fn = func(who: Variant) -> StringName: return _key(StringName(str(who)))
+
 	return link.start().wrap("prophunt's stats-to-achievements link")
 
 
@@ -257,6 +275,7 @@ func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void
 	var key := _key(player_id)
 
 	if not stats.has_player(key):
+		_load_baseline(player_id)
 		stats.begin(key, body.display_name)
 		_begin(key)
 
@@ -282,6 +301,19 @@ func report_hit(attacker: StringName, victim: StringName, damage: DotDamage) -> 
 func report_kill(killer: StringName, victim: StringName) -> void:
 	if feed != null:
 		var _ok := feed.report_kill(killer, victim)
+
+
+## Reads the player's stored lifetime totals before this session's figures are flushed into the store (reading later would count them twice). The file store answers without suspending.
+func _load_baseline(player_id: StringName) -> void:
+	if rank != null and stats.store != null:
+		rank.load_baseline(stats.store, player_id)
+
+
+## Files the player's rank_score on their lifetime baseline plus this session.
+func _publish_rank(player_id: StringName) -> void:
+	if rank == null or rank.mode != DotStatsRank.MODE_WEIGHTED or stats == null or not stats.has_player(_key(player_id)):
+		return
+	var _s := rank.publish_lifetime(player_id, session_values(player_id), stats.schema)
 
 
 ## The key a player's numbers are filed under. Asked of [member durable_key_fn] once, then
@@ -339,6 +371,8 @@ func leave(player_id: StringName) -> void:
 		return
 
 	var _values := stats.end(key)
+	if rank != null:
+		rank.forget(player_id)
 	link.forget(String(key))
 	_end(key)
 
@@ -377,6 +411,8 @@ func on_round_over(winner: int) -> void:
 
 		if found > 0:
 			record(id, BEST_ROUND_FOUND, float(found))
+
+		_publish_rank(id)
 
 	_in_round.clear()
 	_round_found.clear()

@@ -11,7 +11,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## The only suite where [PhModule] loads, [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by the stand-ins the module seats itself (`headless_run` and `headless_net` cannot reach these).
 
 const SECTIONS := 14
-const CHECKS := 116
+const CHECKS := 118
 
 const SERVER_DIR := "user://ph_dedicated"
 var PORT := PHTestPorts.free_port(2)
@@ -227,6 +227,12 @@ func _test_stats_report() -> void:
 		progress.stats.session_values(&"ph-test").get_cell(DotStatsHitzones.HITS, "zone:neck") >= 1.0,
 		"a hit with a hit_group is filed by body zone through the dot-stats hitzone hook"
 	)
+	_check(progress.stats.schema.has(&"rank_score") and progress.rank != null, "rank_score is declared and the rank is set up")
+	var _held := DotStatsValues.new()
+	_held.values = {"ph.rounds_won": 10.0}
+	progress.rank.seed_baseline(&"ph-rank", _held)
+	var _life: float = progress.rank.publish_lifetime(&"ph-rank", DotStatsValues.new(), progress.stats.schema)
+	_check(_life == 20.0, "a stored lifetime baseline (10 wins) is what the published rank is built on")
 
 
 ## Config cvars, the workbench, and dot-team's block rules through dot-game's DotGameNoblock.
