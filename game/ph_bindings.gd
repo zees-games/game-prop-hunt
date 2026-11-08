@@ -25,6 +25,7 @@ const VIEW := &"ph_view"
 const ROAM := &"ph_roam"
 ## The flashlight, on and off, for both sides (L: F is the hunter's quick melee).
 const FLASHLIGHT := &"ph_flashlight"
+const DROP_WEAPON := &"ph_drop_weapon"
 const SCOREBOARD := &"ph_scoreboard"
 ## dot-ui's chat window's actions, which dot-game's chat client leaves at their defaults.
 const CHAT := &"chat_open"
@@ -49,6 +50,7 @@ static func make() -> DotMenuBindings:
 	keys.add(STRAIGHTEN, &"bind_straighten", "Stand upright", "Z", "Props")
 	keys.add(RELOAD, &"bind_reload", "Reload", "R", "Hunters")
 	keys.add(AIM, &"bind_aim", "Aim down the sights (hold)", "Mouse 2", "Hunters")
+	keys.add(DROP_WEAPON, &"bind_drop_weapon", "Throw the gun in hand", "Q", "Hunters")
 	keys.add(BASH, &"bind_bash", "Quick melee", "F", "Hunters")
 	for i in range(SLOTS.size()):
 		keys.add(SLOTS[i], StringName("bind_slot_%d" % (i + 1)), "Weapon slot %d" % (i + 1), str(i + 1), "Hunters")

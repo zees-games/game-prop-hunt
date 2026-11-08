@@ -49,6 +49,14 @@ enum Kind {
 	## A hunter threw a grenade: the server's number for it, the weapon, where from, how fast,
 	## its fuse. A client flies its own copy (`PhProjectiles`), which decides nothing.
 	LAUNCH,
+	## A gun hit the floor: its id, weapon, ammunition, pose, velocity, life left and whether it already rests.
+	WEAPON_DROP,
+	## A dropped gun came to rest where it lies.
+	WEAPON_SETTLED,
+	## A dropped gun is gone: taken, timed out or cleared.
+	WEAPON_GONE,
+	## A hunter's gun left their hands (thrown or dropped dead): who and which. Encoded as ARMED is.
+	WEAPON_LOST,
 }
 
 enum Ask {
@@ -68,6 +76,8 @@ enum Ask {
 	TAUNT,
 	## Switch my flashlight.
 	FLASHLIGHT,
+	## Throw the gun in my hand.
+	DROP_WEAPON,
 }
 
 ## Every decoder returns an `ok` beside its fields, and every caller checks it.
