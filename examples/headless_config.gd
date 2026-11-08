@@ -10,7 +10,7 @@ const PhKillcam := preload("../game/ph_killcam.gd")
 const _SUBJECT := preload("res://examples/killcam_subject.gd")
 const ROOT := "user://ph_cfgtest"
 const GAME := "mg-prop-hunt"
-const CHECKS := 47
+const CHECKS := 48
 const SECTIONS := 7
 
 var _entered := 0
@@ -260,6 +260,8 @@ func _killcam_icon() -> void:
 	_check(seen == ["pistol"] and kc.killcam.banner.icon_rect.visible and kc.killcam.banner.icon_rect.texture != null, "round_ended hands the moment's weapon id to the banner, which shows its picture", str(seen))
 	subject.free()
 	_check(kc.camera_mode_fn.call() == DotKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
+	var pov := preload("../game/ph_kill_pov.gd")
+	_check(pov.weapon_name(pov.hash_of(&"pistol")) != "" and pov.weapon_name(0.0) == "" and pov.aux_of(null) == [0.0], "the killer's screen names a recorded weapon and nothing for an empty hand")
 	var framing := DotKillcamFraming.new(null, 1)
 	var eye := Transform3D(Basis.IDENTITY, Vector3(0, 1.6, 0))
 	var placed: Dictionary = framing.place(DotKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
