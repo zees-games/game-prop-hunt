@@ -1,10 +1,10 @@
 extends DotNetBehaviour
 
-## One of the map's toys on the wire (dot-props' [DotPropToy]): where its moving part is and how it is turned, whether it is on, and how often it has been used.
-## The server's physics, never predicted: Godot's rigid-body solver differs between machines, so the client's toy is frozen and posed from these ([method DotPropToy.show_state]).
+## One of the map's toys on the wire (dot-props' [DotPropBody]): where its moving part is and how it is turned, whether it is on, and how often it has been used.
+## The server's physics, never predicted: Godot's rigid-body solver differs between machines, so the client's toy is frozen and posed from these ([method DotPropBody.show_state]).
 ## Paired by index, so the TOYS event carries only net ids in toy order. A use count rather than an event (eight bits, wraps): a client plays the sound when it moves, so a joiner or lost packet costs only a late sound.
 
-var toy: DotPropToy = null
+var toy: DotPropBody = null
 
 var net_position: Vector3 = Vector3.ZERO
 var net_rotation: Quaternion = Quaternion.IDENTITY

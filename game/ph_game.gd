@@ -152,7 +152,7 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
-var toy_rules: DotPropToyRules = DotPropToyRules.new()
+var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
 
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every weapon
 ## rig. Bound by the module and followed by a client, so its prediction agrees. Nothing sets the aim bit yet.

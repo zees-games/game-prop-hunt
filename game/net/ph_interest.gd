@@ -30,7 +30,7 @@ func _is_relevant(observer: DotNetIdentity, entity: DotNetIdentity, _context: Di
 
 	# A toy: not to a hunter while the props hide, or a ball rolling away from where a prop just
 	# walked would be that prop on the wire. Sent as it stands when the seek starts.
-	if entity.get_parent() is DotPropToy:
+	if entity.get_parent() is DotPropBody:
 		return game.team_of(watcher.player_id) != PhGame.HUNTERS
 
 	var seen := entity.get_parent() as PhPlayer
