@@ -14,6 +14,7 @@ const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
 const PhProjectiles := preload("ph_projectiles.gd")
+const PhWeaponLayer := preload("ph_weapon_layer.gd")
 const PhGameReport := preload("ph_game_report.gd")
 const PhFlashlight := preload("ph_flashlight.gd")
 
@@ -122,6 +123,10 @@ var harm_gate: Callable = Callable()
 ## The hunters' grenades in flight (`ph_projectiles.gd`): flown on the server and solo, and as
 ## copies on a client from the LAUNCH events (`PhNetBridge`), which decide nothing.
 var projectiles: PhProjectiles = null
+
+## Guns lying about (`ph_weapon_layer.gd`), built on both ends, and the `sv_weapon_drop*` rules it runs under: bound by the module, REPLICATED.
+var weapon_layer: PhWeaponLayer = null
+var drop_rules: DotWeaponDropRules = _walk_over_drops()
 var match_node: DotMatch = null
 var random: DotRandomManager = null
 var physics: DotPhysicsLayout = null
@@ -265,6 +270,8 @@ func _ready() -> void:
 	_build_props()
 	_build_map()
 	_build_combat()
+	weapon_layer = PhWeaponLayer.new()
+	weapon_layer.setup(self)
 	_build_loadouts()
 	_build_effects()
 	_build_match()
@@ -1767,6 +1774,8 @@ func _advance_weapons() -> void:
 	if combat == null or phase != Phase.SEEK:
 		return
 
+	weapon_layer.tick()
+
 	for id: StringName in players:
 		var player: PhPlayer = players[id]
 
@@ -2155,6 +2164,13 @@ func _clear_between(from: Vector3, to: Vector3, furniture: bool = false) -> bool
 	return PhGameReport.clear_between(get_world_3d(), physics, from, to, furniture)
 
 
+## Hunters take a gun by walking over it: there is no use key to press, and a hunter has to keep their eyes up.
+static func _walk_over_drops() -> DotWeaponDropRules:
+	var rules := DotWeaponDropRules.new()
+	rules.auto_pickup = true
+	return rules
+
+
 func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	var by := entities.key_for_id(damage.attacker)
 	var why: StringName = damage.context.get("why", DIED_SHOT)
@@ -2178,6 +2194,9 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 
 	if match_node != null and DotEntity.is_kind(player.entity_id, DotEntity.KIND_PLAYER):
 		match_node.report_kill(String(by), String(player.player_id), why, _tick)
+
+	if authoritative and weapon_layer != null:
+		weapon_layer.drop_dead(player.player_id)
 
 	# How the body falls, picked once, here, and carried on DEATH to every client.
 	player.death = decide_death(player, damage)
