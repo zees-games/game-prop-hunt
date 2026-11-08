@@ -1,6 +1,7 @@
 extends "ph_client_round.gd"
 
 const PhAudio := preload("ph_audio.gd")
+const KillPovView := preload("ph_kill_pov_view.gd")
 const PhBreakFx := preload("ph_break_fx.gd")
 const PhBindings := preload("ph_bindings.gd")
 const PhServices := preload("ph_services.gd")
@@ -938,6 +939,7 @@ func _build_killcam() -> void:
 	killcam.world_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop") if game.physics != null else 1
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_round())
 	add_child(killcam)
+	var _mounted := KillPovView.mount(self, killcam)
 	winner_reveal = DotWinnerReveal.new()
 	winner_reveal.name = "WinnerReveal"
 	winner_reveal.skip_actions = PhKillcam.SKIP_ACTIONS

@@ -544,6 +544,15 @@ func note_dealt(weapon_id: StringName, round_number: int) -> void:
 		dealt.append(weapon_id)
 
 
+## The id of the weapon in this player's hand now (the killer's screen in a killcam records it), or &"".
+func held_id() -> StringName:
+	var rig := _rig()
+	if rig != null and rig.arsenal != null:
+		var def := rig.arsenal.current_def()
+		return def.id if def != null else &""
+	return held_by_slot(dealt, mirror_slot) if mirrored else &""
+
+
 func _present_held() -> void:
 	var rig := _rig()
 	var id := &""
