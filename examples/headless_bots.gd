@@ -31,7 +31,9 @@ const WATCHERS := 64
 const NEXT_TO_MIN := 0.9
 const AMONG_MIN := 0.7
 const TUCKED_MIN := 0.26
-const SEEN_MAX := 0.2
+## Props end seen by at most this share of what a floor point picked blind is seen by (measured 9% against 47%, 0.19).
+const SEEN_OF_OPEN_MAX := 0.4
+const OPEN_SPOTS := 48
 const COVER_MIN := 0.91
 ## A map's own minimum where its best places lie too far apart for the hunters to sweep: ph_cyber_dinner
 ## (1092 props, 260 places) passed 80% of 24 rounds; every miss was reachable, the same far corners just went unvisited.
@@ -231,6 +233,7 @@ func _run() -> void:
 	var tucked := 0.0
 	var tucked_floor := 0.0
 	var seen := 0.0
+	var open := 0.0
 	var cover := 0.0
 	var cover_rounds := 0
 	for result in results:
@@ -241,19 +244,20 @@ func _run() -> void:
 		tucked += float(placed["tucked"])
 		tucked_floor += float(placed["n"]) * float(TUCKED_MIN_OF.get(result["map"], TUCKED_MIN))
 		seen += float(placed["seen"])
+		open += float(placed["open"])
 		if int(result["cover_of"]) > 0:
 			cover += float(result["cover"]) / float(result["cover_of"])
 			cover_rounds += 1
 	var sn := maxf(float(samples), 1.0)
-	print("  nav %s: %d prop samples; next to a same-size piece %.0f%%, among two or more %.0f%%, tucked in %.2f, seen by %.0f%% of watchers; hunters passed %.0f%% of the %d best places in %.0f s" % [
-		"on" if nav_on else "OFF", samples, 100.0 * next_to / sn, 100.0 * among / sn, tucked / sn, 100.0 * seen / sn,
+	print("  nav %s: %d prop samples; next to a same-size piece %.0f%%, among two or more %.0f%%, tucked in %.2f, seen by %.0f%% of watchers (a random floor point %.0f%%); hunters passed %.0f%% of the %d best places in %.0f s" % [
+		"on" if nav_on else "OFF", samples, 100.0 * next_to / sn, 100.0 * among / sn, tucked / sn, 100.0 * seen / sn, 100.0 * open / sn,
 		100.0 * cover / maxf(float(cover_rounds), 1.0), COVER_TOP, COVER_WITHIN])
 	if difficulty == "medium":
 		# Armed: `-- --nav 0` fails the tucked-in and coverage bands.
 		_check(samples > 0 and float(next_to) / sn >= NEXT_TO_MIN, "props end next to a piece of furniture of their size", "%.0f%% of %d" % [100.0 * next_to / sn, samples])
 		_check(float(among) / sn >= AMONG_MIN, "props end among two or more of their size", "%.0f%%" % (100.0 * among / sn))
 		_check(tucked >= tucked_floor, "props end tucked in (a wall or furniture within 2 m on this share of sides)", "%.2f" % (tucked / sn))
-		_check(seen / sn <= SEEN_MAX, "props end out of most watchers' sight", "%.0f%% seen" % (100.0 * seen / sn))
+		_check(seen <= open * SEEN_OF_OPEN_MAX, "props end less in sight than a floor point picked at random", "%.0f%% seen against %.0f%%" % [100.0 * seen / sn, 100.0 * open / sn])
 		_check(cover_rounds > 0 and cover / float(cover_rounds) >= _cover_min(results), "the hunters pass the best places within %.0f s" % COVER_WITHIN, "%.0f%%" % (100.0 * cover / maxf(float(cover_rounds), 1.0)))
 	_completed += 1
 
@@ -349,7 +353,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	var disguised_at := {}
 	var first_hurt := -1.0
 	var still_ticks := 0
-	var placed := {"n": 0, "next": 0, "among": 0, "tucked": 0.0, "seen": 0.0}
+	var placed := {"n": 0, "next": 0, "among": 0, "tucked": 0.0, "seen": 0.0, "open": 0.0}
 	var late_done := false
 	var visited := {}
 	var closest := {}
@@ -518,16 +522,42 @@ func _sample_placed(game: PhGame, hidden: Array, into: Dictionary) -> void:
 			if not game._clear_between(head, head + Vector3(cos(a), 0.0, sin(a)) * 2.0, true):
 				blocked += 1
 		into["tucked"] = float(into["tucked"]) + float(blocked) / 16.0
-		var seen := 0
-		var near := 0
-		var target := at + Vector3(0.0, 0.5, 0.0)
-		for eye in watchers:
-			if eye.distance_to(target) > 30.0:
-				continue
-			near += 1
-			if game._clear_between(eye, target, true):
-				seen += 1
-		into["seen"] = float(into["seen"]) + (float(seen) / float(near) if near > 0 else 0.5)
+		into["seen"] = float(into["seen"]) + _seen_share(game, watchers, at)
+		into["open"] = float(into["open"]) + _open_share(game, watchers)
+
+
+## The share of [param watchers] within 30 m with a sight line to a prop standing at [param at].
+func _seen_share(game: PhGame, watchers: PackedVector3Array, at: Vector3) -> float:
+	var seen := 0
+	var near := 0
+	var target := at + Vector3(0.0, 0.5, 0.0)
+	for eye in watchers:
+		if eye.distance_to(target) > 30.0:
+			continue
+		near += 1
+		if game._clear_between(eye, target, true):
+			seen += 1
+	return float(seen) / float(near) if near > 0 else 0.5
+
+
+var _open_cache := {}
+
+
+## What the same watchers see of a floor point picked blind: the mean over up to OPEN_SPOTS of them.
+## The map's own openness, so the seen band is a share of it and not an absolute one that moves
+## with every map's sight lines (stalls and wings round props halved it).
+func _open_share(game: PhGame, watchers: PackedVector3Array) -> float:
+	var key := str(game.map.get_instance_id())
+	if not _open_cache.has(key):
+		_open_cache.clear()
+		var sum := 0.0
+		var count := 0
+		var step := maxi(1, watchers.size() / OPEN_SPOTS)
+		for i in range(0, watchers.size(), step):
+			sum += _seen_share(game, watchers, watchers[i] - Vector3(0.0, 1.6, 0.0))
+			count += 1
+		_open_cache[key] = sum / float(count) if count > 0 else 0.5
+	return _open_cache[key]
 
 
 var _watch_cache := {}
