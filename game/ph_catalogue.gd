@@ -337,10 +337,7 @@ func describe_lines() -> PackedStringArray:
 	return lines
 
 
-## A two-room house with a garden: enough furniture to hide among and a door between the rooms.
-## Written here so a server with no map directory (a fresh clone, a suite) has something to play. Suites lean on: floor x -10..10, z -8..8 at y 0;
-## wall at x 0 with a 1.8 m door at z -1..0.8; hunters start east, props west; garden x 10..22.
-static func practice() -> Dictionary:
+static func _practice_boxes() -> Array:
 	var boxes: Array = []
 	var height := 3.2
 
@@ -365,8 +362,11 @@ static func practice() -> Dictionary:
 	boxes.append({"at": [22.1, 1.0, 0.0], "size": [0.2, 2.0, 16.4], "mat": "wood"})
 	boxes.append({"at": [16.0, 1.0, -8.1], "size": [12.0, 2.0, 0.2], "mat": "wood"})
 	boxes.append({"at": [16.0, 1.0, 8.1], "size": [12.0, 2.0, 0.2], "mat": "wood"})
+	return boxes
 
-	var props: Array = [
+
+static func _practice_props() -> Array:
+	return [
 		# West room: a living room.
 		{"id": "furniture_lounge_sofa", "at": [-7.0, 0.0, -6.8], "yaw": 0.0},
 		{"id": "furniture_table_coffee", "at": [-7.0, 0.0, -4.6]},
@@ -401,6 +401,14 @@ static func practice() -> Dictionary:
 		{"id": "nature_crop_pumpkin", "at": [20.8, 0.0, 6.8]},
 		{"id": "nature_flower_red_a", "at": [12.0, 0.0, -7.0]},
 	]
+
+
+## A two-room house with a garden: enough furniture to hide among and a door between the rooms.
+## Written here so a server with no map directory (a fresh clone, a suite) has something to play. Suites lean on: floor x -10..10, z -8..8 at y 0;
+## wall at x 0 with a 1.8 m door at z -1..0.8; hunters start east, props west; garden x 10..22.
+static func practice() -> Dictionary:
+	var boxes := _practice_boxes()
+	var props := _practice_props()
 
 	var source := {
 		"format": PhMapDoc.FORMAT,
