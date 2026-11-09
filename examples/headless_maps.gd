@@ -142,6 +142,13 @@ func _test_map(id: StringName) -> void:
 
 	_check(buried.is_empty(), "no prop is sunk into a wall or a floor", "; ".join(buried.slice(0, 6)))
 	_check(floating.is_empty(), "every prop stands on something", "%d: %s" % [floating.size(), "; ".join(floating.slice(0, 6))])
+	await _check_toys(game, doc)
+	await _dispose(game)
+	_finished()
+
+
+## The map's toys: all built, none inside a wall, a car or a shelf, and none moved off its place after two seconds of physics.
+func _check_toys(game: PhGame, doc: Dictionary) -> void:
 	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
 	# seconds of physics later every one still where the map put it, not through a floor.
 	var box := game.map.toys
@@ -174,8 +181,6 @@ func _test_map(id: StringName) -> void:
 		if toy.body.global_position.distance_to(toy.rest.origin) > 0.6:
 			strayed.append("%s %d: %s to %s" % [toy.def["id"], toy.index, toy.rest.origin.snapped(Vector3.ONE * 0.1), toy.body.global_position.snapped(Vector3.ONE * 0.1)])
 	_check(strayed.is_empty(), "two seconds on, every toy is still where the map put it", "; ".join(strayed.slice(0, 6)))
-	await _dispose(game)
-	_finished()
 
 
 ## Why a person could not stand at [param at], or "" when they can.
