@@ -58,35 +58,7 @@ func _run() -> void:
 func _test_the_codec() -> void:
 	_section("every event decodes to what was encoded")
 
-	# The command: the aim bit rides after the slot, alone and in a batch with commands that do not carry it.
-	var sent_commands: Array = []
-	for i in range(3):
-		var sent := PhNetCommand.new()
-		sent.tick = 40 + i
-		sent.delta = 1.0 / 64.0
-		sent.slot = 2 + i
-		sent.aim = i != 1
-		sent.move.yaw = 10.0 * float(i)
-		sent.move.move = Vector2(0.0, 1.0)
-		sent.move.set_button(PhNetCommand.BUTTON_FIRE, i == 2)
-		sent_commands.append(sent)
-	var writer := DotNetWriter.new()
-	DotNetInput.write_batch(writer, sent_commands)
-	var got := DotNetInput.read_batch(writer.to_reader(), func() -> DotNetInput: return PhNetCommand.new())
-	var round_trip := got.size() == 3
-	for i in range(mini(got.size(), 3)):
-		var back_cmd := got[i] as PhNetCommand
-		round_trip = round_trip and back_cmd != null and back_cmd.aim == (i != 1) and back_cmd.slot == 2 + i \
-			and back_cmd.move.is_pressed(PhNetCommand.BUTTON_FIRE) == (i == 2) and absf(back_cmd.move.yaw - 10.0 * float(i)) < 1.0
-	_check(round_trip, "a batch of commands keeps each one's aim bit, slot and buttons", "%d back" % got.size())
-	var plain := PhNetCommand.new()
-	var bits_plain := DotNetWriter.new()
-	plain._write(bits_plain)
-	plain.aim = true
-	var bits_aim := DotNetWriter.new()
-	plain._write(bits_aim)
-	_check(bits_plain.to_bytes().size() == bits_aim.to_bytes().size() and plain._equals(plain) and not plain._equals(PhNetCommand.new()),
-		"the bit costs no byte, and a command with it is not equal to one without", "%d bytes" % bits_aim.to_bytes().size())
+	_test_the_command_codec()
 
 	var hello := PhEvents.read_hello(DotNetReader.new(PhEvents.write_hello(SESSION, 64, 1234, 30.0, 300.0, 2.0, 60.0)))
 	_check(bool(hello["ok"]) and int(hello["player_id"]) == SESSION
@@ -141,6 +113,42 @@ func _test_the_codec() -> void:
 		and again.fuse_ticks == 141 and again.life_ticks == 768 and again.tick == 9001,
 		"LAUNCH carries the grenade exactly, so a client flies the same one", str(launch))
 
+	_test_the_codec_rest()
+
+## The command's wire form: the aim bit rides after the slot, alone and in a batch with commands that do not carry it.
+func _test_the_command_codec() -> void:
+	var sent_commands: Array = []
+	for i in range(3):
+		var sent := PhNetCommand.new()
+		sent.tick = 40 + i
+		sent.delta = 1.0 / 64.0
+		sent.slot = 2 + i
+		sent.aim = i != 1
+		sent.move.yaw = 10.0 * float(i)
+		sent.move.move = Vector2(0.0, 1.0)
+		sent.move.set_button(PhNetCommand.BUTTON_FIRE, i == 2)
+		sent_commands.append(sent)
+	var writer := DotNetWriter.new()
+	DotNetInput.write_batch(writer, sent_commands)
+	var got := DotNetInput.read_batch(writer.to_reader(), func() -> DotNetInput: return PhNetCommand.new())
+	var round_trip := got.size() == 3
+	for i in range(mini(got.size(), 3)):
+		var back_cmd := got[i] as PhNetCommand
+		round_trip = round_trip and back_cmd != null and back_cmd.aim == (i != 1) and back_cmd.slot == 2 + i \
+			and back_cmd.move.is_pressed(PhNetCommand.BUTTON_FIRE) == (i == 2) and absf(back_cmd.move.yaw - 10.0 * float(i)) < 1.0
+	_check(round_trip, "a batch of commands keeps each one's aim bit, slot and buttons", "%d back" % got.size())
+	var plain := PhNetCommand.new()
+	var bits_plain := DotNetWriter.new()
+	plain._write(bits_plain)
+	plain.aim = true
+	var bits_aim := DotNetWriter.new()
+	plain._write(bits_aim)
+	_check(bits_plain.to_bytes().size() == bits_aim.to_bytes().size() and plain._equals(plain) and not plain._equals(PhNetCommand.new()),
+		"the bit costs no byte, and a command with it is not equal to one without", "%d bytes" % bits_aim.to_bytes().size())
+
+
+## The codec checks from TURN on: the clock, the size limits and the kind fields.
+func _test_the_codec_rest() -> void:
 	var turned := PhEvents.read_turn(DotNetReader.new(PhEvents.write_turn(PhGame.Turn.TILT_LEFT)))
 	var asked := PhEvents.read_ask_taunt(DotNetReader.new(PhEvents.write_ask_taunt(&"whistle")))
 	_check(bool(turned["ok"]) and int(turned["how"]) == PhGame.Turn.TILT_LEFT and bool(asked["ok"]) and asked["taunt_id"] == &"whistle",
@@ -172,6 +180,22 @@ func _test_the_codec() -> void:
 		"%d kinds in %d bits" % [DotChatMessage.KIND_NAMES.size(), PhEvents.CHAT_KIND_BITS])
 
 	_finished()
+
+
+## Records what the client's bridge hears, for the checks to read from `_heard`.
+func _listen_to_the_client_bridge() -> void:
+	_client_bridge.map_received.connect(func(id: StringName) -> void:
+		_heard["map"] = id)
+	_client_bridge.disguise_received.connect(func(who: int, revealed: bool) -> void:
+		_heard["disguises"] = int(_heard.get("disguises", 0)) + 1
+		_heard["disguise"] = [who, revealed])
+	_client_bridge.taunt_received.connect(func(who: int, taunt_id: StringName, forced: bool) -> void:
+		_heard["taunt"] = [who, taunt_id, forced])
+	_client_bridge.decoy_received.connect(func(amount: float) -> void:
+		_heard["decoy"] = amount)
+	_client_bridge.round_changed.connect(func(n: int, began: bool, winner: int, why: String) -> void:
+		if not began:
+			_heard["round_over"] = [n, winner, why])
 
 
 func _build() -> bool:
@@ -236,18 +260,7 @@ func _build() -> bool:
 	var _s := _server_net.start()
 	var _c := _client_net.start()
 
-	_client_bridge.map_received.connect(func(id: StringName) -> void:
-		_heard["map"] = id)
-	_client_bridge.disguise_received.connect(func(who: int, revealed: bool) -> void:
-		_heard["disguises"] = int(_heard.get("disguises", 0)) + 1
-		_heard["disguise"] = [who, revealed])
-	_client_bridge.taunt_received.connect(func(who: int, taunt_id: StringName, forced: bool) -> void:
-		_heard["taunt"] = [who, taunt_id, forced])
-	_client_bridge.decoy_received.connect(func(amount: float) -> void:
-		_heard["decoy"] = amount)
-	_client_bridge.round_changed.connect(func(n: int, began: bool, winner: int, why: String) -> void:
-		if not began:
-			_heard["round_over"] = [n, winner, why])
+	_listen_to_the_client_bridge()
 
 	_stand_in = _server_bridge.add_bot("Stand-in")
 	_check(_stand_in != null and _stand_in.is_bot, "a stand-in is seated before anybody joins")
