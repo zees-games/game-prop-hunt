@@ -539,7 +539,6 @@ func _test_rock_the_vote(vote: Node, director: DotVoteDirector) -> void:
 		# The director opens it under MANUAL; this game must not also open it from clock.expired.
 	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", str(opened_count[0]))
 	director.vote_opened.disconnect(counter)
-	_finished()
 
 
 ## `time_up: finish_round` waits for a round being played, never for warmup: without the game's `round_in_progress_fn` a limit that ran out in warmup held the change for `finish_round_max_sec`.
