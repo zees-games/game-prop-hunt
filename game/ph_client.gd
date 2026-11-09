@@ -251,13 +251,8 @@ func _bind_bot_console() -> void:
 
 
 
-func _build_netcode() -> DotResult:
-	# The server's `mp_teammate_passthrough` and every change to it, through the link: this end traces its own shots,
-	# and against a server on 0 or 2 they ended in (or went through) a team-mate where the server's did not.
-	# An older shell's link cannot say, and the manager keeps its default.
-	if game.combat != null and link != null:
-		var _following := game.combat.follow_cvars(link)
-
+## The client's network manager, configured and added; `net.setup()` follows.
+func _make_net() -> void:
 	net = DotNetManager.new()
 	net.name = "Net"
 	net.is_server = false
@@ -275,28 +270,9 @@ func _build_netcode() -> DotResult:
 	net.config = net_config
 	add_child(net)
 
-	var started := net.setup()
 
-	if not started.ok:
-		return started
-
-	bridge = PhNetBridge.new()
-	bridge.name = "Bridge"
-	add_child(bridge)
-
-	var attached := bridge.attach(game, net)
-
-	if not attached.ok:
-		return attached
-
-	bridge.open_link(link)
-	_follow_server_cvars()
-	# Before the seal and in the server's order (after the bridge), or the actions stay local.
-	DotLog.result(CHANNEL, "avatar action message", DotGameAvatarActionMessage.register(net))
-	# The server's order again (after the avatar frame): the remote workbench's frame.
-	workbench_remote = DotGameWorkbenchRemoteClient.attach(net)
-	net.messages.seal()
-
+## Routes the bridge's signals to this client's handlers.
+func _connect_bridge() -> void:
 	bridge.hello_received.connect(_on_hello)
 	bridge.roster_changed.connect(_on_roster_changed)
 	bridge.phase_received.connect(_on_phase)
@@ -320,6 +296,40 @@ func _build_netcode() -> DotResult:
 		var who: PhPlayer = game.players.get(PhNetBridge.player_key(session_id))
 		if who != null:
 			var _heard := audio.on_weapon(who.global_position, kind))
+
+
+func _build_netcode() -> DotResult:
+	# The server's `mp_teammate_passthrough` and every change to it, through the link: this end traces its own shots,
+	# and against a server on 0 or 2 they ended in (or went through) a team-mate where the server's did not.
+	# An older shell's link cannot say, and the manager keeps its default.
+	if game.combat != null and link != null:
+		var _following := game.combat.follow_cvars(link)
+
+	_make_net()
+
+	var started := net.setup()
+
+	if not started.ok:
+		return started
+
+	bridge = PhNetBridge.new()
+	bridge.name = "Bridge"
+	add_child(bridge)
+
+	var attached := bridge.attach(game, net)
+
+	if not attached.ok:
+		return attached
+
+	bridge.open_link(link)
+	_follow_server_cvars()
+	# Before the seal and in the server's order (after the bridge), or the actions stay local.
+	DotLog.result(CHANNEL, "avatar action message", DotGameAvatarActionMessage.register(net))
+	# The server's order again (after the avatar frame): the remote workbench's frame.
+	workbench_remote = DotGameWorkbenchRemoteClient.attach(net)
+	net.messages.seal()
+
+	_connect_bridge()
 
 	if link != null and link.has_method("ping_ms"):
 		bridge.rtt_source = func() -> float:

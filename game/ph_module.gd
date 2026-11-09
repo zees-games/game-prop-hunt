@@ -174,20 +174,7 @@ func _game_load() -> DotResult:
 	_bind_rule_cvars(world)
 	_bind_config(world)
 
-	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
-	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
-		"Seconds the killcam of a round's last moment plays, added to the intermission (0 for none)",
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
-	_killcam_cvar = killcam
-	if killcam != null:
-		killcam.changed.connect(func(_old: String, new_value: String) -> void:
-			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
-			world.apply_intermission())
-
-	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
-	var _camera := add_cvar("mp_killview_camera", "0",
-		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay DotKillcamFraming)",
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	_bind_killcam(world)
 
 	_bots = add_cvar(
 		"ph_bots", "1",
@@ -214,6 +201,24 @@ func _game_load() -> DotResult:
 
 	log_info("the map is up", world.describe())
 	return DotResult.success(null)
+
+
+## The killcam's cvars: its length and its camera.
+func _bind_killcam(world: PhGame) -> void:
+	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
+	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
+		"Seconds the killcam of a round's last moment plays, added to the intermission (0 for none)",
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	_killcam_cvar = killcam
+	if killcam != null:
+		killcam.changed.connect(func(_old: String, new_value: String) -> void:
+			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
+			world.apply_intermission())
+
+	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
+	var _camera := add_cvar("mp_killview_camera", "0",
+		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay DotKillcamFraming)",
+		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 
 
 ## The rule sets of the player, body and ambience addons, each as cvars: server-side only, or REPLICATED where a client draws or predicts under it.

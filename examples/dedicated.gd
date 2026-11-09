@@ -513,6 +513,12 @@ func _test_the_map_vote() -> void:
 	_check(str(game.map_doc.get("id", "")) == str(pick) and game.next_map_id == &"",
 		"and the next map laid is the one voted for, once", "%s / %s" % [game.map_doc.get("id", ""), game.next_map_id])
 
+	_test_rock_the_vote(vote, director)
+	_finished()
+
+
+## Rock the vote, typed at the console, on the director the map vote built.
+func _test_rock_the_vote(vote: Node, director: DotVoteDirector) -> void:
 		# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL a passed rtv answered "Rocked. 1 of 1." and no ballot came.
 		# Past dot-vote's cooldown, on the director alone so the map's own ballot timer does not open one first.
 	var laid := StringName(str(game.map_doc.get("id", "")))
@@ -533,7 +539,6 @@ func _test_the_map_vote() -> void:
 		# The director opens it under MANUAL; this game must not also open it from clock.expired.
 	_check(opened_count[0] == 1, "and opens exactly one rtv ballot, not a second from the game", str(opened_count[0]))
 	director.vote_opened.disconnect(counter)
-	_finished()
 
 
 ## `time_up: finish_round` waits for a round being played, never for warmup: without the game's `round_in_progress_fn` a limit that ran out in warmup held the change for `finish_round_max_sec`.
