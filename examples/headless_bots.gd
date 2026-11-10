@@ -7,6 +7,9 @@ const PhBots := preload("../game/ph_bots.gd")
 
 ## Stand-ins play whole rounds against each other on the real maps, and the suite holds how they hide and hunt to bands (props disguised and apart, still unless shot, 35-55% props at medium, a reachable hiding place).
 ## Rounds, not a unit test: stand-in props once stood as sinks in a hallway and the hunter found nobody. Ninety-six rounds by default, about 13 minutes.
+## `-- --shard <id>` plays one map's twelve rounds of the rotation and prints each as a `ROUND_JSON` line, holding only what is true of any round
+## (disguised, board, reachable); `-- --merge LOG...` reads those lines from the shards' logs and holds the bands over all of them, so a
+## sharded run (`game.sh test headless_bots`, up to four shards at once) reports what the one 96-round run reports.
 ## `-- --rounds N`, `--first N`, `--map <id>`, `--difficulty <preset>`, `PH_BOTS_TRACE=1`, `PH_ROUND_SECONDS`, `PH_HIDE_SECONDS`; without `maps/` linked it plays the practice house.
 
 const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church"]
@@ -16,6 +19,32 @@ const TICK := 1.0 / float(TICK_RATE)
 const BOTS := 8
 
 const SECTIONS := 4
+
+## A round's result as JSON can carry it: no infinity (a prop that never got a disguise reads 1e9).
+static func _wire(result: Dictionary) -> Dictionary:
+	var out := result.duplicate()
+	for key: String in out:
+		if out[key] is float and is_inf(out[key]):
+			out[key] = 1e9
+	return out
+
+
+## The rounds the shards printed (`ROUND_JSON` lines in each log), in the order the one run plays them.
+static func _load_rounds(paths: PackedStringArray) -> Array[Dictionary]:
+	var rounds: Array[Dictionary] = []
+	for path in paths:
+		var f := FileAccess.open(path, FileAccess.READ)
+		if f == null:
+			print("  cannot read %s" % path)
+			continue
+		for line in f.get_as_text().split("\n"):
+			if line.begins_with("ROUND_JSON "):
+				var parsed: Variant = JSON.parse_string(line.substr(11))
+				if parsed is Dictionary:
+					rounds.append(parsed)
+	rounds.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["round"]) < int(b["round"]))
+	return rounds
+
 
 ## Where a prop is looked at again, seconds into the seek (after the moves before a forced taunt
 ## and the restless ones), and how long the hunters' coverage of the best places is counted.
@@ -92,11 +121,16 @@ func _run() -> void:
 	print("")
 	var args := OS.get_cmdline_user_args()
 	var ci := OS.get_environment("CI") == "true"
+	var merge := args.find("--merge")
+	var shard := _arg(args, "--shard", "")
 	var rounds := maxi(1, int(_arg(args, "--rounds", str(CI_ROUNDS if ci else 96))))
+	if shard != "":
+		# The map's share of the whole run: the rounds the one run plays on it.
+		rounds = maxi(1, int(_arg(args, "--rounds", str(rounds / MAPS.size()))))
 	var close_band := CI_PROPS_WIN if ci and args.find("--rounds") < 0 else PROPS_WIN
 	# One map only: its own rounds of the rotation (the 2nd, 6th, 10th... for the house), so a
 	# round played this way is the same round the whole run plays.
-	var only := _arg(args, "--map", "")
+	var only := _arg(args, "--map", shard)
 	var difficulty := _arg(args, "--difficulty", "medium")
 	# `--nav 0` plays the first way (no annotations read), to measure what they change.
 	nav_on = _arg(args, "--nav", "1") != "0"
@@ -104,7 +138,13 @@ func _run() -> void:
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
 
-	_section("%d rounds of stand-ins at %s%s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)", " (CI length)" if close_band == CI_PROPS_WIN else ""])
+	if merge >= 0:
+		results = _load_rounds(args.slice(merge + 1))
+		rounds = 0
+		_section("%d rounds of stand-ins at %s, merged from %d logs" % [results.size(), difficulty, args.size() - merge - 1])
+		_check(not results.is_empty(), "the shards' logs hold rounds", "%d rounds" % results.size())
+	else:
+		_section("%d rounds of stand-ins at %s%s%s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)", " (CI length)" if close_band == CI_PROPS_WIN else "", " (shard %s)" % shard if shard != "" else ""])
 	var played := 0
 	var r := first
 	while played < rounds:
@@ -119,6 +159,7 @@ func _run() -> void:
 		played += 1
 		var result := await _round(map_id, r - 1, difficulty)
 		results.append(result)
+		print("ROUND_JSON " + JSON.stringify(_wire(result)))
 		print("  round %2d %-11s %d hunters: found %d of %d props, mean last %5.1f s, %s; fit %.2f, spread %4.1f m; moving %4.1f s/prop-min; tests %2d props %2d furniture; decoy %5.1f hp, %d hunters killed by it; board %s; reach %d/%d" % [
 			r, map_id, result["hunters"], result["found"], result["props"], result["mean_last"],
 			"props win" if result["props_won"] else "hunters win", result["fit"], result["spread"], result["moving"],
@@ -188,7 +229,7 @@ func _run() -> void:
 	_check(board_ok, "the board's props left is the props alive after every find")
 	print("  every prop wore its disguise within %.1f s of the hide; still %.1f%% of the time; a prop first hurt in %d rounds, the latest at %.0f s of the seek" % [slowest_disguise, still / n * 100.0, hurt_rounds, hurt_late])
 	_check(slowest_disguise <= DISGUISE_WITHIN, "every prop is disguised within %.0f s of the hide starting" % DISGUISE_WITHIN, "%.1f s" % slowest_disguise)
-	if difficulty == "medium":
+	if difficulty == "medium" and shard == "":
 		_check(still / n >= 0.9, "a disguised prop is still at least 90% of the time", "%.1f%%" % (still / n * 100.0))
 		_check(hurt_rounds * 10 >= results.size() * 9 and hurt_late <= SEEKER_DAMAGES_WITHIN,
 			"a seeker bot damages a disguised prop within %.0f s of the seek, in nine rounds in ten" % SEEKER_DAMAGES_WITHIN, "%d of %d rounds, the latest at %.0f s" % [hurt_rounds, results.size(), hurt_late])
@@ -208,9 +249,9 @@ func _run() -> void:
 		_check(rounds_with_find * 2 >= results.size(), "the hunters find somebody in at least half the rounds", "%d of %d" % [rounds_with_find, results.size()])
 		_check(tests_furniture <= maxi(tests_props * 3, 4 * results.size()), "the hunters do not shoot the furniture to pieces", "%d furniture tests, %d prop tests" % [tests_furniture, tests_props])
 		_check(decoy_deaths * 5 <= hunters, "the decoy penalty kills at most one hunter in five", "%d of %d" % [decoy_deaths, hunters])
-	elif difficulty == "easy":
+	elif difficulty == "easy" and shard == "":
 		_check(float(props_won) >= EASY_PROPS_WIN * n, "at easy the props win at least %.0f%% of rounds" % (EASY_PROPS_WIN * 100.0), "props won %d of %d" % [props_won, results.size()])
-	elif difficulty == "hard":
+	elif difficulty == "hard" and shard == "":
 		_check(float(props_won) <= HARD_PROPS_WIN * n, "at hard the props win at most %.0f%% of rounds" % (HARD_PROPS_WIN * 100.0), "props won %d of %d" % [props_won, results.size()])
 	_completed += 1
 
@@ -252,7 +293,7 @@ func _run() -> void:
 	print("  nav %s: %d prop samples; next to a same-size piece %.0f%%, among two or more %.0f%%, tucked in %.2f, seen by %.0f%% of watchers (a random floor point %.0f%%); hunters passed %.0f%% of the %d best places in %.0f s" % [
 		"on" if nav_on else "OFF", samples, 100.0 * next_to / sn, 100.0 * among / sn, tucked / sn, 100.0 * seen / sn, 100.0 * open / sn,
 		100.0 * cover / maxf(float(cover_rounds), 1.0), COVER_TOP, COVER_WITHIN])
-	if difficulty == "medium":
+	if difficulty == "medium" and shard == "":
 		# Armed: `-- --nav 0` fails the tucked-in and coverage bands.
 		_check(samples > 0 and float(next_to) / sn >= NEXT_TO_MIN, "props end next to a piece of furniture of their size", "%.0f%% of %d" % [100.0 * next_to / sn, samples])
 		_check(float(among) / sn >= AMONG_MIN, "props end among two or more of their size", "%.0f%%" % (100.0 * among / sn))
@@ -452,7 +493,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 		"tests_props": bots.tests_on_props, "tests_furniture": bots.tests_on_furniture,
 		"decoy_hp": decoy["hp"], "decoy_deaths": decoy["deaths"], "board_ok": board["ok"],
 		"reach": reach, "places": places,
-		"placed": placed, "cover": float(visited.size()), "cover_of": top.size(),
+		"placed": placed, "cover": float(visited.size()), "cover_of": top.size(), "round": index,
 	}
 	remove_child(game)
 	game.free()
