@@ -1,0 +1,15 @@
+{
+  "format": "tmc-game-listing",
+  "version": 1,
+  "listing": {
+    "name": "Prop Hunt",
+    "description": "Most players are props: they hide by turning into a piece of furniture, a plant or a rock somewhere on the map and keeping still. The rest are hunters, who are blindfolded while the props hide and then have a few minutes to find them, with every wrong guess costing them health.",
+    "tags": ["3D", "Multiplayer", "Minigame"],
+    "platforms": ["PLATFORM_WEB"],
+    "graphicsType": "THREE_D",
+    "tmcKind": "MINIGAME"
+  },
+  "pack": {
+    "id": "gamemann/mg-prop-hunt"
+  }
+}
