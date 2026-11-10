@@ -1595,12 +1595,17 @@ func _advance_flashlights() -> void:
 		return
 
 	var cfg := flashlight_conf()
-	var map_id := str(map_doc.get("id", ""))
+	var map_id := map_id_str()
 
 	for player: PhPlayer in players.values():
 		if not player.flashlight_ready:
 			player.flashlight_ready = true
 			player.flashlight = PhFlashlight.starts_on(cfg, map_id, map_doc)
+
+
+## The map document's id as a string, (ids are strings).
+func map_id_str() -> String:
+	return String(map_doc.get("id", ""))
 
 
 ## A living player switches their light, either side. Refused where the map or the config disallows it. Server side.
