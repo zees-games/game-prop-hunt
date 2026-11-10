@@ -225,6 +225,13 @@ func _build_bottom() -> void:
 	ammo.offset_right = -24.0
 	ammo.offset_top = -100.0
 	ammo.offset_bottom = -24.0
+	if PhTouch.wanted():
+		# The fire, jump and aim buttons own the bottom right on a phone: the counter goes under the Menu button.
+		ammo.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		ammo.offset_left = -420.0
+		ammo.offset_right = -24.0
+		ammo.offset_top = 100.0
+		ammo.offset_bottom = 176.0
 	ammo.visible = false
 	_root.add_child(ammo)
 
@@ -236,6 +243,12 @@ func _build_bottom() -> void:
 	weapon_icon.offset_right = -24.0
 	weapon_icon.offset_top = -172.0
 	weapon_icon.offset_bottom = -108.0
+	if PhTouch.wanted():
+		weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		weapon_icon.offset_left = -204.0
+		weapon_icon.offset_right = -24.0
+		weapon_icon.offset_top = 184.0
+		weapon_icon.offset_bottom = 248.0
 	weapon_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(weapon_icon)
 
