@@ -10,9 +10,14 @@ const PhMapDoc := preload("../game/ph_map_doc.gd")
 const MAPS := ["ph_practice", "ph_school", "ph_house", "ph_office", "ph_woods", "ph_frontyard", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church", "ph_abandoned_hotel", "ph_elementary_school", "ph_autumngetaway", "ph_bank", "ph_volcano", "ph_westerncity", "ph_gas_station", "ph_bikinibottom", "ph_swimmingpool", "ph_restaurant_os", "ph_oceanwaves", "ph_midwestapartment", "ph_cyber_dinner", "ph_islandhouse", "ph_library"]
 const CHECKS_PER_MAP := 11
 
+## `-- --shard mN` checks every SHARDS-th map (N of SHARDS) and the catalogue, each shard as a whole run of its own; `-- --merge LOG...`
+## holds that every shard's log is there and that together they entered the catalogue once per shard and every map once.
+const SHARDS := 4
+
 ## The maps actually checked: all of MAPS, or only the practice house where `maps/` is not linked in (CI clones this repository alone).
 ## Sections and checks are counted against this list.
 var _maps: Array = []
+var _shard := ""
 
 ## A person's capsule, for "is this spawn clear".
 const RADIUS := 0.4
@@ -37,17 +42,48 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
+func _merge(logs: Array) -> void:
+	var absent: Array = logs.filter(func(path: String) -> bool: return not FileAccess.file_exists(path))
+	_check(logs.size() == SHARDS and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
+	var entered := 0
+	var rx := RegEx.create_from_string("(?m)^(\\d+) sections entered")
+	for path: String in logs:
+		var hit := rx.search(FileAccess.get_file_as_string(path))
+		if hit != null:
+			entered += int(hit.get_string(1))
+	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
+	var want := SHARDS + (MAPS.size() if linked else 1)
+	_check(entered == want, "the shards entered every map once and the catalogue once each (%d of %d sections)" % [entered, want])
+	_report_sections(1, 1, 1, 2)
+
+
 func _run() -> void:
 	print("prophunt maps")
 	print("")
+	var args := OS.get_cmdline_user_args()
+	var merge := args.find("--merge")
 
+	if merge >= 0:
+		_section("merged from the shards' logs")
+		_merge(args.slice(merge + 1))
+		_finished()
+		_report_sections(_sections_entered, _sections_finished, 1, 2)
+		return
+
+	var at := args.find("--shard")
+	_shard = args[at + 1] if at >= 0 and at + 1 < args.size() else ""
 	await _test_the_catalogue()
+	var play: Array = []
 
-	for id: String in _maps:
+	for i in _maps.size():
+		if _shard == "" or _shard == "m%d" % (i % SHARDS):
+			play.append(_maps[i])
+
+	for id: String in play:
 		await _test_map(StringName(id))
 
 	_broken = _maps.is_empty()
-	_report_sections(_sections_entered, _sections_finished, 1 + _maps.size(), 1 + CHECKS_PER_MAP * _maps.size())
+	_report_sections(_sections_entered, _sections_finished, 1 + play.size(), 1 + CHECKS_PER_MAP * play.size())
 
 
 func _test_the_catalogue() -> void:
