@@ -121,8 +121,8 @@ func _run() -> void:
 	print("")
 	var args := OS.get_cmdline_user_args()
 	var ci := OS.get_environment("CI") == "true"
-	var merge := args.find("--merge")
-	var shard := _arg(args, "--shard", "")
+	var shard := DotGameShardArgs.shard()
+	var merge_logs := DotGameShardArgs.merge_logs()
 	var rounds := maxi(1, int(_arg(args, "--rounds", str(CI_ROUNDS if ci else 96))))
 	if shard != "":
 		# The map's share of the whole run: the rounds the one run plays on it.
@@ -138,10 +138,10 @@ func _run() -> void:
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
 
-	if merge >= 0:
-		results = _load_rounds(args.slice(merge + 1))
+	if DotGameShardArgs.is_merge():
+		results = _load_rounds(merge_logs)
 		rounds = 0
-		_section("%d rounds of stand-ins at %s, merged from %d logs" % [results.size(), difficulty, args.size() - merge - 1])
+		_section("%d rounds of stand-ins at %s, merged from %d logs" % [results.size(), difficulty, merge_logs.size()])
 		_check(not results.is_empty(), "the shards' logs hold rounds", "%d rounds" % results.size())
 	else:
 		_section("%d rounds of stand-ins at %s%s%s%s" % [rounds, difficulty, "" if linked else " (no maps/: the practice house)", " (CI length)" if close_band == CI_PROPS_WIN else "", " (shard %s)" % shard if shard != "" else ""])

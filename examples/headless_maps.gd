@@ -43,14 +43,9 @@ func _ready() -> void:
 
 
 func _merge(logs: Array) -> void:
-	var absent: Array = logs.filter(func(path: String) -> bool: return not FileAccess.file_exists(path))
+	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARDS and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := 0
-	var rx := RegEx.create_from_string("(?m)^(\\d+) sections entered")
-	for path: String in logs:
-		var hit := rx.search(FileAccess.get_file_as_string(path))
-		if hit != null:
-			entered += int(hit.get_string(1))
+	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var want := SHARDS + (MAPS.size() if linked else 1)
 	_check(entered == want, "the shards entered every map once and the catalogue once each (%d of %d sections)" % [entered, want])
@@ -60,24 +55,16 @@ func _merge(logs: Array) -> void:
 func _run() -> void:
 	print("prophunt maps")
 	print("")
-	var args := OS.get_cmdline_user_args()
-	var merge := args.find("--merge")
-
-	if merge >= 0:
+	if DotGameShardArgs.is_merge():
 		_section("merged from the shards' logs")
-		_merge(args.slice(merge + 1))
+		_merge(DotGameShardArgs.merge_logs())
 		_finished()
 		_report_sections(_sections_entered, _sections_finished, 1, 2)
 		return
 
-	var at := args.find("--shard")
-	_shard = args[at + 1] if at >= 0 and at + 1 < args.size() else ""
+	_shard = DotGameShardArgs.shard()
 	await _test_the_catalogue()
-	var play: Array = []
-
-	for i in _maps.size():
-		if _shard == "" or _shard == "m%d" % (i % SHARDS):
-			play.append(_maps[i])
+	var play: Array = DotGameShardArgs.slice(_maps, _shard, SHARDS)
 
 	for id: String in play:
 		await _test_map(StringName(id))
