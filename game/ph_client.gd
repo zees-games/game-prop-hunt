@@ -1994,17 +1994,10 @@ func _flash_audio_ref() -> DotNodeRef:
 ## The light on the eye follows the server's state (but not for 0.4 s after our own switch); everybody else's beam, and ours when the camera is not our eye, comes from the crowd.
 func _present_flashlights(delta: float) -> void:
 	var cfg := game.flashlight_conf()
-	var map_id := str(game.map_doc.get("id", ""))
+	var map_id := game.map_id_str()
 
 	if flash == null or not is_instance_valid(flash):
-		flash = DotFlashlight.new()
-		flash.name = "Flashlight"
-		flash.config = cfg
-		flash.handle_input = false
-		flash.authoritative = false
-		flash.audio = _flash_audio_ref()
-		flash.switch_requested.connect(_on_flash_switch)
-		camera.add_child(flash)
+		_make_flash(cfg)
 
 	flash.allowed = DotFlashlightRules.allowed_on(cfg, map_id)
 
@@ -2036,6 +2029,18 @@ func _present_flashlights(delta: float) -> void:
 	if _flash_retain <= 0.0:
 		_flash_retain = 2.0
 		flash_crowd.retain(game.players.keys())
+
+
+func _make_flash(cfg: DotFlashlightConfig) -> void:
+	flash = DotFlashlight.new()
+	flash.name = "Flashlight"
+	flash.config = cfg
+	flash.handle_input = false
+	flash.authoritative = false
+	flash.audio = _flash_audio_ref()
+	if not flash.switch_requested.is_connected(_on_flash_switch):
+		flash.switch_requested.connect(_on_flash_switch)
+	camera.add_child(flash)
 
 
 ## Our own switch: shown at once, asked of the server (or done here, offline).
