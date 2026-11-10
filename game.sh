@@ -50,8 +50,9 @@ PARSE=1
 # A suite too long for one run, as name=shard,shard,...: `test NAME` plays each shard as its own
 # `examples/NAME.tscn -- --shard SHARD` (up to $SHARD_JOBS at once, default 4) and then runs the
 # suite once more as `-- --merge LOG...` over the shards' logs, which holds the whole-run checks.
-# `test NAME.SHARD` plays one shard. `suites --shards` lists the shards instead of the suite.
-SUITE_SHARDS="headless_bots=ph_school,ph_house,ph_office,ph_woods,ph_office221,ph_apartment,ph_hotel,ph_abandoned_church"
+# `test NAME.SHARD` plays one shard; `test NAME.merge` only the merge over logs already in .godot/test-logs.
+# `suites --shards` lists the shards instead of the suite (`hv shard` runs them as separate jobs, then NAME.merge).
+SUITE_SHARDS="headless_bots=ph_school,ph_house,ph_office,ph_woods,ph_office221,ph_apartment,ph_hotel,ph_abandoned_church headless_maps=m0,m1,m2,m3"
 TIMEOUT_GIVEN=0
 # A suite that legitimately runs longer than the default, as name=seconds. An explicit
 # --timeout still wins for every suite.
@@ -124,8 +125,11 @@ run_suite() {
     # NAME is a suite, or SUITE.SHARD; ARGS (after NAME) go to the scene as user args.
     local scene="$1" base="${1%%.*}"
     shift
-    local extra=("$@")
-    case "$scene" in *.*) extra=(--shard "${scene#*.}" "$@") ;; esac
+    local extra=("$@") _s
+    case "$scene" in
+        *.merge) extra=(--merge $(for _s in $(shards_of "$base"); do printf '.godot/test-logs/%s.%s.log ' "$base" "$_s"; done) "$@") ;;
+        *.*) extra=(--shard "${scene#*.}" "$@") ;;
+    esac
     local log out status summary kv TIMEOUT="$TIMEOUT"
     if [ "$TIMEOUT_GIVEN" -eq 0 ]; then
         for kv in $SUITE_TIMEOUTS; do [ "${kv%%=*}" = "$base" ] && TIMEOUT="${kv#*=}"; done
