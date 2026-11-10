@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+const PhTouch := preload("ph_touch.gd")
 const PhGame := preload("ph_game.gd")
 const PhPlayer := preload("ph_player.gd")
 const PhBindings := preload("ph_bindings.gd")
@@ -134,8 +135,10 @@ func _build() -> void:
 	_blindfold_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	_blindfold_label.offset_left = -520.0
 	_blindfold_label.offset_right = 520.0
-	_blindfold_label.offset_top = -60.0
-	_blindfold_label.offset_bottom = 60.0
+	# Touch: a short screen puts the health plate over a centred label, so it sits lower.
+	var drop := 50.0 if PhTouch.wanted() else 0.0
+	_blindfold_label.offset_top = -60.0 + drop
+	_blindfold_label.offset_bottom = 60.0 + drop
 	_blindfold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_blindfold_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.45))
 
@@ -241,7 +244,8 @@ func _build_bottom() -> void:
 func _build_status_labels() -> void:
 	_as = _label(17)
 	_as.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
-	_as.offset_left = 24.0
+	# 124 clears the touch Menu button, which a short phone screen puts at the same height.
+	_as.offset_left = 124.0 if PhTouch.wanted() else 24.0
 	_as.offset_right = 600.0
 	_as.offset_top = -356.0
 	_as.offset_bottom = -328.0
@@ -459,7 +463,7 @@ func _draw_hints(side: int) -> void:
 		lines.append("Shoot the props. Shooting furniture hurts you.")
 		lines.append(_weapon_hint())
 		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
-		if loadout_offered:
+		if loadout_offered and not DotPlatform.has_touch():
 			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
 
 	_hints.text = "\n".join(lines)
@@ -540,7 +544,7 @@ func present_blind(delta: float) -> void:
 			# the second one rounds down and the other up.
 			_blindfold_label.text = "Blindfolded while the props hide\n%s" % DotScoreStrip.clock_text(left)
 			# The hide is when a new loadout goes straight into the hands (PhGame.rearm_if_allowed).
-			if loadout_offered:
+			if loadout_offered and not DotPlatform.has_touch():
 				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"dot_menu_loadout")
 
 
