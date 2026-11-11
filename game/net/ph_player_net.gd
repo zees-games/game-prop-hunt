@@ -192,7 +192,6 @@ func pull() -> void:
 		net_max_health = player.health.max_health
 
 	net_points = clampi(player.points, 0, 65535)
-	net_ping = clampi(player.ping_ms, 0, 1023)
 	net_watching = player.watching
 	net_taunt_meter = player.taunt_meter
 	net_reveal_wait = clampi(int(ceilf(player.reveal_wait)), 0, 1023)
@@ -200,7 +199,10 @@ func pull() -> void:
 	net_beacon = player.beacon or player.marked
 	net_marked = player.marked and not player.beacon
 	net_flashlight = player.flashlight
-	net_warp = player.warps & 0xF
+	# Only the server's counts: the client's own warps and ping_ms differ from the snapshot (a predicted pad, replays), so copying them made the prediction disagree with every snapshot (a replay storm).
+	if identity == null or identity.is_authoritative:
+		net_ping = clampi(player.ping_ms, 0, 1023)
+		net_warp = player.warps & 0xF
 
 	# [b]After the arsenal has simulated, which on this end it has: the whole world ticks
 	# before anything is pulled.[/b] A prop has no rig and leaves these at zero, and zero is a
