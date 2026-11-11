@@ -144,6 +144,9 @@ func _pick_sides(game: PhGame, local: Object, hunter: bool) -> void:
 func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
+	# Waits past the load cover (slow on a cold GPU box) before any view's timing starts; capped, so a stuck cover cannot hang the shot.
+	if not await DotShotGate.wait_lifted(get_tree(), _client.get("platform")):
+		printerr("shot: load cover still up after the wait; shooting anyway")
 	var local = _client.get("player")
 	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade", "killcam"]
 
@@ -309,12 +312,6 @@ func _finish() -> void:
 		tab.pressed = true
 		menu.handle_event(tab)
 
-	# The loading cover lifts a moment after the player exists; capturing early shows only the cover.
-	var platform: DotGameClient = _client.get("platform")
-	var waited := 0
-	while platform != null and not platform.is_shown() and waited < 600:
-		await get_tree().process_frame
-		waited += 1
 	await _frames(3)
 	var image := get_viewport().get_texture().get_image()
 	var path := ProjectSettings.globalize_path(_out)
