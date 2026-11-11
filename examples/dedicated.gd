@@ -1,4 +1,5 @@
 extends "dedicated_rotation.gd"
+const PHTestPorts := preload("test_ports.gd")
 
 const PhAmbience := preload("../game/ph_ambience.gd")
 const PhConfig := preload("../game/ph_config.gd")
