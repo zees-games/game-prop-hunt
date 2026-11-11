@@ -473,7 +473,7 @@ func _build_effects() -> void:
 	hurt.flash_decay_ms = 260
 	fx.add(hurt)
 
-	# A grenade going off: a fireball, smoke, sparks and a light (game-arena's scene, copied). At
+	# A grenade going off: a fireball, smoke, sparks and a light (game-fatal-contact's scene, copied). At
 	# every quality: where something went off is information, not decoration.
 	var blast := DotFxDef.new()
 	blast.id = BLAST_FX
@@ -2057,7 +2057,7 @@ func _shoot_toys(shot: DotShot) -> void:
 
 
 ## How fast a blast throws a toy at its centre (nothing at its edge), whatever the toy weighs:
-## game-arena's number, so a ball goes as far from a frag in both games.
+## game-fatal-contact's number, so a ball goes as far from a frag in both games.
 const BLAST_TOY_SPEED := 12.0
 
 

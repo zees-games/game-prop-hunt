@@ -104,7 +104,7 @@ static func sound_catalogue() -> DotAudioCatalogue:
 	var throw := _placed(WEAPON_THROW, 40.0, 8.0, 2, 55, 0.95, 1.05)
 	throw.tags = [&"weapon"]
 	c.add(throw)
-	# The heavy shot pitched right down (as game-arena's): the lowest thing the synthesiser makes
+	# The heavy shot pitched right down (as game-fatal-contact's): the lowest thing the synthesiser makes
 	# is what reads as a blast rather than a gun.
 	var blast := _placed(BLAST, 140.0, 22.0, 3, 85, 0.42, 0.5)
 	blast.tags = [&"weapon"]
