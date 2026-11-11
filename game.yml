@@ -11,7 +11,7 @@
 #
 # Paths are relative to the pack's mount point, which is also this repository's root.
 
-content_id: gamemann/mg-prop-hunt
+content_id: gamemann/game-prop-hunt
 version: 0.0.0
 kind: pack
 
