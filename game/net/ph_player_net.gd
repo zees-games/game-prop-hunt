@@ -121,7 +121,7 @@ func _register_net_vars() -> void:
 	# 98 as 97.9 (headless_net, "and the chair's health").
 	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(14)
 	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
-	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10)
+	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
 	replicate(&"net_watching", DotNetVar.Type.BOOL)
 	var _meter := replicate(&"net_taunt_meter", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).to_owner_only()
 	var _wait := replicate(&"net_reveal_wait", DotNetVar.Type.UINT).bits(10).to_owner_only()
