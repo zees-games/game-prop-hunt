@@ -1,6 +1,6 @@
 extends RefCounted
 
-## A hunter's grenades in flight, and what happens where they go off; copied from game-arena's `ArenaProjectiles` because dot-weapon spawns nothing.
+## A hunter's grenades in flight, and what happens where they go off; copied from game-fatal-contact's `ArenaProjectiles` because dot-weapon spawns nothing.
 ## Everything is a pure function of the tick, so the wire carries one LAUNCH per grenade; a client's copies resolve no damage and only draw the burst.
 ## A blast is a dot-combat shot with a splash; what it COSTS is the game's ([signal blasted], docs/design.md "Grenades").
 

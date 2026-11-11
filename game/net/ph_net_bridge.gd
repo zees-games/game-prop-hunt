@@ -24,7 +24,7 @@ const CHANNEL := "ph.net"
 const ACK_BYTES := 4
 
 ## Commands per input packet: this tick's and the four before it, so one lost ENet packet costs no tick.
-## Measured in game-arena: 80% of ticks right at 20% loss with one copy, 99-100% with three, five closed the rest.
+## Measured in game-fatal-contact: 80% of ticks right at 20% loss with one copy, 99-100% with three, five closed the rest.
 const INPUT_COPIES := 5
 
 ## How often the round clock and its numbers go out, in ticks (twice a second).

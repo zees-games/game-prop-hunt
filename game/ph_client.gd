@@ -994,7 +994,7 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 		for def in ZeeWeaponPack.weapons():
 			_weapon_defs[def.id] = def
 	var out: Dictionary = {}
-	# The weapon's silhouette: game-arena's `tools/build_weapon_icons.sh` renders, copied for the
+	# The weapon's silhouette: game-fatal-contact's `tools/build_weapon_icons.sh` renders, copied for the
 	# guns a hunter is offered. A gun an owner adds without one is drawn as its letters.
 	var icon_path := "%s/%s.png" % [WEAPON_ICON_DIR, String(id)]
 	var sprite := PhWeaponIcons.shared.menu_texture(id)
