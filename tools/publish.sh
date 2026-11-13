@@ -11,5 +11,5 @@ FAM="$(cd "$HERE/.." && pwd)"
 [ -x "$FAM/dot-cloud/tools/publish_pack.sh" ] || { echo "publish.sh: dot-cloud not found beside $HERE or in $FAM (set DOT_FAMILY_DIR)" >&2; exit 2; }
 export DOT_FAMILY_DIR="$FAM"
 exec "$FAM/dot-cloud/tools/publish_pack.sh" publish --source "$HERE" --id game-prop-hunt \
-    --host-addons "$FAM/dot-server-deploy/addons.lock" --exclude-dir maps --exclude-dir art-src --exclude-dir reports --exclude-dir screenshots \
+    --host-addons "${DOT_HOST_LOCK:-$FAM/dot-server-deploy/addons.lock}" --exclude-dir maps --exclude-dir art-src --exclude-dir reports --exclude-dir screenshots \
     --lock "$HERE/content.lock.json" "$@"
