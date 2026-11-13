@@ -1,16 +1,33 @@
 extends DotGameCheckSuite
 
 const PhCatalogue := preload("../game/ph_catalogue.gd")
+const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhVote := preload("../game/ph_vote.gd")
 
 ## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex] and never the process's shared one.
 ##   godot --headless --path . res://examples/headless_workshop.tscn
 ## A solo pack map is listed ("Name [Pack]") and can be chosen next, an online session lists none of it, a map kind the game does not accept is left out, and the game's own ids win.
+## The client shell's `start_map` (`--solo-map`, a "Play map" link) is the first map laid out, from the map pack the shell mounted.
 
-const SECTIONS := 5
+const SECTIONS := 6
 const MAP := &"fixture_barn"
 const DIR := "user://ws_fixture_ph/"
+
+## A client shell's solo host as the game sees it: `start_map` and the `<pack>/maps` directories it mounted.
+## [member start_map] null stands for an older shell that has no such property.
+class FakeSolo:
+	extends RefCounted
+	var dirs := PackedStringArray()
+
+	func map_dirs(_subdir: String) -> PackedStringArray:
+		return dirs
+
+
+class FakeSoloStart:
+	extends FakeSolo
+	var start_map: StringName = &""
+
 
 var _entered := 0
 var _completed := 0
@@ -29,6 +46,7 @@ func _run() -> void:
 	_test_online()
 	_test_ids()
 	await _test_vote()
+	await _test_start_map()
 
 	_report_sections(_entered, _completed, SECTIONS)
 
@@ -173,4 +191,50 @@ func _test_vote() -> void:
 	_check(labels.has(own), "and still has the game's own")
 	vote.queue_free()
 	await get_tree().process_frame
+	_completed += 1
+
+
+## A world laid out with [param host] as the `dot_solo` service (none when null): the id of its first map.
+func _first_map(host: Object) -> String:
+	if host != null:
+		DotRegistry.register(PhGame.SOLO_SERVICE, host)
+	var config := PhConfig.new()
+	config.warmup_seconds = 0.0
+	config.minimum_players = 0
+	config.keep_progress = false
+	config.shuffle_maps = false
+	var game := PhGame.new()
+	game.config = config
+	game.tick_rate = 60
+	game.authoritative = true
+	game.register_service = false
+	add_child(game)
+	game.set_physics_process(false)
+	await get_tree().physics_frame
+	var id := str(game.map_doc.get("id", ""))
+	remove_child(game)
+	game.free()
+	if host != null:
+		DotRegistry.unregister_instance(PhGame.SOLO_SERVICE, host)
+	await get_tree().process_frame
+	return id
+
+
+func _test_start_map() -> void:
+	_entered += 1
+	print("")
+	print("the shell's start map")
+	var plain := await _first_map(null)
+	_check(plain != "" and plain != String(MAP), "with no solo host the first map is the game's own", plain)
+	_check(PhGame.solo_start_map() == &"", "and there is no start map")
+	# The fallbacks mount no pack: a pack map can be the first of a checkout without `maps/`.
+	_check(await _first_map(FakeSolo.new()) == plain, "a shell with no start_map changes nothing")
+	var asked := FakeSoloStart.new()
+	asked.start_map = &"ph_not_a_map"
+	_check(await _first_map(asked) == plain, "a start map nobody has falls back to the game's own")
+	asked.start_map = &""
+	_check(await _first_map(asked) == plain, "an empty one changes nothing")
+	asked.dirs = PackedStringArray([DIR])
+	asked.start_map = MAP
+	_check(await _first_map(asked) == String(MAP), "a start map from the mounted pack is the first map laid out")
 	_completed += 1

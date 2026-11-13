@@ -290,6 +290,8 @@ func _ready() -> void:
 			var _added := catalogue.add_directory(root)
 		# The Workshop's maps, solo only by the index's own session (an online session lists none).
 		catalogue.follow_content(DotContentIndex.shared(), PhCatalogue.accepted_map_kinds())
+		# A "Play map" link starts solo on its map; one the catalogue lacks falls through to the rotation.
+		next_map_id = solo_start_map()
 		# Laid out now, not on the first round: a warmup on an empty world is
 		# indistinguishable from a map that failed to load.
 		_lay_out_map()
@@ -308,6 +310,15 @@ static func solo_map_dirs(subdir: String) -> PackedStringArray:
 	if host == null or not host.has_method(&"map_dirs"):
 		return PackedStringArray()
 	return host.call(&"map_dirs", subdir)
+
+
+## The map the client shell was asked to start solo on (`--solo-map`, a hotspot "Play map" link): its
+## `start_map`, or empty with no host, no such property or none asked. Duck-typed like [method solo_map_dirs].
+static func solo_start_map() -> StringName:
+	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	if host == null or not (&"start_map" in host):
+		return &""
+	return StringName(str(host.get(&"start_map")))
 
 
 func _exit_tree() -> void:
