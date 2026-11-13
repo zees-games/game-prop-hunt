@@ -11,6 +11,9 @@ const CHANNEL := "ph.catalogue"
 
 const PRACTICE := &"ph_practice"
 
+## A local folder of extra map documents, read after the game's own (first root wins an id).
+const USER_MAPS := "user://maps"
+
 ## id -> normalised document.
 var maps: Dictionary = {}
 
@@ -53,6 +56,8 @@ func load_from(directory: String) -> int:
 
 	var root := PhPaths.rebase("res://" + directory.trim_prefix("res://").trim_prefix("/"))
 	var loaded := _read_directory(root)
+	# Internal-use-only originals (`*_orig` ids) unzipped into the user folder; never shipped. The game's own maps win an id.
+	loaded += _read_directory(USER_MAPS)
 	_rebuild_order()
 
 	DotLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
