@@ -36,7 +36,7 @@
 GAME_NAME="Prop Hunt"
 PACK="prophunt"
 EXTRA_PACKS="prophunt_maps:mg-prop-hunt-maps"
-SUITES="headless_config headless_workbench headless_run headless_mapcfg headless_workshop headless_maps headless_bots headless_net dedicated headless_touch"
+SUITES="headless_config headless_workbench headless_run headless_mapcfg headless_workshop headless_maps headless_bots headless_net dedicated headless_touch headless_native_motor"
 # --------------------------------------------------------------------------------
 
 set -uo pipefail
