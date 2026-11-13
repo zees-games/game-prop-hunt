@@ -1,0 +1,15 @@
+{
+	"format": 1,
+	"mirrors": [],
+	"origin": "https://dotgames.org/content",
+	"packs": [
+		{
+			"id": "gamemann/game-prop-hunt",
+			"into": "",
+			"kind": "pack",
+			"manifest_sha256": "99e2017fbf34302158773b7dbcbfc9c7a567cac309ab88442bc80d271065d613",
+			"optional": false,
+			"version": "0.1.19"
+		}
+	]
+}
