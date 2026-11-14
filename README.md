@@ -2,21 +2,21 @@ This is a game to demonstrate the capabilities of the [**Dot collection**](https
 
 **This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with TMC, you will need to build and integrate your own back-end infrastructure.
 
-**Please treat this as partially tested.** The game was built with Claude Code. Its headless test suite passes, but little of it has been in front of real players. Please report anything you run into.
+This game was built with Claude Code and has had little testing with real players, so please report anything odd you run into.
 
 ## How it plays
-Each round starts with the **hide**. The props get 30 seconds to run off and pick a spot while the hunters stand at their spawn with a black screen (they can still see their HUD and menus, just not the map or anybody on it). Then the hunters are let go and have 5 minutes.
+Each round starts with the **hide**. By default the props get 30 seconds to run off and pick a spot while the hunters stand at their spawn with a black screen (they can still see their HUD and menus, just not the map or anybody on it). Then the hunters are let go and have 5 minutes. Both times are settings (see below), and a map may ask for less.
 
 - **Props** look at something and press **E** to become it: a chair, a bin, a houseplant, a bookcase, a pumpkin. Bigger things have more health but are easier to spot, and you need room to become them: if you're too close to a wall you're moved a step away, and if there's no room at all (or no room to stand up when you show yourself) you're told so. Turn to fit in with the arrow keys, lock your rotation with **C** so looking around doesn't turn you, and stay still. Press **Q** to take the disguise off and show yourself as your avatar, which earns a point a second while you dare; it goes back on with **Q** again, and then you have to wait a little before you can do it again.
-- **Taunts.** Once the hunters are let go, press **T** to play a sound from where you are standing (or **F3** to pick one). Every taunt is worth points, but the hunters hear where it came from. Stand still for too long and the game taunts for you, with a meter on screen showing how close it is.
+- **Taunts.** Once the hunters are let go, press **T** to play a sound from where you are standing (or **F3** to pick one). Every taunt is worth points, but the hunters hear where it came from. Stand still for too long (60 seconds by default) and the game taunts for you, with a meter on screen showing how close it is.
 - **Hunters** get an SMG, a shotgun and a hatchet. Shooting a prop hurts it. Shooting real furniture hurts **you**, so guess carefully. Run out of health and you blow apart.
-- **The beacon.** When only one prop is left, or with 30 seconds to go, every prop still hiding pings out a sound and a ring everybody can see, every two seconds.
+- **The beacon.** When only one prop is left (by default; you can also set a time left), every prop still hiding pings out a sound and a ring everybody can see, every two seconds.
 
-The props win if any of them is still hidden when the clock runs out, or if every hunter is gone. The hunters win if they find every prop. Winning is worth 10 points to everyone on that side, finding a prop 5 and surviving a round 5. Points, rounds won, props found and the rest go to your stats and the leaderboards on TMC.
+The props win if any of them is still hidden when the clock runs out, or if every hunter is gone. The hunters win if they find every prop. By default winning is worth 10 points to everyone on that side, finding a prop 5 and surviving a round 5 (all three are settings). Points, rounds won, props found and the rest go to your stats and the leaderboards on TMC.
 
-A round draws the hunters fresh: one hunter for every three players by default. Say **!hunter** or **!prop** in chat to ask for a side. Anybody who is out watches the rest of the round. After a few rounds on a map, players vote for the next one (`!rtv`, `!nominate ph_house`).
+A round draws the hunters fresh: one hunter for every 3 players by default, and at most 8. Say **!hunter** or **!prop** in chat to ask for a side. Anybody who is out watches the rest of the round. After a few rounds on a map, players vote for the next one (`!rtv`, `!nominate ph_house`).
 
-There are five maps: a small practice house built into the game, and **Maple Grove School**, **Willow Lane**, **Brightline Offices** and **Pinecrest Woods** from [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps).
+The game has a small practice house built in. The separate [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps) pack adds over thirty more (schools, offices, hotels, a bank, a library and so on). A server holds 24 players by default (`max_players` in `game.yml`).
 
 ## Controls
 
@@ -80,10 +80,10 @@ ph_round_seconds 300           // how long the hunters have to find them (a map 
 ph_timeout_winner 1            // who wins when the clock runs out: 0 nobody, 1 props, 2 hunters
 ph_players_per_hunter 3        // one hunter for every this many players
 ph_min_hunters 1               // never fewer than this many
-ph_max_hunters 8               // never more than this many
-ph_hunter_pick 0               // 0 random, 1 everybody gets an equal share, 2 the sides swap
+ph_max_hunters 8               // never more than this many (default 8)
+ph_hunter_pick 0               // 0 random, 1 a queue so everybody gets an equal share, 2 the sides swap
 ph_side_choice 1               // 1 = !hunter and !prop count in the draw
-ph_auto_taunt_seconds 45       // a prop standing still this long is taunted for (0 never)
+ph_auto_taunt_seconds 60       // a prop standing still this long is taunted for (0 never)
 ph_auto_taunt_radius 1.5       // metres a prop has to move for it to count as moving
 ph_taunt_points 2              // points for a taunt a prop chose
 ph_forced_taunt_points 0       // points for one the game forced
@@ -130,7 +130,7 @@ Console commands:
 These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
 
 ## Writing a map
-A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](maps/README.md) describes the format. The server sends the map to each player when it changes, so players don't need the map files.
+A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](https://github.com/zees-games/mg-prop-hunt-maps/blob/main/maps/README.md) in that repository describes the format. The server sends the map to each player when it changes, so players don't need the map files.
 
 ## Testing
 
@@ -148,11 +148,7 @@ A map is a JSON file: the building as boxes, the furniture as props, the lights,
 
 [`CLAUDE.md`](CLAUDE.md) has the design decisions and the reasoning behind them.
 
-## Known gaps
-- The bots are simple: a bot prop walks to the nearest thing it can be and stays there, and a bot hunter wanders and shoots what moves.
-- Your own avatar from TMC is used when you show yourself, but the props themselves can't be customised.
-- The round sounds (not the taunts) are made in code and are placeholders.
-- Not yet tried in a browser.
+The bots are simple: a bot prop walks to the nearest thing it can be and stays there, and a bot hunter wanders and shoots what moves. [`docs/not-yet.md`](docs/not-yet.md) lists what else is missing.
 
 ## Credits
 
