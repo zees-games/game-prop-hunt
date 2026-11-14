@@ -1,0 +1,174 @@
+{
+	"format": "dot-achievement-defs",
+	"version": 1,
+	"achievements": [
+		{
+			"key": "ph.hidden",
+			"name": "Hidden in Plain Sight",
+			"description": "Get through a round as a prop.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "ph.hider",
+			"tier": 1,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.survived",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.furniture",
+			"name": "Part of the Furniture",
+			"description": "Get through twenty-five rounds as a prop.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "ph.hider",
+			"tier": 2,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.survived",
+					"op": "at_least",
+					"value": 25.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.seeker",
+			"name": "Found One",
+			"description": "Find a prop.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "ph.seeker",
+			"tier": 1,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.props_found",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.bloodhound",
+			"name": "Bloodhound",
+			"description": "Find fifty props.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "ph.seeker",
+			"tier": 2,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.props_found",
+					"op": "at_least",
+					"value": 50.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.chameleon",
+			"name": "Chameleon",
+			"description": "Take the shape of a hundred things.",
+			"points": 20,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.disguises",
+					"op": "at_least",
+					"value": 100.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.loudmouth",
+			"name": "Loudmouth",
+			"description": "Taunt the hunters fifty times.",
+			"points": 15,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.taunts",
+					"op": "at_least",
+					"value": 50.0,
+					"merge": "sum"
+				}
+			]
+		},
+		{
+			"key": "ph.clean_sweep",
+			"name": "Clean Sweep",
+			"description": "Find four props in one round.",
+			"points": 30,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": false,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.best_round_found",
+					"op": "at_least",
+					"value": 4.0,
+					"merge": "highest"
+				}
+			]
+		},
+		{
+			"key": "ph.collateral",
+			"name": "Collateral Damage",
+			"description": "Be beaten by the furniture.",
+			"points": 10,
+			"category": "",
+			"icon": "",
+			"hidden": false,
+			"secret": true,
+			"series": "",
+			"tier": 0,
+			"requireAll": true,
+			"rules": [
+				{
+					"stat": "ph.decoy_deaths",
+					"op": "at_least",
+					"value": 1.0,
+					"merge": "sum"
+				}
+			]
+		}
+	]
+}
