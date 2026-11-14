@@ -23,7 +23,7 @@ extends DotConfig
 @export_range(0.0, 300.0, 1.0) var warmup_seconds: float = 8.0
 
 ## People in the match before a round starts (stand-ins count).
-@export_range(1, 24, 1) var min_players_to_start: int = 2
+@export_range(1, 24, 1, "or_greater") var min_players_to_start: int = 2
 
 ## Who wins a round the clock ends: 1 the props, 2 the hunters, 0 nobody.
 ##
@@ -37,7 +37,7 @@ extends DotConfig
 ## most [member max_hunters] — and never everybody.
 @export_range(1.0, 32.0, 0.5) var players_per_hunter: float = 3.0
 @export_range(1, 16, 1) var min_hunters: int = 1
-@export_range(1, 32, 1) var max_hunters: int = 8
+@export_range(1, 32, 1, "or_greater") var max_hunters: int = 8
 
 ## How hunters are chosen each round: 0 a random draw that skips last round's hunters, 1 a queue
 ## so everybody gets an equal share of turns, 2 the sides swap over every round. See
@@ -108,7 +108,7 @@ extends DotConfig
 @export_group("The beacon")
 
 ## Every prop still alive is beaconed once this few are left. 0 never.
-@export_range(0, 32, 1) var beacon_props_left: int = 1
+@export_range(0, 32, 1, "or_greater") var beacon_props_left: int = 1
 
 ## Every prop still alive is beaconed once this few seconds are left; 0 never, the default.
 ## At 30 the stand-in props won 4 rounds in 20, and off 11 in 24, because by then every hunter walks to every prop still in.
@@ -192,7 +192,7 @@ extends DotConfig
 @export var shuffle_maps: bool = true
 
 ## Rounds played on a map before the next one, unless the players vote first.
-@export_range(1, 50, 1) var rounds_per_map: int = 4
+@export_range(1, 50, 1, "or_greater") var rounds_per_map: int = 4
 
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
@@ -208,7 +208,7 @@ extends DotConfig
 @export_group("Bots")
 
 ## How many players the server keeps in the round by adding stand-ins.
-@export_range(0, 24, 1) var minimum_players: int = 4
+@export_range(0, 24, 1, "or_greater") var minimum_players: int = 4
 
 # How a stand-in hunter turns, aims and how quickly it fires are dot-bot's `bot_*` settings,
 # shared by every game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...).
