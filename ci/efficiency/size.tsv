@@ -5,8 +5,8 @@ examples/headless_bots.gd::_run	157
 examples/headless_net.gd	834
 examples/headless_run.gd	1183
 examples/headless_run.gd::_test_the_client	140
-game/net/ph_net_bridge.gd	1547
+game/net/ph_net_bridge.gd	1546
 game/net/ph_net_bridge.gd::_on_event	136
 game/net/ph_net_bridge.gd::attach	116
 game/ph_client.gd	1735
-game/ph_game.gd	2006
+game/ph_game.gd	1996
