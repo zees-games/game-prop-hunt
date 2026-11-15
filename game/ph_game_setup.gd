@@ -39,7 +39,6 @@ var _round_seed: int = 0
 var sides: Dictionary = {}
 var spectate: PhSpectate = null
 var _tick: int = 0
-static var _weapon_catalogue: DotWeaponCatalogue = null
 @export var authoritative: bool = true
 @export_range(1, 240, 1) var tick_rate: int = 64
 ## Whether the map is drawn. A client sets it.
@@ -216,41 +215,55 @@ func _set_side(id: StringName, side: int) -> void:
 		side_changed.emit(id, side)
 
 
-## The weapon table, built once; every rig shares it so its behaviour scripts load once.
-static func weapon_catalogue() -> DotWeaponCatalogue:
-	if _weapon_catalogue == null:
-		_weapon_catalogue = ZeeWeaponPack.catalogue()
-		# Built under the loading cover; the first spawn then loads no script.
-		_weapon_catalogue.warm_scripts()
-	return _weapon_catalogue
+## The next map, built; also every map this server plays, as the map menu (M) lists them: `{id, name, detail, current}`.
+## Solo the client's list, online the server's (the module hands it to dot-vote's map menu), so both say the same.
+func map_rows() -> Array:
+	var out: Array = []
+	if catalogue == null:
+		return out
+	var now := StringName(str(map_doc.get("id", "")))
+	for id in catalogue.playable(config.map_ids):
+		var doc: Dictionary = catalogue.maps.get(id, {})
+		var detail := str(doc.get("blurb", ""))
+		if not catalogue.in_rotation(id):
+			detail = ("%s (not in rotation)" % detail).strip_edges()
+		var row := {"id": String(id), "name": catalogue.label_of(id), "current": id == now,
+			"detail": detail}
+		if doc.has("thumbnail"):
+			row["thumbnail"] = str(doc["thumbnail"])
+		out.append(row)
+	return out
 
 
-## Hands [param player] a weapon, building their rig the first time.
-func arm(player: PhPlayer, weapon_id: StringName) -> bool:
-	if player.weapons == null:
-		var rig := ZeeWeaponRig.new()
-		rig.name = "Weapons"
-		rig.role = ZeeWeaponRig.Role.SERVER
-		rig.authority = authoritative
-		rig.tick_rate = tick_rate
-		rig.catalogue = weapon_catalogue()
-		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-		rig.player_ref = DotNodeRef.of_path(player.get_path())
-		rig.ads_rules = ads_rules
-		player.add_child(rig)
+func weapon_command_for(player: PhPlayer) -> DotWeaponCommand:
+	var command := DotWeaponCommand.new()
+	var pending := player.controller.current_command
 
-		var ready_now := rig.setup()
+	if pending == null:
+		return command
 
-		if not ready_now.ok:
-			DotLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
-			player.remove_child(rig)
-			rig.queue_free()
-			return false
+	command.set_button(DotWeaponCommand.BUTTON_ATTACK, pending.is_pressed(DotFpsCommand.BUTTON_USER_0))
+	command.set_button(DotWeaponCommand.BUTTON_ALT, pending.is_pressed(DotFpsCommand.BUTTON_USER_1))
+	command.set_button(DotWeaponCommand.BUTTON_RELOAD, pending.is_pressed(DotFpsCommand.BUTTON_USER_2))
+	command.set_button(DotWeaponCommand.BUTTON_AIM, player.aiming)
+	command.yaw = pending.yaw
+	command.pitch = pending.pitch
+	command.slot = player.wanted_slot
+	return command
 
-		player.weapons = rig
 
-	if not player.weapons.give(weapon_id).ok:
-		return false
-
-	player_armed.emit(player.player_id, weapon_id)
-	return true
+## Everybody against the map's toys, after they moved: a walk into a barrel or a ball
+## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
+func _advance_toys(delta: float) -> void:
+	if map == null or map.toys == null or map.toys.count() == 0:
+		return
+	for id: StringName in players:
+		var player: PhPlayer = players[id]
+		if not player.is_alive() or player.watching:
+			continue
+		var state := player.controller.state
+		var tunables := player.controller.tunables
+		var radius := tunables.radius if tunables != null else 0.35
+		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
+		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
+	map.toys.advance(delta)

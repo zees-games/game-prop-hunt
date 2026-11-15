@@ -758,26 +758,6 @@ static func _names(of: Array[PhPlayer]) -> PackedStringArray:
 	return out
 
 
-## The next map, built; also every map this server plays, as the map menu (M) lists them: `{id, name, detail, current}`.
-## Solo the client's list, online the server's (the module hands it to dot-vote's map menu), so both say the same.
-func map_rows() -> Array:
-	var out: Array = []
-	if catalogue == null:
-		return out
-	var now := StringName(str(map_doc.get("id", "")))
-	for id in catalogue.playable(config.map_ids):
-		var doc: Dictionary = catalogue.maps.get(id, {})
-		var detail := str(doc.get("blurb", ""))
-		if not catalogue.in_rotation(id):
-			detail = ("%s (not in rotation)" % detail).strip_edges()
-		var row := {"id": String(id), "name": catalogue.label_of(id), "current": id == now,
-			"detail": detail}
-		if doc.has("thumbnail"):
-			row["thumbnail"] = str(doc["thumbnail"])
-		out.append(row)
-	return out
-
-
 ## The map menu's change: [param id] now, not after this map's rounds. The next map is set and
 ## a fresh round begins on it (dot-match's `begin_round_now`: the round called off has no
 ## winner); with no match running it is simply built. Authority only.
@@ -944,7 +924,6 @@ func _build_loadouts() -> void:
 		return storage_key(StringName("u%d" % int((session as Object).get(&"userid")))) if session is Object else "")
 	loadout_command.set(&"applied_fn", func(_ctx: Object, key: String) -> bool:
 		return await rearm_if_allowed(player_id_of_key(key)))
-
 
 
 ## The loadout key of [param player_id]: `ph-hunter-<id>`, with anything a key may not hold made
@@ -1674,23 +1653,6 @@ func _on_prop_broken_debris(index: int, direction: Vector3) -> void:
 		physics.layer_mask(&"world") if physics != null else 1, _round_seed + index)
 
 
-func weapon_command_for(player: PhPlayer) -> DotWeaponCommand:
-	var command := DotWeaponCommand.new()
-	var pending := player.controller.current_command
-
-	if pending == null:
-		return command
-
-	command.set_button(DotWeaponCommand.BUTTON_ATTACK, pending.is_pressed(DotFpsCommand.BUTTON_USER_0))
-	command.set_button(DotWeaponCommand.BUTTON_ALT, pending.is_pressed(DotFpsCommand.BUTTON_USER_1))
-	command.set_button(DotWeaponCommand.BUTTON_RELOAD, pending.is_pressed(DotFpsCommand.BUTTON_USER_2))
-	command.set_button(DotWeaponCommand.BUTTON_AIM, player.aiming)
-	command.yaw = pending.yaw
-	command.pitch = pending.pitch
-	command.slot = player.wanted_slot
-	return command
-
-
 func _physics_process(delta: float) -> void:
 	if not authoritative or match_node == null or external_tick:
 		return
@@ -1779,23 +1741,6 @@ func _watch_world() -> void:
 			fall.tick = _tick
 			fall.context = {"why": DIED_FELL}
 			var _applied := combat.apply_damage(fall)
-
-
-## Everybody against the map's toys, after they moved: a walk into a barrel or a ball
-## sends it on; then the box's own tick (the awake cap, the lost sent home). Server side.
-func _advance_toys(delta: float) -> void:
-	if map == null or map.toys == null or map.toys.count() == 0:
-		return
-	for id: StringName in players:
-		var player: PhPlayer = players[id]
-		if not player.is_alive() or player.watching:
-			continue
-		var state := player.controller.state
-		var tunables := player.controller.tunables
-		var radius := tunables.radius if tunables != null else 0.35
-		var height := lerpf(tunables.stand_height, tunables.crouch_height, state.crouch_fraction) if tunables != null else 1.8
-		var _pushed := map.toys.push_from(state.position, state.velocity, radius, height)
-	map.toys.advance(delta)
 
 
 ## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed (dot-props' `shot_along`). Server side.
@@ -2006,3 +1951,46 @@ func _note_hits(shooter: PhPlayer, shot: DotShot) -> void:
 		if progress != null and players.has(victim):
 			progress.report_hit(shooter.player_id, victim, damage)
 		hit_landed.emit(shooter.player_id, damage.point, damage.lethal, damage.hit_group == DotHitGroup.HEAD)
+
+
+static var _weapon_catalogue: DotWeaponCatalogue = null
+
+
+## The weapon table, built once; every rig shares it so its behaviour scripts load once.
+static func weapon_catalogue() -> DotWeaponCatalogue:
+	if _weapon_catalogue == null:
+		_weapon_catalogue = ZeeWeaponPack.catalogue()
+		# Built under the loading cover; the first spawn then loads no script.
+		_weapon_catalogue.warm_scripts()
+	return _weapon_catalogue
+
+
+## Hands [param player] a weapon, building their rig the first time.
+func arm(player: PhPlayer, weapon_id: StringName) -> bool:
+	if player.weapons == null:
+		var rig := ZeeWeaponRig.new()
+		rig.name = "Weapons"
+		rig.role = ZeeWeaponRig.Role.SERVER
+		rig.authority = authoritative
+		rig.tick_rate = tick_rate
+		rig.catalogue = weapon_catalogue()
+		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
+		rig.player_ref = DotNodeRef.of_path(player.get_path())
+		rig.ads_rules = ads_rules
+		player.add_child(rig)
+
+		var ready_now := rig.setup()
+
+		if not ready_now.ok:
+			DotLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
+			player.remove_child(rig)
+			rig.queue_free()
+			return false
+
+		player.weapons = rig
+
+	if not player.weapons.give(weapon_id).ok:
+		return false
+
+	player_armed.emit(player.player_id, weapon_id)
+	return true
