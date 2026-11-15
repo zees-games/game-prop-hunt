@@ -1099,24 +1099,7 @@ func _on_event(message: DotNetMessage) -> void:
 		PhEvents.Kind.CLOCK:
 			_apply_clock(reader)
 		PhEvents.Kind.ROUND:
-			var round_info := PhEvents.read_round(reader)
-
-			if bool(round_info["ok"]):
-				game.round_number = int(round_info["round"])
-
-				if bool(round_info["began"]):
-					game.phase_elapsed = 0.0
-					game.seek_elapsed = 0.0
-					# The server put every broken piece back.
-					if game.map != null:
-						game.map.restore_all()
-
-				round_changed.emit(
-					int(round_info["round"]),
-					bool(round_info["began"]),
-					int(round_info["winner"]),
-					str(round_info["why"])
-				)
+			_apply_round(reader)
 		PhEvents.Kind.PHASE:
 			var moved := PhEvents.read_phase(reader)
 
@@ -1211,6 +1194,30 @@ func _on_event(message: DotNetMessage) -> void:
 
 			if bool(broke["ok"]):
 				game.apply_broken(int(broke["index"]), broke["direction"], bool(broke["quiet"]))
+
+
+## A round began or ended: the number, the clocks and (on a start) every broken piece.
+func _apply_round(reader: DotNetReader) -> void:
+	var round_info := PhEvents.read_round(reader)
+
+	if not bool(round_info["ok"]):
+		return
+
+	game.round_number = int(round_info["round"])
+
+	if bool(round_info["began"]):
+		game.phase_elapsed = 0.0
+		game.seek_elapsed = 0.0
+		# The server put every broken piece back.
+		if game.map != null:
+			game.map.restore_all()
+
+	round_changed.emit(
+		int(round_info["round"]),
+		bool(round_info["began"]),
+		int(round_info["winner"]),
+		str(round_info["why"])
+	)
 
 
 func _apply_hello(reader: DotNetReader) -> void:

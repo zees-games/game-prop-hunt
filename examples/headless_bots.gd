@@ -270,6 +270,14 @@ func _run() -> void:
 	_check(unreachable * 50 <= places, "at most one place in fifty is cut off (a corner behind furniture)", "%d of %d%s" % [unreachable, places, worst])
 	_completed += 1
 
+	_check_placement(results, difficulty, shard)
+
+	_report_sections(_entered, _completed, SECTIONS)
+
+
+## The annotated map: where the props ended up standing and how much of the best places the
+## hunters passed, held to the bands at medium on the whole run.
+func _check_placement(results: Array[Dictionary], difficulty: String, shard: String) -> void:
 	_section("the annotated map: where the props stand, what the hunters cover")
 	var samples := 0
 	var next_to := 0
@@ -304,8 +312,6 @@ func _run() -> void:
 		_check(seen <= open * SEEN_OF_OPEN_MAX, "props end less in sight than a floor point picked at random", "%.0f%% seen against %.0f%%" % [100.0 * seen / sn, 100.0 * open / sn])
 		_check(cover_rounds > 0 and cover / float(cover_rounds) >= _cover_min(results), "the hunters pass the best places within %.0f s" % COVER_WITHIN, "%.0f%%" % (100.0 * cover / maxf(float(cover_rounds), 1.0)))
 	_completed += 1
-
-	_report_sections(_entered, _completed, SECTIONS)
 
 
 ## The round's config: a seed per index, and the server's ceilings when a measurement asks.

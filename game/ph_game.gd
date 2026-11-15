@@ -1,19 +1,13 @@
-extends "ph_game_rotation.gd"
+extends "ph_game_setup.gd"
 
-const PhMap := preload("ph_map.gd")
 const PhMapDoc := preload("ph_map_doc.gd")
-const PhPaths := preload("ph_paths.gd")
-const PhPlayer := preload("ph_player.gd")
-const PhProgress := preload("ph_progress.gd")
 const PhProps := preload("ph_props.gd")
 const PhRules := preload("ph_rules.gd")
-const PhSpectate := preload("ph_spectate.gd")
 const PhBots := preload("ph_bots.gd")
 const PhAmbience := preload("ph_ambience.gd")
 const PhDebris := preload("ph_debris.gd")
 const PhController := preload("ph_controller.gd")
 const PhLoadout := preload("ph_loadout.gd")
-const PhProjectiles := preload("ph_projectiles.gd")
 const PhWeaponLayer := preload("ph_weapon_layer.gd")
 const PhGameReport := preload("ph_game_report.gd")
 const PhFlashlight := preload("ph_flashlight.gd")
@@ -37,10 +31,6 @@ const NET_SNAPSHOT_RATE := 30
 ## How far a position may be from the origin, in metres, on the wire. Both ends read it here.
 const NET_WORLD_EXTENT := 512.0
 
-## The two sides. Fixed ids, because the whole game is about which of the two somebody is.
-const PROPS := 1
-const HUNTERS := 2
-
 const TEAM_COLOURS: Array[Color] = [
 	Color(0.30, 0.58, 0.96),
 	Color(0.97, 0.56, 0.16),
@@ -62,9 +52,6 @@ const DIED_SHOT := &"shot"
 const DIED_DECOY := &"decoy"
 const DIED_FELL := &"fell"
 
-## The burst drawn where a grenade went off (dot-fx).
-const BLAST_FX := &"blast"
-
 ## What a turn request asks of a disguise.
 enum Turn { LOCK, TILT_FORWARD, TILT_BACK, TILT_LEFT, TILT_RIGHT, STRAIGHTEN }
 
@@ -75,7 +62,6 @@ signal world_clearing()
 signal world_rebuilt()
 signal round_over(number: int, winner: int, winner_name: String)
 signal phase_changed(phase: int)
-signal side_changed(player_id: StringName, side: int)
 signal player_died(player_id: StringName, by: StringName, why: StringName, weapon_id: StringName)
 
 ## Somebody's disguise changed: a new prop, their own face, a turn, a lock.
@@ -94,8 +80,6 @@ signal decoy_hit(player_id: StringName, amount: float)
 ## from [param direction]. Both ends; a client throws its debris.
 signal prop_broken(index: int, direction: Vector3)
 
-signal achievement_earned(player_id: StringName, title: String, points: int)
-signal player_armed(player_id: StringName, weapon_id: StringName)
 
 ## A weapon's shot took health off somebody: to [param player_id], the shooter, for the hit
 ## marker and the hit drawn on the body. The server's word, never a client's prediction.
@@ -105,34 +89,21 @@ signal hit_landed(player_id: StringName, point: Vector3, killed: bool, headshot:
 ## copies, `PhProjectiles`), for the burst and the sound.
 signal blast_drawn(at: Vector3, weapon_id: StringName)
 
-@export var authoritative: bool = true
-@export_range(1, 240, 1) var tick_rate: int = 64
 @export var external_tick: bool = false
 @export var register_service: bool = true
 
-## Whether the map is drawn. A client sets it.
-@export var draw_world: bool = false
-
-var map: PhMap = null
 var props_catalogue: PhProps = null
 var combat: DotCombatManager = null
 ## Whether a player may be hurt or eliminated now: `func(player_id: StringName) -> bool`, assigned by the module.
 ## A seat behind its client's loading cover is frozen by that client, so a shot or fall must not end it.
 ## Unset offline, where bots are never loading.
 var harm_gate: Callable = Callable()
-## The hunters' grenades in flight (`ph_projectiles.gd`): flown on the server and solo, and as
-## copies on a client from the LAUNCH events (`PhNetBridge`), which decide nothing.
-var projectiles: PhProjectiles = null
 
 ## Guns lying about (`ph_weapon_layer.gd`), built on both ends, and the `sv_weapon_drop*` rules it runs under: bound by the module, REPLICATED.
 var weapon_layer: PhWeaponLayer = null
 var drop_rules: DotWeaponDropRules = _walk_over_drops()
-var match_node: DotMatch = null
 var random: DotRandomManager = null
 var physics: DotPhysicsLayout = null
-var effects: DotFxManager = null
-var spectate: PhSpectate = null
-var progress: PhProgress = null
 var taunts: DotPropTaunts = null
 var rules: DotPropDisguiseRules = null
 
@@ -143,9 +114,6 @@ var loadouts: DotLoadoutManager = null
 ## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
 ## Untyped and loaded by path because a host whose dot-loadout predates API 2 has no such class; null there, and B is not offered.
 var loadout_command: Object = null
-
-## player id -> PhPlayer.
-var players: Dictionary = {}
 
 ## dot-player-controller's `mp_forceview`: views switchable (0), held first person (1) or third (2); module-bound (REPLICATED), client-followed.
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
@@ -158,10 +126,6 @@ var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
 ## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
 var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
-
-## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every weapon
-## rig. Bound by the module and followed by a client, so its prediction agrees. Nothing sets the aim bit yet.
-var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 
 ## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
 var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
@@ -200,22 +164,14 @@ var block_rules: Object = null:
 		if block_rules != null and block_rules.has_signal(&"changed"):
 			block_rules.connect(&"changed", body_rules.refresh)
 
-## player id -> side.
-var sides: Dictionary = {}
-
 ## The map the next round plays, set by the players' vote or an operator, used once.
 var next_map_id: StringName = &""
-
-var round_number: int = 0
 
 ## Seconds into the current phase, and into the seeking. Simulated, never a wall clock.
 var phase_elapsed: float = 0.0
 var seek_elapsed: float = 0.0
 
 var phase: int = Phase.IDLE
-
-## The map this round is played on.
-var map_doc: Dictionary = {}
 
 var entities := DotEntityTable.new()
 
@@ -224,15 +180,10 @@ var remote_props: int = -1
 var remote_hunters: int = -1
 var remote_playable: bool = false
 
-## Who has had the hunters' role, for [DotTeamRotation].
-var hunter_history: Dictionary = {}
-
-var _tick: int = 0
 ## Scratch for _make_room, reused so a request allocates nothing.
 var _spots: Array[Vector3] = []
 ## A refusal with a formatted reason; held as a Callable because it is a rare request refusal, not per-frame work.
 var _refuse_fmt: Callable = _refuse_formatted
-var _round_seed: int = 0
 var _rounds_on_map: int = 0
 var _map_unplayed: bool = false
 var _decided: bool = false
@@ -356,40 +307,6 @@ func _build_physics() -> void:
 		physics = null
 
 
-## The gravity the movement is tuned against, on this world's own physics SPACE: a project
-## setting does not travel with a delivered pack.
-func _apply_gravity() -> void:
-	var world := get_world_3d()
-
-	if world == null:
-		return
-
-	PhysicsServer3D.area_set_param(world.space, PhysicsServer3D.AREA_PARAM_GRAVITY, config.gravity)
-
-
-## The server's movement numbers (its HELLO), so this client predicts with what the server simulates.
-func adopt_movement(move: PackedFloat32Array, auto_hop: bool) -> void:
-	if move.size() < 9:
-		return
-	config.run_speed = move[0]
-	config.walk_speed_scale = move[1]
-	config.jump_height = move[2]
-	config.gravity = move[3]
-	config.air_accelerate = move[4]
-	config.accelerate = move[5]
-	config.friction = move[6]
-	config.stop_speed = move[7]
-	config.crouch_speed_scale = move[8]
-	config.auto_bunny_hop = auto_hop
-	_apply_gravity()
-	if projectiles != null:
-		projectiles.set_gravity(config.gravity)
-	if map != null:
-		map.gravity = config.gravity
-	for id: StringName in players:
-		(players[id] as PhPlayer).retune()
-
-
 func _build_random() -> void:
 	random = DotRandomManager.new()
 	random.name = "Random"
@@ -464,48 +381,6 @@ func _build_combat() -> void:
 		blast_drawn.emit(at, spawn.id if spawn != null else &""))
 
 
-func _build_effects() -> void:
-	if authoritative and not draw_world:
-		return
-
-	var fx := DotFxCatalogue.new()
-
-	var go := DotFxDef.new()
-	go.id = &"go"
-	go.kind = DotFxDef.Kind.SCREEN
-	go.flash_peak = 0.18
-	go.flash_colour = Color(0.98, 0.86, 0.35, 1.0)
-	go.flash_decay_ms = 380
-	fx.add(go)
-
-	var hurt := DotFxDef.new()
-	hurt.id = &"hurt"
-	hurt.kind = DotFxDef.Kind.SCREEN
-	hurt.flash_peak = 0.3
-	hurt.flash_colour = Color(0.9, 0.1, 0.1, 1.0)
-	hurt.flash_decay_ms = 260
-	fx.add(hurt)
-
-	# A grenade going off: a fireball, smoke, sparks and a light (game-fatal-contact's scene, copied). At
-	# every quality: where something went off is information, not decoration.
-	var blast := DotFxDef.new()
-	blast.id = BLAST_FX
-	blast.scene_path = PhPaths.rebase("res://scenes/fx/explosion.tscn")
-	blast.lifetime_ms = 1400
-	blast.cost = 10
-	blast.priority = 85
-	blast.max_distance = 140.0
-	fx.add(blast)
-
-	effects = DotFxManager.new()
-	effects.name = "Effects"
-	effects.catalogue = fx
-	effects.config = DotFxConfig.new()
-	effects.register_as_service = false
-	add_child(effects)
-	DotLog.result(CHANNEL, "the effects layer", effects.setup())
-
-
 func _build_match() -> void:
 	match_node = DotMatch.new()
 	match_node.name = "Match"
@@ -549,49 +424,6 @@ func _build_match() -> void:
 
 func _decision() -> Dictionary:
 	return {"decided": _decided, "winner": _winner}
-
-
-func _build_spectate() -> void:
-	spectate = PhSpectate.new()
-	spectate.name = "Spectate"
-	spectate.players = players
-	spectate.sides = sides
-	spectate.authoritative = authoritative
-	spectate.tick_rate = tick_rate
-	spectate.force_camera = config.spectate_camera
-	add_child(spectate)
-
-	var ready_now := spectate.setup()
-
-	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
-		remove_child(spectate)
-		spectate.queue_free()
-		spectate = null
-
-
-func _build_progress() -> void:
-	if not authoritative or not config.keep_progress:
-		return
-
-	progress = PhProgress.new()
-	progress.name = "Progress"
-	progress.players = players
-	progress.sides = sides
-	add_child(progress)
-
-	var ready_now := progress.setup(config.progress_directory, config.report_progress)
-
-	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "progress is off", {"why": ready_now.error.message})
-		remove_child(progress)
-		progress.queue_free()
-		progress = null
-		return
-
-	progress.earned.connect(func(id: StringName, title: String, points: int) -> void:
-		achievement_earned.emit(id, title, points)
-	)
 
 
 ## The taunt list, on both ends: the server decides when a taunt plays, every client plays it.
@@ -912,62 +744,11 @@ func _on_round_ended(number: int, winner: int, _outcome: int) -> void:
 	DotLog.info(CHANNEL, "round over", {"number": number, "winner": _winner_name})
 
 
-## Who hunts this round: [DotTeamRotation], with the server's mode and the players' wishes.
-func _draw_sides() -> void:
-	var keys: Array[StringName] = []
-
-	for id: StringName in players:
-		keys.append(id)
-
-	keys.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
-
-	var wishes := {}
-
-	if config.allow_side_choice:
-		for id in keys:
-			match (players[id] as PhPlayer).side_wish:
-				HUNTERS:
-					wishes[id] = 1
-				PROPS:
-					wishes[id] = -1
-
-	# A map may ask for its own share of hunters: a big school with a hiding place every few
-	# metres wants more of them than a cottage (`ph-bots-map-spread-1`).
-	var want := config.hunters_for(keys.size(), float(map_doc.get("players_per_hunter", 0.0)))
-	var picked: Dictionary = DotTeamRotation.pick(
-		keys, want, config.hunter_pick as DotTeamRotation.Mode, hunter_history, _round_seed, wishes
-	)
-	DotTeamRotation.note(hunter_history, keys, picked["picked"], round_number)
-
-	for id in keys:
-		_set_side(id, HUNTERS if (picked["picked"] as Array).has(id) else PROPS)
-
-	if not keys.is_empty():
-		DotLog.debug(CHANNEL, "hunters drawn", {"why": str(picked["why"])})
-
-
 ## A player's wish, from chat. Server side. Takes effect at the next draw.
 func wish_side(id: StringName, side: int) -> void:
 	var player: PhPlayer = players.get(id)
 	if player != null:
 		player.side_wish = side if side == PROPS or side == HUNTERS else 0
-
-
-func _set_side(id: StringName, side: int) -> void:
-	var player: PhPlayer = players.get(id)
-
-	if player == null:
-		return
-
-	var was := int(sides.get(id, 0))
-	sides[id] = side
-	player.team = side
-
-	if match_node != null and was != side:
-		var _moved := match_node.switch_team(String(id), side, _tick)
-
-	if was != side:
-		side_changed.emit(id, side)
 
 
 static func _names(of: Array[PhPlayer]) -> PackedStringArray:
@@ -1164,17 +945,6 @@ func _build_loadouts() -> void:
 	loadout_command.set(&"applied_fn", func(_ctx: Object, key: String) -> bool:
 		return await rearm_if_allowed(player_id_of_key(key)))
 
-
-static var _weapon_catalogue: DotWeaponCatalogue = null
-
-
-## The weapon table, built once; every rig shares it so its behaviour scripts load once.
-static func weapon_catalogue() -> DotWeaponCatalogue:
-	if _weapon_catalogue == null:
-		_weapon_catalogue = ZeeWeaponPack.catalogue()
-		# Built under the loading cover; the first spawn then loads no script.
-		_weapon_catalogue.warm_scripts()
-	return _weapon_catalogue
 
 
 ## The loadout key of [param player_id]: `ph-hunter-<id>`, with anything a key may not hold made
@@ -1745,37 +1515,6 @@ func _look(player: PhPlayer, reach: float) -> int:
 		return -1
 
 	return map.prop_from_hit(hit.get("collider"), int(hit.get("shape", -1)))
-
-
-## Hands [param player] a weapon, building their rig the first time.
-func arm(player: PhPlayer, weapon_id: StringName) -> bool:
-	if player.weapons == null:
-		var rig := ZeeWeaponRig.new()
-		rig.name = "Weapons"
-		rig.role = ZeeWeaponRig.Role.SERVER
-		rig.authority = authoritative
-		rig.tick_rate = tick_rate
-		rig.catalogue = weapon_catalogue()
-		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-		rig.player_ref = DotNodeRef.of_path(player.get_path())
-		rig.ads_rules = ads_rules
-		player.add_child(rig)
-
-		var ready_now := rig.setup()
-
-		if not ready_now.ok:
-			DotLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
-			player.remove_child(rig)
-			rig.queue_free()
-			return false
-
-		player.weapons = rig
-
-	if not player.weapons.give(weapon_id).ok:
-		return false
-
-	player_armed.emit(player.player_id, weapon_id)
-	return true
 
 
 func _disarm(player: PhPlayer) -> void:
