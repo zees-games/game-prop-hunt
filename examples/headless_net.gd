@@ -6,7 +6,7 @@ extends "headless_net_base.gd"
 ## and the blindfold is true on the wire (a hunter's snapshots carry no prop while the props hide, `PhInterest`). Then everything else that crosses. Sections and checks are both counted (mg-smash-copter's notes say why).
 
 const SECTIONS := 19
-const CHECKS := 103
+const CHECKS := 104
 
 
 func _ready() -> void:
@@ -171,6 +171,26 @@ func _test_the_codec_rest() -> void:
 	var carried := PhEvents.read_map(incoming.reader())
 	_check(bool(carried["ok"]) and (carried["encoded"] as PackedByteArray).size() == PhEvents.MAP_BYTES,
 		"a MAP as large as a reader accepts fits in an event", "%d of %d bytes" % [(carried["encoded"] as PackedByteArray).size(), PhEvents.MAP_BYTES])
+
+	# A map has no size limit: past one message it goes in MAP_PARTs, each one an event, joined whole.
+	var large := PackedByteArray()
+	large.resize(PhMapDoc.PART_BYTES * 3 + 5)
+	for i in large.size():
+		large[i] = (i * 31 + 7) & 0xff
+	var parts := PhEvents.write_map_parts(large, PhMapDoc.PART_BYTES)
+	var joined := PackedByteArray()
+	var parts_ok := parts.size() == 4
+	for part: Array in parts:
+		var sent_part := PhEvent.new(part[0], part[1])
+		var part_wire := DotNetWriter.new()
+		sent_part._write(part_wire)
+		var got_part := PhEvent.new()
+		got_part._read(DotNetReader.new(part_wire.to_bytes()))
+		var piece := PhEvents.read_map_part(got_part.reader())
+		parts_ok = parts_ok and got_part.kind == PhEvents.Kind.MAP_PART and bool(piece["ok"]) and int(piece["total"]) == large.size()
+		joined.append_array(piece["chunk"])
+	_check(parts_ok and joined == large and PhEvents.write_map_parts(PackedByteArray([1, 2]), PhMapDoc.PART_BYTES)[0][0] == PhEvents.Kind.MAP,
+		"a map past one message goes in MAP_PARTs that join whole; a small one is one MAP", "%d parts, %d of %d bytes" % [parts.size(), joined.size(), large.size()])
 
 	_check(PhEvent.fits(), "every event kind fits the event's kind field",
 		"%d kinds in %d bits" % [PhEvents.Kind.size(), PhEvent.KIND_BITS])

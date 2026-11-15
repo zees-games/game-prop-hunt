@@ -16,8 +16,8 @@ extends DotConfig
 ## Seconds between rounds.
 @export_range(0.0, 60.0, 1.0) var intermission_seconds: float = 8.0
 
-## Seconds of the round's final killcam, added to the intermission (`mp_killcam_time`); 0 is off. Not added when the intermission is 0.
-@export_range(0.0, 30.0, 0.5) var killcam_seconds: float = 0.0
+## Seconds of the round's final killcam, added to the intermission (`mp_killcam_time`); default 0 (off), any length. Not added when the intermission is 0.
+@export_range(0.0, 30.0, 0.5, "or_greater") var killcam_seconds: float = 0.0
 
 ## Seconds of warmup before the first round. 0 starts immediately.
 @export_range(0.0, 300.0, 1.0) var warmup_seconds: float = 8.0
@@ -204,6 +204,24 @@ extends DotConfig
 
 ## Seed every random choice is drawn from: the map, the hunters, the bots.
 @export var seed_value: int = 20261009
+
+## The most boxes a map document may hold; a map past it is refused with the count. 0 = no limit.
+@export_range(0, 100000, 1, "or_greater") var max_map_boxes: int = 0
+
+## The most props a map document may hold. 0 = no limit.
+@export_range(0, 100000, 1, "or_greater") var max_map_props: int = 0
+
+## The most toys (balls, trampolines, switches) a map document may hold. 0 = no limit.
+@export_range(0, 100000, 1, "or_greater") var max_map_toys: int = 0
+
+## The most lights a map document may hold. 0 = no limit; what they cost to draw is the map's choice.
+@export_range(0, 100000, 1, "or_greater") var max_map_lights: int = 0
+
+## Past this many lights a map is still played, with a warning in the log. 0 = no warning.
+@export_range(0, 100000, 1, "or_greater") var map_lights_warn: int = 128
+
+## The most spawns a map document may give each side. 0 = no limit.
+@export_range(0, 100000, 1, "or_greater") var max_map_spawns: int = 0
 
 
 @export_group("Bots")

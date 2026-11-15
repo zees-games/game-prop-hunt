@@ -113,6 +113,8 @@ The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuot
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
+A map document has no size limit. A map larger than one message (60,000 bytes deflated) is sent in pieces, so a browser client gets it too. A server can still set limits with `--ph-max-map-boxes`, `-props`, `-toys`, `-lights` and `-spawns` (default 0, no limit, any value). A document over a limit is refused with its count, never cut down. `--ph-map-lights-warn` (default 128, any value, 0 for none) logs a warning past that many lights; the cost of a light stays the map author's choice.
+
 `--ph-map-ids=<ids>` limits a server to some maps, and every other setting in `game/ph_config.gd` can be given the same way (`--ph-taunt-range=80`). The taunts are listed in `taunts/taunts.json`: edit it to add your own sounds. The vote's settings go in `user://cfg/prophunt_vote.json` (`{"enabled": false}` turns it off); dot-vote's README lists them.
 
 Console commands:
@@ -142,7 +144,7 @@ A map is a JSON file: the building as boxes, the furniture as props, the lights,
 | Suite | What it covers |
 | --- | --- |
 | `headless_run` | The game itself: the draw, hiding, disguises, taunts, decoys, the beacon, bots |
-| `headless_maps` | Every map: it fits on the wire, every spawn is clear, every prop stands on something |
+| `headless_maps` | Every map: it encodes for the wire (no hard document limit), every spawn is clear, every prop stands on something |
 | `headless_net` | A server and a client in one process, over the network code: disguises, the blindfold, taunts |
 | `dedicated` | A real server: boots, loads the game, runs its commands, a round of bots, the map vote |
 

@@ -6,6 +6,7 @@ const AMBIENT_KIND := "ambience"
 const PhPlayer := preload("ph_player.gd")
 const PhAvatars := preload("ph_avatars.gd")
 const PhVote := preload("ph_vote.gd")
+const PhMapDoc := preload("ph_map_doc.gd")
 
 ## This game as a module a dedicated server loads; [DotGameModule] holds the netcode, bridge, roster and tick.
 ## No `class_name`: [method DotModuleHost.load_module] takes a path, and a pack's globals are not registered in the host.
@@ -211,8 +212,14 @@ func _bind_killcam(world: PhGame) -> void:
 		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
 	_killcam_cvar = killcam
 	if killcam != null:
+		# Any length, 0 for none; below 0 or not a number is refused with the reason, not clamped.
+		var _v := killcam.with_validator(func(value: String) -> DotResult:
+			if not value.is_valid_float() or value.to_float() < 0.0:
+				return DotResult.fail(DotError.CODE_INVALID,
+					"mp_killcam_time is %s; it takes seconds, 0 or more (0 for none)." % value)
+			return DotResult.success(null))
 		killcam.changed.connect(func(_old: String, new_value: String) -> void:
-			world.config.killcam_seconds = clampf(new_value.to_float(), 0.0, 30.0)
+			world.config.killcam_seconds = new_value.to_float()
 			world.apply_intermission())
 
 	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
@@ -790,6 +797,7 @@ func _cmd_reload(ctx: DotCmdContext) -> void:
 		ctx.reply("No world.")
 		return
 
+	PhMapDoc.apply_limits(world.config)
 	var loaded := world.catalogue.load_from(world.config.map_directory)
 	loaded += await _add_delivered_maps(world)
 	world.apply_rotation()

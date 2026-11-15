@@ -282,6 +282,8 @@ func _ready() -> void:
 	prop_broken.connect(_on_prop_broken_debris)
 
 	if authoritative:
+		# Before any document is read: the server's limits on one (`max_map_*`, 0 = none).
+		PhMapDoc.apply_limits(config)
 		catalogue = PhCatalogue.new()
 		var _loaded := catalogue.load_from(config.map_directory)
 		# Solo in the client shell: the map packs it mounted for this game, which a server

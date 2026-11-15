@@ -13,16 +13,26 @@ const FORMAT := 1
 
 const KIND := "prophunt_map"
 
-## The largest a document may be on the wire, compressed. A WebSocket's outbound buffer is
-## sixty-four kilobytes and a message past it is never sent (mg-look-at-me's finding), so a map
-## must fit with room for the header.
-const WIRE_LIMIT := 60000
+const CHANNEL := "ph.map"
 
-const MAX_BOXES := 6000
-const MAX_PROPS := 2000
-const MAX_TOYS := 96
-const MAX_LIGHTS := 128
-const MAX_SPAWNS := 64
+## The most one MAP message carries, compressed. A WebSocket's outbound buffer is sixty-four
+## kilobytes and a message past it is never sent (mg-look-at-me's finding), so a larger map goes
+## as MAP_PART messages of at most this many bytes each (the bridge's `_map_messages`). Not a
+## limit on a map: a document of any size is sent.
+const PART_BYTES := 60000
+
+## How many of each thing a document may hold, 0 for no limit (the default for every one).
+## Settings, not constants: `PhConfig.max_map_*` (`max_map_boxes` ... in config_maps/game.yml), applied by
+## [method apply_limits] when the game starts. A document over a set limit is refused with the
+## count, never cut down. What a big map costs to draw and send is its author's choice.
+static var max_boxes: int = 0
+static var max_props: int = 0
+static var max_toys: int = 0
+static var max_lights: int = 0
+static var max_spawns: int = 0
+## Past this many lights a document is still read, with a warning in the log: every light is
+## drawn, and the Compatibility renderer lights a mesh with at most eight. 0 is no warning.
+static var lights_warn: int = 128
 
 ## The ambience beds dot-audio ships (CC0, its stock/CREDITS.md), which a map may name.
 const AMBIENCE_BEDS := ["amb_wind", "amb_outdoor", "amb_night", "amb_city", "amb_indoor", "amb_eerie", "amb_industrial", "amb_cave", "amb_rain"]
@@ -102,8 +112,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("box %d is not {at, size, mat}" % boxes.size(), source)
 		boxes.append(box)
 
-	if boxes.size() > MAX_BOXES:
-		return _refuse("%d boxes; the most is %d" % [boxes.size(), MAX_BOXES], source)
+	if _over(boxes.size(), max_boxes):
+		return _refuse("%d boxes; this server takes at most %d (max_map_boxes, 0 = no limit)" % [boxes.size(), max_boxes], source)
 
 	doc["boxes"] = boxes
 
@@ -114,8 +124,8 @@ static func validate(source: Dictionary) -> DotResult:
 			return _refuse("prop %d is not {id, at}" % props.size(), source)
 		props.append(prop)
 
-	if props.size() > MAX_PROPS:
-		return _refuse("%d props; the most is %d" % [props.size(), MAX_PROPS], source)
+	if _over(props.size(), max_props):
+		return _refuse("%d props; this server takes at most %d (max_map_props, 0 = no limit)" % [props.size(), max_props], source)
 
 	doc["props"] = props
 
@@ -173,8 +183,8 @@ static func _spawns(source: Dictionary) -> DotResult:
 			list.append({"at": _floats((raw as Dictionary)["at"], 3), "yaw": _r(float((raw as Dictionary).get("yaw", 0.0)))})
 		if list.is_empty():
 			return _refuse("no spawns for the %s" % side, source)
-		if list.size() > MAX_SPAWNS:
-			return _refuse("%d %s spawns; the most is %d" % [list.size(), side, MAX_SPAWNS], source)
+		if _over(list.size(), max_spawns):
+			return _refuse("%d %s spawns; this server takes at most %d (max_map_spawns, 0 = no limit)" % [list.size(), side, max_spawns], source)
 		out_spawns[side] = list
 	return DotResult.success(out_spawns)
 
@@ -190,8 +200,8 @@ static func _toys(source: Dictionary) -> DotResult:
 			return _refuse("toy %d is not {toy, at}" % toys.size(), source)
 		toys.append(toy)
 
-	if toys.size() > MAX_TOYS:
-		return _refuse("%d toys; the most is %d" % [toys.size(), MAX_TOYS], source)
+	if _over(toys.size(), max_toys):
+		return _refuse("%d toys; this server takes at most %d (max_map_toys, 0 = no limit)" % [toys.size(), max_toys], source)
 
 	return DotResult.success(toys)
 
@@ -209,8 +219,13 @@ static func _lights(source: Dictionary) -> DotResult:
 			"colour": _floats(light.get("colour", [1.0, 0.95, 0.85]), 3),
 		})
 
-	if lights.size() > MAX_LIGHTS:
-		return _refuse("%d lights; the most is %d" % [lights.size(), MAX_LIGHTS], source)
+	if _over(lights.size(), max_lights):
+		return _refuse("%d lights; this server takes at most %d (max_map_lights, 0 = no limit)" % [lights.size(), max_lights], source)
+
+	if _over(lights.size(), lights_warn):
+		DotLog.warn(CHANNEL, "a map has more lights than the warning level; each one costs every frame", {
+			"map": str(source.get("id", "?")), "lights": lights.size(), "warn_at": lights_warn,
+		})
 
 	return DotResult.success(lights)
 
@@ -293,8 +308,9 @@ static func decode(bytes: PackedByteArray) -> DotResult:
 	if bytes.decode_u32(4) != bytes.size() - 8:
 		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire is not the length it says.")
 
-	# A size this large is a corrupt header; decompressing it would allocate whatever it says.
-	if size <= 0 or size > WIRE_LIMIT * 40:
+	# Deflate expands at most 1032 to 1, so a size past that is a corrupt header, and
+	# decompressing it would allocate whatever it says. A bound of the format, not a limit.
+	if size <= 0 or size > (bytes.size() - 8) * 1032:
 		return DotResult.fail(DotError.CODE_PARSE, "A map on the wire says it is %d bytes." % size)
 
 	var raw := bytes.slice(8).decompress(size, FileAccess.COMPRESSION_DEFLATE)
@@ -366,6 +382,22 @@ static func _is_id(id: String) -> bool:
 			return false
 
 	return true
+
+
+## Whether [param count] is past [param limit], where a limit of 0 or less is none.
+static func _over(count: int, limit: int) -> bool:
+	return limit > 0 and count > limit
+
+
+## Sets the document limits from a config's `max_map_*` fields (0 = no limit). Static, so every
+## document read in this process after it (catalogue, wire, tests) is held to the same.
+static func apply_limits(config: Object) -> void:
+	max_boxes = int(config.get("max_map_boxes"))
+	max_props = int(config.get("max_map_props"))
+	max_toys = int(config.get("max_map_toys"))
+	max_lights = int(config.get("max_map_lights"))
+	max_spawns = int(config.get("max_map_spawns"))
+	lights_warn = int(config.get("map_lights_warn"))
 
 
 static func _refuse(why: String, doc: Dictionary) -> DotResult:

@@ -133,8 +133,16 @@ var _client_ticked_for: int = -1
 ## The guns on the floor, over the link; a client connects to its `lost_received`.
 var weapon_net := PhWeaponNet.new()
 
-## The map the clients were last sent, so a late joiner is sent the same bytes.
-var _map_body: PackedByteArray = PackedByteArray()
+## The map the clients were last sent, as `[kind, body]` messages (one MAP, or MAP_PARTs in
+## order), so a late joiner is sent the same bytes.
+var _map_messages: Array = []
+
+## A client's map so far while it arrives in MAP_PARTs: the next index it expects, how many,
+## the whole size, and the bytes joined.
+var _map_next: int = 0
+var _map_count: int = 0
+var _map_total: int = 0
+var _map_joined: PackedByteArray = PackedByteArray()
 
 
 
@@ -503,15 +511,17 @@ func _on_world_rebuilt() -> void:
 
 	var encoded := PhMapDoc.encode(game.map.doc)
 
-	if encoded.size() > PhMapDoc.WIRE_LIMIT:
-		# Sent anyway: a client on a native transport will take it, and the line says why a
-		# browser does not. A WebSocket message past its outbound buffer is never delivered.
-		DotLog.warn(CHANNEL, "a map is larger than a browser can be sent in one message", {
-			"map": String(game.map.id()), "bytes": encoded.size(), "limit": PhMapDoc.WIRE_LIMIT,
+	# A map larger than one message goes in pieces: a WebSocket message past its outbound
+	# buffer is never delivered, so no message is let near it, whatever the map's size.
+	_map_messages = PhEvents.write_map_parts(encoded, PhMapDoc.PART_BYTES)
+
+	if _map_messages.size() > 1:
+		DotLog.info(CHANNEL, "a large map goes in pieces", {
+			"map": String(game.map.id()), "bytes": encoded.size(), "pieces": _map_messages.size(),
 		})
 
-	_map_body = PhEvents.write_map(encoded)
-	_broadcast(PhEvents.Kind.MAP, _map_body)
+	for message: Array in _map_messages:
+		_broadcast(message[0], message[1])
 	_register_toys()
 
 
@@ -901,8 +911,9 @@ func _admit(peer_id: int) -> void:
 	))
 
 	# The map, before anything that stands on it, and what of it is already broken.
-	if not _map_body.is_empty():
-		_tell(peer_id, PhEvents.Kind.MAP, _map_body)
+	if not _map_messages.is_empty():
+		for message: Array in _map_messages:
+			_tell(peer_id, message[0], message[1])
 		# The map's toys by net id in toy order, which the joiner's own copies are paired with.
 		if not _toys_body.is_empty():
 			_tell(peer_id, PhEvents.Kind.TOYS, _toys_body)
@@ -1061,6 +1072,8 @@ func _on_event(message: DotNetMessage) -> void:
 			_apply_hello(reader)
 		PhEvents.Kind.MAP:
 			_apply_map(reader)
+		PhEvents.Kind.MAP_PART:
+			_apply_map_part(reader)
 		PhEvents.Kind.TOYS:
 			var told := PhEvents.read_toys(reader)
 			if bool(told["ok"]):
@@ -1403,7 +1416,55 @@ func _apply_map(reader: DotNetReader) -> void:
 	if not bool(told["ok"]) or game == null:
 		return
 
-	var decoded := PhMapDoc.decode(told["encoded"])
+	_map_next = 0
+	_build_map_bytes(told["encoded"])
+
+
+## One piece of a large map. Index 0 starts it over; a piece out of order, or a whole that
+## does not add up, drops the map with a line rather than building half of one.
+func _apply_map_part(reader: DotNetReader) -> void:
+	var told := PhEvents.read_map_part(reader)
+
+	if not bool(told["ok"]) or game == null:
+		return
+
+	var index := int(told["index"])
+
+	if index == 0:
+		_map_next = 0
+		_map_count = int(told["count"])
+		_map_total = int(told["total"])
+		_map_joined = PackedByteArray()
+
+	if index != _map_next or int(told["count"]) != _map_count or int(told["total"]) != _map_total:
+		DotLog.warn(CHANNEL, "a map piece arrived out of order; the map is dropped", {
+			"index": index, "expected": _map_next, "count": told["count"],
+		})
+		_map_next = -1
+		return
+
+	_map_joined.append_array(told["chunk"])
+	_map_next += 1
+
+	if _map_next < _map_count:
+		return
+
+	_map_next = 0
+
+	if _map_joined.size() != _map_total:
+		DotLog.warn(CHANNEL, "a map's pieces do not add up; the map is dropped", {
+			"bytes": _map_joined.size(), "expected": _map_total,
+		})
+		return
+
+	var whole := _map_joined
+	_map_joined = PackedByteArray()
+	_build_map_bytes(whole)
+
+
+## A whole map's bytes, decoded and built.
+func _build_map_bytes(encoded: PackedByteArray) -> void:
+	var decoded := PhMapDoc.decode(encoded)
 
 	if not decoded.ok:
 		DotLog.warn(CHANNEL, "the server sent a map this build cannot build", {
