@@ -6,8 +6,6 @@ extends DotVoteRoundGame
 
 const PhCatalogue := preload("ph_catalogue.gd")
 
-const CHANNEL := "prophunt.vote"
-
 const METADATA_KEY := "map_vote"
 
 ## What the vote command is called: `!vote 2` in chat, `vote 2` in a console.
@@ -15,7 +13,7 @@ const COMMAND_NAMES := {"vote": "vote"}
 
 
 func _init() -> void:
-	channel = CHANNEL
+	channel = "prophunt.vote"
 	metadata_key = METADATA_KEY
 	command_names = COMMAND_NAMES
 	config_path = "user://cfg/prophunt_vote.json"

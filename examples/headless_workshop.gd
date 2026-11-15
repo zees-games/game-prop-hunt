@@ -5,10 +5,8 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhVote := preload("../game/ph_vote.gd")
 
-## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex] and never the process's shared one.
-##   godot --headless --path . res://examples/headless_workshop.tscn
-## A solo pack map is listed ("Name [Pack]") and can be chosen next, an online session lists none of it, a map kind the game does not accept is left out, and the game's own ids win.
-## The client shell's `start_map` (`--solo-map`, a "Play map" link) is the first map laid out, from the map pack the shell mounted.
+## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex] and never the process's shared one. godot --headless --path . res://examples/headless_workshop.tscn
+## A solo pack map is listed ("Name [Pack]") and can be chosen next, an online session lists none of it, a map kind the game does not accept is left out, and the game's own ids win. The client shell's `start_map` (`--solo-map`, a "Play map" link) is the first map laid out, from the map pack the shell mounted.
 
 const SECTIONS := 6
 const MAP := &"fixture_barn"

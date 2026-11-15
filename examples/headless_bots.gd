@@ -5,12 +5,9 @@ const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 const PhBots := preload("../game/ph_bots.gd")
 
-## Stand-ins play whole rounds against each other on the real maps, and the suite holds how they hide and hunt to bands (props disguised and apart, still unless shot, 35-55% props at medium, a reachable hiding place).
-## Rounds, not a unit test: stand-in props once stood as sinks in a hallway and the hunter found nobody. Ninety-six rounds by default, about 13 minutes.
-## `-- --shard <id>` plays one map's twelve rounds of the rotation and prints each as a `ROUND_JSON` line, holding only what is true of any round
-## (disguised, board, reachable); `-- --merge LOG...` reads those lines from the shards' logs and holds the bands over all of them, so a
-## sharded run (`game.sh test headless_bots`, up to four shards at once) reports what the one 96-round run reports.
-## `-- --rounds N`, `--first N`, `--map <id>`, `--difficulty <preset>`, `PH_BOTS_TRACE=1`, `PH_ROUND_SECONDS`, `PH_HIDE_SECONDS`; without `maps/` linked it plays the practice house.
+## Stand-ins play whole rounds against each other on the real maps, and the suite holds how they hide and hunt to bands (props disguised and apart, still unless shot, 35-55% props at medium, a reachable hiding place). Rounds, not a unit test: stand-in props once stood as sinks in a hallway and the hunter found nobody. Ninety-six rounds by default, about 13 minutes.
+## `-- --shard <id>` plays one map's twelve rounds of the rotation and prints each as a `ROUND_JSON` line, holding only what is true of any round (disguised, board, reachable); `-- --merge LOG...` reads those lines from the shards' logs and holds the bands over all of them, so a
+## sharded run (`game.sh test headless_bots`, up to four shards at once) reports what the one 96-round run reports. `-- --rounds N`, `--first N`, `--map <id>`, `--difficulty <preset>`, `PH_BOTS_TRACE=1`, `PH_ROUND_SECONDS`, `PH_HIDE_SECONDS`; without `maps/` linked it plays the practice house.
 
 const MAPS := ["ph_school", "ph_house", "ph_office", "ph_woods", "ph_office221", "ph_apartment", "ph_hotel", "ph_abandoned_church"]
 
