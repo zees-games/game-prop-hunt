@@ -4,6 +4,7 @@ const PhAmbience := preload("ph_ambience.gd")
 ## The workbench kind of the ambience cvar set (saved to cfg/.../ambience/server.yml).
 const AMBIENT_KIND := "ambience"
 const PhAvatars := preload("ph_avatars.gd")
+const PhMapDoc := preload("ph_map_doc.gd")
 
 ## This game as a module a dedicated server loads; [DotGameModule] holds the netcode, bridge, roster and tick.
 ## No `class_name`: [method DotModuleHost.load_module] takes a path, and a pack's globals are not registered in the host.
