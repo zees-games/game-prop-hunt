@@ -78,9 +78,9 @@ Settings are cvars. Set them in the server's config, on the command line, or liv
 ph_hide_seconds 30             // how long the props have to hide (a map may ask for less)
 ph_round_seconds 300           // how long the hunters have to find them (a map may ask for less)
 ph_timeout_winner 1            // who wins when the clock runs out: 0 nobody, 1 props, 2 hunters
-ph_players_per_hunter 3        // one hunter for every this many players
-ph_min_hunters 1               // never fewer than this many
-ph_max_hunters 8               // never more than this many (default 8)
+ph_players_per_hunter 3        // one hunter for every this many players (default 3, any value of 1 or more)
+ph_min_hunters 1               // never fewer than this many (default 1, any value)
+ph_max_hunters 8               // never more than this many (default 8, any value; 0 = no limit)
 ph_hunter_pick 0               // 0 random, 1 a queue so everybody gets an equal share, 2 the sides swap
 ph_side_choice 1               // 1 = !hunter and !prop count in the draw
 ph_auto_taunt_seconds 60       // a prop standing still this long is taunted for (0 never)

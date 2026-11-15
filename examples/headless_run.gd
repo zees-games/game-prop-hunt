@@ -7,7 +7,7 @@ extends "headless_run_base.gd"
 
 const SECTIONS := 33
 
-const CHECKS := 209
+const CHECKS := 212
 
 
 func _ready() -> void:
@@ -69,6 +69,15 @@ func _test_config() -> void:
 	_check(config.hunters_for(2) == 1 and config.hunters_for(3) == 1, "one hunter up to three players")
 	_check(config.hunters_for(7) == 3, "one per three, rounded up (7 players, 3)")
 	_check(config.hunters_for(60) == config.max_hunters, "never more than the most")
+	var open := PhConfig.new()
+	open.max_hunters = 0
+	_check(open.validate().ok and open.hunters_for(60) == 20, "0 is no limit: one per three",
+		"%d" % open.hunters_for(60))
+	open.min_hunters = 24
+	_check(open.validate().ok and open.hunters_for(30) == 24, "and the least takes any count",
+		"%d" % open.hunters_for(30))
+	open.max_hunters = -1
+	_check(not open.validate().ok, "a negative most is refused")
 
 	var rules := config.disguise_rules()
 	_check(is_equal_approx(rules.reach, config.disguise_reach) and is_equal_approx(rules.reveal_cooldown, config.reveal_cooldown),

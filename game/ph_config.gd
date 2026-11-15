@@ -34,10 +34,11 @@ extends DotConfig
 @export_group("The sides")
 
 ## One hunter for every this many players, rounded up, at least [member min_hunters] and at
-## most [member max_hunters] — and never everybody.
-@export_range(1.0, 32.0, 0.5) var players_per_hunter: float = 3.0
-@export_range(1, 16, 1) var min_hunters: int = 1
-@export_range(1, 32, 1, "or_greater") var max_hunters: int = 8
+## most [member max_hunters] — and never everybody. Each takes any value (the slider is only a
+## guide); [member max_hunters] 0 is no limit.
+@export_range(1.0, 32.0, 0.5, "or_greater") var players_per_hunter: float = 3.0
+@export_range(1, 16, 1, "or_greater") var min_hunters: int = 1
+@export_range(0, 32, 1, "or_greater") var max_hunters: int = 8
 
 ## How hunters are chosen each round: 0 a random draw that skips last round's hunters, 1 a queue
 ## so everybody gets an equal share of turns, 2 the sides swap over every round. See
@@ -319,7 +320,17 @@ func validate() -> DotResult:
 	if round_seconds <= 0.0:
 		return DotResult.fail(DotError.CODE_INVALID, "A round has to last some time.")
 
-	if min_hunters > max_hunters:
+	if players_per_hunter < 1.0:
+		return DotResult.fail(DotError.CODE_INVALID,
+			"players_per_hunter is %.2f; it is 1 or more." % players_per_hunter)
+
+	if min_hunters < 1:
+		return DotResult.fail(DotError.CODE_INVALID, "min_hunters is %d; a round has at least one hunter." % min_hunters)
+
+	if max_hunters < 0:
+		return DotResult.fail(DotError.CODE_INVALID, "max_hunters is %d; it is 0 (no limit) or more." % max_hunters)
+
+	if max_hunters > 0 and min_hunters > max_hunters:
 		return DotResult.fail(DotError.CODE_INVALID, "min_hunters is over max_hunters.")
 
 	if timeout_winner < 0 or timeout_winner > 2:
@@ -341,7 +352,8 @@ func validate() -> DotResult:
 func describe() -> Dictionary:
 	return {
 		"round": "%.0f s hide, %.0f s seek" % [hide_seconds, round_seconds],
-		"hunters": "1 per %.1f, %d..%d, %s" % [players_per_hunter, min_hunters, max_hunters,
+		"hunters": "1 per %.1f, %d..%s, %s" % [players_per_hunter, min_hunters,
+			str(max_hunters) if max_hunters > 0 else "no limit",
 			["random", "queue", "swap"][hunter_pick]],
 		"timeout": ["draw", "props", "hunters"][timeout_winner],
 		"taunts": "forced after %.0f s within %.1f m" % [auto_taunt_seconds, auto_taunt_radius]

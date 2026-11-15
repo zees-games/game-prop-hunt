@@ -12,7 +12,7 @@ const PhNetLink := preload("../game/net/ph_net_link.gd")
 ## The only suite where [PhModule] loads, [DotGameModule]'s order runs, a cvar is typed at a console and a round is played by the stand-ins the module seats itself (`headless_run` and `headless_net` cannot reach these).
 
 const SECTIONS := 14
-const CHECKS := 118
+const CHECKS := 120
 
 const SERVER_DIR := "user://ph_dedicated"
 var PORT := PHTestPorts.free_port(2)
@@ -276,9 +276,15 @@ func _test_the_commands() -> void:
 	var _set := _run_command("ph_round_seconds 45")
 	_check(is_equal_approx(game.config.round_seconds, 45.0), "and setting it writes through to the world",
 		"%.1f" % game.config.round_seconds)
-	var _back := _run_command("ph_max_hunters 0")
-	_check(game.config.max_hunters == 1, "a round with no hunter is not one: it is taken as one",
+	var _many := _run_command("ph_max_hunters 40")
+	_check(game.config.max_hunters == 40, "the most hunters takes any count, not a ceiling",
 		"%d" % game.config.max_hunters)
+	var _back := _run_command("ph_max_hunters 0")
+	_check(game.config.max_hunters == 0, "and 0 is no limit", "%d" % game.config.max_hunters)
+	var _min := _run_command("ph_min_hunters 20")
+	_check(game.config.min_hunters == 20, "the least hunters takes any count too", "%d" % game.config.min_hunters)
+	var _min_back := _run_command("ph_min_hunters 1")
+	var _max_back := _run_command("ph_max_hunters 8")
 	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
 	# every change, so a client's own combat manager (following its link) predicts tracers
 	# under the server's level rather than its default.

@@ -12,17 +12,17 @@
 # killcam_seconds: 0.0
 # Seconds of warmup before the first round. 0 starts immediately. [0.0..300.0]
 # warmup_seconds: 8.0
-# People in the match before a round starts (stand-ins count). [1..24]
+# People in the match before a round starts (stand-ins count). [1..]
 # min_players_to_start: 2
 # Who wins a round the clock ends: 1 the props, 2 the hunters, 0 nobody.
 # timeout_winner: 1
 
 # --- The sides
-# One hunter for every this many players, rounded up, at least min_hunters and at most max_hunters — and neve... [1.0..32.0]
+# One hunter for every this many players, rounded up, at least min_hunters and at most max_hunters — and neve... [1.0..]
 # players_per_hunter: 3.0
-#  [1..16]
+#  [1..]
 # min_hunters: 1
-#  [1..32]
+#  [0..]
 # max_hunters: 8
 # How hunters are chosen each round: 0 a random draw that skips last round's hunters, 1 a queue so everybody ...
 # hunter_pick: 0
