@@ -43,10 +43,10 @@ The game has a small practice house built in. The separate [mg-prop-hunt-maps](h
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
 ## Getting started
-You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/modcommunity/dot-bootstrap). It clones every project and links the addons into each one:
+You need [Godot 4.7](https://godotengine.org/download). The game is built from many Dot addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
 
 ```bash
-git clone https://github.com/modcommunity/dot-bootstrap.git
+git clone https://github.com/gamespice-platform/bootstrap.git
 cd dot-bootstrap
 ./bootstrap.sh
 cd projects/mg-prop-hunt
@@ -69,7 +69,7 @@ The maps come from the mg-prop-hunt-maps checkout, which bootstrap links into `m
 | `./game.sh shot` | Save a screenshot to `screenshots/`. `tools/shot.sh` lists the views |
 | `./game.sh help` | All of the options |
 
-`online` and `server` use [dot-server-deploy](https://github.com/modcommunity/dot-server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
+`online` and `server` use [dot-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
 Settings are cvars. Set them in the server's config, on the command line, or live from the console. Most of them take effect from the next round.
@@ -107,9 +107,9 @@ bot_difficulty medium          // how bot hunters turn, aim and react: easy, med
 ph_vote_after 20               // seconds into a map's last round before the vote opens
 ```
 
-A hunter who dies drops as a ragdoll ([dot-player-char](https://github.com/modcommunity/dot-player-char)) and a prop that is found bursts into pieces; the server picks how each body goes down and everybody sees the same fall. `sv_ragdoll 0` makes it a quick fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off). On a player's own machine, `--ph-prop-death=1` topples a found prop instead of bursting it (2: it vanishes), and `--ph-hunter-break` says what the furniture does to a hunter it finishes (0 a ragdoll, 1 limbs, 2 bursts).
+A hunter who dies drops as a ragdoll ([dot-player-char](https://github.com/gamespice-platform/player-char)) and a prop that is found bursts into pieces; the server picks how each body goes down and everybody sees the same fall. `sv_ragdoll 0` makes it a quick fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off). On a player's own machine, `--ph-prop-death=1` topples a found prop instead of bursting it (2: it vanishes), and `--ph-hunter-break` says what the furniture does to a hunter it finishes (0 a ragdoll, 1 limbs, 2 bursts).
 
-The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they turn, aim and react is [dot-bot](https://github.com/modcommunity/dot-bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
+The bot cvars are the family's shared ones: how many is dot-server's `DotBotQuota`, how they turn, aim and react is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
 
 `mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
@@ -129,7 +129,7 @@ Console commands:
 | `ph_net` | What the network code is doing |
 
 ### Admin commands
-These come from [dot-moderation](https://github.com/modcommunity/dot-moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
+These come from [dot-moderation](https://github.com/gamespice-platform/moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
 
 ## Writing a map
 A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](https://github.com/zees-games/mg-prop-hunt-maps/blob/main/maps/README.md) in that repository describes the format. The server sends the map to each player when it changes, so players don't need the map files.
@@ -170,7 +170,7 @@ The bots are simple: a bot prop walks to the nearest thing it can be and stays t
 | Glass, boards, lockers, lines | Drawn in code | none | in code |
 | Footsteps | Kenney, Impact Sounds | CC0 | `addons/dot_audio/stock/CREDITS.md` |
 | Ambience beds | Generated by dot-audio | CC0 | `addons/dot_audio/stock/CREDITS.md` |
-| Toys | [dot-props](https://github.com/modcommunity/dot-props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
+| Toys | [dot-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
 
 If you made one of these assets and want it removed, open an issue.
 
