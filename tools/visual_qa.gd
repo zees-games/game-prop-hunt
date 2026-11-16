@@ -21,9 +21,13 @@ const WEAPON_CLIPS: PackedStringArray = ["idle", "draw", "fire", "reload"]
 ## Ground speed per person clip (metres a second): PhConfig: run_speed 6.5, walk and crouch 0.45 of it.
 const PERSON_SPEED := {"idle": 0.0, "walk": 2.9, "run": 6.5, "crouch": 2.9, "jump": 2.9}
 const SECONDS := {"idle": 2.0, "walk": 2.4, "run": 2.0, "crouch": 2.0, "jump": 1.6, "draw": 1.0, "fire": 2.0, "reload": 3.0, "turntable": 2.0}
-## Seconds between shots in the fire clip: automatics fire fast, the rest one a half second.
-const FIRE_AUTO_EVERY := 0.1
+## Seconds between shots in the fire clip when a weapon has no use interval; otherwise its own, as in a match.
+## A faster cadence restarts a melee swing mid-follow-through, a jump no player can make.
 const FIRE_EVERY := 0.5
+const REAL_SIZES := "res://props/real_sizes.json"
+## bone_pop limit in a fire clip whose arm swings or throws: a real strike turns the forearm about
+## 1700 deg/s, so the slash moves ~111 deg in the 1/15 s window. A gun's fire clip keeps the 90 default.
+const STRIKE_POP_DEG := 130.0
 
 var _figure: PhFigure = null
 var _props: PhProps = null
@@ -37,6 +41,8 @@ var _shots_done := 0
 var _weapon_defs := {}
 var _prop_height := 1.0
 var _prop_away := 2.5
+var _real_sizes := {}
+var _struck := false
 
 
 func _items() -> PackedStringArray:
@@ -99,6 +105,11 @@ func _stage(item: String, clip: String) -> DotResult:
 		views.behind_look_height = 1.0
 		views.opponent_offset = Vector3(0.4, 1.6, -4.0)
 		views.opponent_look_height = 1.3
+	if item.begins_with("weapon_"):
+		# Straight ahead, a held gun points down the lens and draws as a thin stick; from the gun-hand side it reads in profile.
+		views.behind_offset = Vector3(2.4, 1.5, 2.2)
+		views.opponent_offset = Vector3(3.0, 1.3, -2.2)
+		views.opponent_look_height = 1.0
 	if item.begins_with("person_"):
 		_shown_kind = "person"
 		_stand_person(item.trim_prefix("person_"))
@@ -124,6 +135,7 @@ func _stage(item: String, clip: String) -> DotResult:
 			return equipped
 		_model.on_deploy(1.0)
 		_shots_done = 0
+		_struck = false
 	else:
 		_load_props()
 		var id := StringName(item.trim_prefix("prop_"))
@@ -142,12 +154,13 @@ func _stage(item: String, clip: String) -> DotResult:
 ## Cameras that fit the prop: a shower is 2 m tall and a pea is not, so the distance and look height follow its size.
 func _frame_prop(size: Vector3) -> void:
 	var reach := maxf(size.y, maxf(size.x, size.z))
-	var away := reach * 1.9 + 0.6
+	# Every term scales with the prop: a fixed margin left an apple a few pixels across in a 2 m-wide frame.
+	var away := reach * 1.6
 	_prop_height = size.y
 	_prop_away = away
-	views.behind_offset = Vector3(away * 0.45, size.y * 0.7 + 0.2, away)
+	views.behind_offset = Vector3(away * 0.45, size.y * 0.7 + reach * 0.15, away)
 	views.behind_look_height = size.y * 0.5
-	views.opponent_offset = Vector3(away * 0.15, size.y * 0.6 + 0.2, -away)
+	views.opponent_offset = Vector3(away * 0.15, size.y * 0.6 + reach * 0.15, -away)
 	views.opponent_look_height = size.y * 0.5
 
 
@@ -216,7 +229,7 @@ func _drive_weapon(_item: String, clip: String, t: float, step: float) -> void:
 			_figure.hold(id, t < 0.3)
 		"fire":
 			var def: DotWeaponDef = _weapon_defs.get(String(id))
-			var every := FIRE_AUTO_EVERY if def != null and def.fire_mode == DotWeaponDef.Fire.AUTO else FIRE_EVERY
+			var every := _fire_interval(def)
 			var due := int(floor((t - 0.2) / every)) + 1 if t >= 0.2 else 0
 			while _shots_done < due:
 				_shots_done += 1
@@ -229,7 +242,15 @@ func _drive_weapon(_item: String, clip: String, t: float, step: float) -> void:
 	_model.advance(step)
 
 
+func _fire_interval(def: DotWeaponDef) -> float:
+	if def == null or def.use_interval_ticks <= 0:
+		return FIRE_EVERY
+	var rate := def.authored_tick_rate if def.authored_tick_rate > 0 else ZeeWeaponPack.TICK_RATE
+	return float(def.use_interval_ticks) / float(rate)
+
+
 func _fire(art: ZeeWeaponArt) -> void:
+	_struck = art.pose == ZeeWeaponArtTable.POSE_MELEE or art.pose == ZeeWeaponArtTable.POSE_THROWN
 	if art.pose == ZeeWeaponArtTable.POSE_MELEE:
 		_model.on_swing()
 		_figure.fired(1, ZeeWeaponNet.KIND_SWING)
@@ -261,24 +282,56 @@ func _place_first_person(_item: String) -> void:
 	var subject := _subject("")
 	var height := BODY_HEIGHT if _shown_kind == "person" else _prop_height
 	var away := 2.5 if _shown_kind == "person" else _prop_away
-	var eye := 1.6 if _shown_kind == "person" else clampf(height * 1.4 + 0.2, 0.4, 1.6)
+	var eye := 1.6 if _shown_kind == "person" else clampf(height * 1.4, 0.1, 1.6)
 	first_person.global_position = subject.global_position + Vector3(0.0, eye, -away)
 	first_person.look_at(subject.global_position + Vector3(0.0, height * 0.5, 0.0))
 
 
-## Prop rows: where the model's lowest point sits against the floor, and its size against the catalogue's (hull) size.
-func _checks(item: String, _clip: String, rows: Array[Dictionary]) -> Array[Dictionary]:
+## Prop rows: where the model's lowest point sits against the floor, and its drawn size against the
+## real-world size in props/real_sizes.json. The catalogue size is measured from the model itself, so
+## comparing against it can never fail; a 0.7 m radio can only be caught by what a radio really is.
+func _checks(item: String, clip: String, rows: Array[Dictionary]) -> Array[Dictionary]:
+	if _shown_kind == "weapon" and clip == "fire" and _struck:
+		for row: Dictionary in rows:
+			if row["check"] == "bone_pop" and not row.get("skip", false):
+				row["pass"] = float(row["value"]) <= STRIKE_POP_DEG
+				row["limit"] = STRIKE_POP_DEG
+				row["note"] = "%s (a strike or throw)" % row.get("note", "")
 	if _shown_kind != "prop":
 		return rows
 	var box := _bounds(_prop_model)
-	var size: Vector3 = _props.size_of(StringName(item.trim_prefix("prop_")))
 	var floor_gap := absf(box.position.y)
 	rows.append({"check": "prop_floor_m", "pass": floor_gap <= 0.03, "value": snappedf(floor_gap, 0.001), "limit": 0.03,
 		"note": "lowest point above (+) or under (-) the floor: %s" % snappedf(box.position.y, 0.001)})
-	var ratio := box.size.y / maxf(size.y, 0.001)
-	rows.append({"check": "prop_height_ratio", "pass": ratio > 0.8 and ratio < 1.25, "value": snappedf(ratio, 0.01), "limit": "0.8-1.25",
-		"note": "model height / catalogue height %s" % snappedf(size.y, 0.001)})
+	var id := item.trim_prefix("prop_")
+	var largest := maxf(box.size.y, maxf(box.size.x, box.size.z))
+	var band := _real_band(id)
+	var fits := band != Vector2.ZERO and largest >= band.x and largest <= band.y
+	rows.append({"check": "prop_real_size", "pass": fits, "value": snappedf(largest, 0.01),
+		"limit": "%s-%s" % [snappedf(band.x, 0.01), snappedf(band.y, 0.01)] if band != Vector2.ZERO else "none",
+		"note": "largest dimension in metres against %s" % (REAL_SIZES if band != Vector2.ZERO else "no pattern in " + REAL_SIZES)})
 	return rows
+
+
+## The [min, max] real-world band for a prop id, from the first matching pattern; empty when none matches.
+func _real_band(id: String) -> Vector2:
+	if _real_sizes.is_empty():
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(REAL_SIZES))
+		if not (parsed is Dictionary) or not (parsed.get("sizes") is Dictionary):
+			printerr("visual_qa: %s would not read" % REAL_SIZES)
+			quit(2)
+			return Vector2.ZERO
+		_real_sizes = parsed
+	var tolerance: Array = _real_sizes.get("tolerance", [1.0, 1.0])
+	var sizes: Dictionary = _real_sizes["sizes"]
+	for pattern: String in sizes:
+		if not id.match(pattern):
+			continue
+		var real: Variant = sizes[pattern]
+		if real is Array:
+			return Vector2(float(real[0]), float(real[1]))
+		return Vector2(float(real) * float(tolerance[0]), float(real) * float(tolerance[1]))
+	return Vector2.ZERO
 
 
 func _bounds(node: Node3D) -> AABB:
