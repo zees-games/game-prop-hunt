@@ -7,9 +7,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FAM="$(cd "$HERE/.." && pwd)"
-[ -x "$FAM/dot-cloud/tools/publish_pack.sh" ] || FAM="${DOT_FAMILY_DIR:-/home/gamedev/godot}"
-[ -x "$FAM/dot-cloud/tools/publish_pack.sh" ] || { echo "publish.sh: dot-cloud not found beside $HERE or in $FAM (set DOT_FAMILY_DIR)" >&2; exit 2; }
-export DOT_FAMILY_DIR="$FAM"
+[ -x "$FAM/dot-cloud/tools/publish_pack.sh" ] || FAM="${GS_FAMILY_DIR:-${DOT_FAMILY_DIR:-/home/gamedev/godot}}"
+[ -x "$FAM/dot-cloud/tools/publish_pack.sh" ] || { echo "publish.sh: dot-cloud not found beside $HERE or in $FAM (set GS_FAMILY_DIR)" >&2; exit 2; }
+export GS_FAMILY_DIR="$FAM"
 exec "$FAM/dot-cloud/tools/publish_pack.sh" publish --source "$HERE" --id game-prop-hunt \
-    --host-addons "${DOT_HOST_LOCK:-$FAM/dot-server-deploy/addons.lock}" --exclude-dir maps --exclude-dir art-src --exclude-dir reports --exclude-dir screenshots \
+    --host-addons "${GS_HOST_LOCK:-${DOT_HOST_LOCK:-$FAM/dot-server-deploy/addons.lock}}" --exclude-dir maps --exclude-dir art-src --exclude-dir reports --exclude-dir screenshots \
     --lock "$HERE/content.lock.json" "$@"
