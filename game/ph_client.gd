@@ -763,13 +763,7 @@ func _build_touch() -> void:
 	if not PhTouch.wanted():
 		return
 
-	touch = PhTouch.new()
-	touch.client = platform
-	touch.owner_client = self
-	touch.build(_sampler, game.mobile_rules)
-	touch.pressed.connect(_on_touch_button.bind(true))
-	touch.released.connect(_on_touch_button.bind(false))
-	add_child(touch)
+	touch = PhTouch.attach(self, platform, _sampler, game.mobile_rules, _on_touch_button)
 
 
 ## Whether a screen position is the Menu button, which the overlay leaves to the button.

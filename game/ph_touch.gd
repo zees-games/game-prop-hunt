@@ -66,6 +66,18 @@ func _init() -> void:
 	layer = 6
 
 
+## The overlay for [param host], its buttons routed to [param on_button] (id, down).
+static func attach(host: Node, platform: Object, sampler: DotFpsSampler, rules: DotMobileRules, on_button: Callable) -> PhTouch:
+	var made := PhTouch.new()
+	made.client = platform
+	made.owner_client = host
+	made.build(sampler, rules)
+	made.pressed.connect(on_button.bind(true))
+	made.released.connect(on_button.bind(false))
+	host.add_child(made)
+	return made
+
+
 ## Builds the overlay on [param sampler], following [param rules] (the server's; null keeps dot-mobile's defaults).
 func build(sampler: DotFpsSampler, rules: DotMobileRules = null) -> void:
 	controls = DotMobileControls.new()
