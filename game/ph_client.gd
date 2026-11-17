@@ -760,10 +760,9 @@ func _on_view_rules_changed() -> void:
 
 ## The phone's buttons, over the HUD. Not built elsewhere.
 func _build_touch() -> void:
-	if not PhTouch.wanted():
-		return
-
-	touch = PhTouch.attach(self, platform, _sampler, game.mobile_rules, _on_touch_button)
+	if PhTouch.wanted():
+		touch = PhTouch.new()
+		touch.attach(self, platform, _sampler, game.mobile_rules, _on_touch_button)
 
 
 ## Whether a screen position is the Menu button, which the overlay leaves to the button.

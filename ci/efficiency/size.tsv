@@ -8,5 +8,5 @@ examples/headless_run.gd::_test_the_client	140
 game/net/ph_net_bridge.gd	1546
 game/net/ph_net_bridge.gd::_on_event	136
 game/net/ph_net_bridge.gd::attach	116
-game/ph_client.gd	1732
+game/ph_client.gd	1731
 game/ph_game.gd	1996
