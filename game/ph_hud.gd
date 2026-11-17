@@ -461,7 +461,11 @@ func _draw_hints(side: int) -> void:
 
 	var lines := PackedStringArray()
 
-	if side == PhGame.PROPS:
+	if side == PhGame.PROPS and DotPlatform.has_touch():
+		# The phone's buttons are labelled; a list of keyboard keys beside them is noise.
+		if player.reveal_wait > 0.0 and player.is_disguised():
+			lines.append("show yourself again in %d s" % int(ceilf(player.reveal_wait)))
+	elif side == PhGame.PROPS:
 		lines.append("%s  Become what you look at" % _key(PhBindings.DISGUISE))
 		lines.append("%s  Show yourself / hide again" % _key(PhBindings.REVEAL))
 		lines.append("%s  Lock rotation" % _key(PhBindings.LOCK))
