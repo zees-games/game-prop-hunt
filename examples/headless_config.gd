@@ -120,6 +120,7 @@ const QUERY_FUNCS := {
 	"game/ph_game.gd": ["_look", "_make_room"],
 	"game/ph_game_report.gd": ["clear_between"],
 	"game/ph_client.gd": ["_process"],
+	"game/ph_touch.gd": ["_crosshair", "crosshair_kind"],  # the auto-fire crosshair, from the overlay's _process
 }
 const QUERY_NEEDLES: Array[String] = ["direct_space_state", "space.intersect_", "space.cast_motion(", "space.get_rest_info("]
 

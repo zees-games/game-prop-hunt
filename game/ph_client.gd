@@ -286,6 +286,7 @@ func _build_netcode() -> DotResult:
 func _follow_server_cvars() -> void:
 	# The server's mp_forceview: this end places its own camera.
 	var _view := game.view_rules.follow_cvars(link)
+	var _mobile := game.mobile_rules.follow_cvars(link)
 	var _ambient := game.ambient_rules.follow_cvars(link)
 	# mp_forcecamera, mp_freeroam and mp_freeroam_speed: whether the free camera is offered, and
 	# how fast it flies. A change redraws the hint, so a key that would now be refused is not
@@ -763,21 +764,29 @@ func _build_touch() -> void:
 
 	touch = PhTouch.new()
 	touch.client = platform
-	touch.build()
+	touch.owner_client = self
+	touch.build(_sampler, game.mobile_rules)
 	touch.pressed.connect(_on_touch_button.bind(true))
 	touch.released.connect(_on_touch_button.bind(false))
 	add_child(touch)
 	_bind_touch_sampler(_sampler)
 
 
-## A touch sampler leaves a finger on a button to the button, and knows the screen's width.
+## The overlay drives this sampler (offline play keeps its own on the player).
 func _bind_touch_sampler(sampler: DotFpsSampler) -> void:
-	if touch == null or not sampler is DotFpsTouchSampler:
-		return
+	if touch != null and sampler is DotFpsTouchSampler:
+		touch.bind_sampler(sampler)
 
-	var touch_sampler := sampler as DotFpsTouchSampler
-	touch_sampler.ignore_fn = touch.contains_point
-	touch_sampler.set_screen_width(get_viewport().get_visible_rect().size.x)
+
+## Whether a screen position is the Menu button, which the overlay leaves to the button.
+func touch_ignores(at: Vector2) -> bool:
+	var button: Control = settings.menu.menu_button if settings != null and settings.menu != null else null
+	return button != null and button.is_visible_in_tree() and button.get_global_rect().has_point(at)
+
+
+## Whether auto-fire and aim assist may act: a living hunter who is not watching somebody.
+func touch_live() -> bool:
+	return player != null and player.is_alive() and is_hunter() and not is_spectating() and not _covered()
 
 
 ## A button press does what its key does: the same asks, the same held states.
@@ -786,8 +795,7 @@ func _on_touch_button(id: StringName, down: bool) -> void:
 
 	match id:
 		&"jump":
-			if sampler is DotFpsTouchSampler:
-				(sampler as DotFpsTouchSampler).hold(DotFpsCommand.BUTTON_JUMP, down)
+			pass  # held on the sampler by the overlay (the row's `hold`)
 		&"fire":
 			_firing = down and is_hunter() and not is_spectating()
 		&"reload":
@@ -1057,7 +1065,9 @@ func _stamp(command: DotFpsCommand) -> void:
 	if command == null:
 		return
 
-	command.set_button(PhNetCommand.BUTTON_FIRE, _firing)
+	# A thumb on FIRE sets `_firing`; auto-fire (the server's `sv_autofire`, off by default) is read here, the Fire key's own path.
+	var auto := touch != null and touch.is_held(&"fire") and is_hunter() and not is_spectating()
+	command.set_button(PhNetCommand.BUTTON_FIRE, _firing or auto)
 	command.set_button(PhNetCommand.BUTTON_ALT, _alt)
 	command.set_button(PhNetCommand.BUTTON_RELOAD, _reloading)
 
@@ -1169,7 +1179,7 @@ func _on_hit(point: Vector3, killed: bool, headshot: bool) -> void:
 func _process(delta: float) -> void:
 	if touch != null:
 		touch.show_for(is_hunter())
-		touch.buttons.visible = not _covered() and not (platform != null and platform.is_input_blocked())
+		touch.sync(_covered() or (platform != null and platform.is_input_blocked()))
 
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
 	_present_hide()
@@ -1521,6 +1531,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			_roam_mouse(event as InputEventMouseMotion)
 		return
 
+	# dot-mobile's overlay forwards every touch to the sampler itself, and Godot's mouse from a touch would turn the view
+	# and fire a second time.
+	if event is InputEventScreenTouch or event is InputEventScreenDrag:
+		return
+	if touch != null and touch.takes(event):
+		return
+
 	if event is InputEventMouseButton:
 		var button := event as InputEventMouseButton
 
@@ -1546,7 +1563,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Every event, not only motion: the sampler latches a press that a wheel tick sends with its
 	# release in the same frame, and reads its own actions off the events it is shown.
-	if _pointer_ours() or touch != null:
+	if _pointer_ours():
 		if _offline and player.sampler != null:
 			player.sampler.handle_event(event)
 		elif _sampler != null:

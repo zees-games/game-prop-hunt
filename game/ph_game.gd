@@ -119,6 +119,10 @@ var loadout_command: Object = null
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 
+## dot-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the module
+## (REPLICATED), followed by the client's overlay. Auto-fire stays off: a hunter pays health for shooting real furniture.
+var mobile_rules: DotMobileRules = DotMobileRules.new()
+
 ## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED) and client-followed because the client draws bodies.
 ## A person's body only; a disguised prop that dies is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
