@@ -523,6 +523,23 @@ func _prey(player: PhPlayer, state: Dictionary) -> PhPlayer:
 	return best
 
 
+## The walk over the map's own pieces in dot-sim ([code]DotSimPropDoubt[/code], one call per
+## doubt instead of a dictionary, transform and size read per piece) when the library has it; off,
+## or with no library, the script walks them. The same pieces in the same order either way
+## ([code]headless_native_doubt[/code]).
+static var native_doubt: bool = true
+## Walks the pieces in script beside every native scan and reports any difference (a check: slow).
+static var doubt_verify: bool = OS.get_environment("PH_DOUBT_VERIFY") == "1"
+## Native scans that differed from the script's walk while [member doubt_verify] was on.
+static var doubt_mismatches: int = 0
+## Native scans made (the suites check the native path ran).
+static var doubt_scans: int = 0
+
+var _doubt_table: RefCounted = null
+var _doubt_map: Object = null
+var _doubt_version: int = -1
+
+
 ## Suspicion of everything in view: real furniture and props alike, as a person who knows the
 ## map so well and heard what they heard would weigh it.
 func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
@@ -545,15 +562,18 @@ func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
 	var seen: Array = []
 
 	# The map's own pieces, near and in view.
-	for i in range(props.size()):
-		var prop: Dictionary = props[i]
-		if bool(prop.get("broken", false)):
-			continue
-		var frame: Transform3D = prop["transform"]
-		var middle := frame.origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0)
-		if absf(middle.x - eye.x) > DOUBT_REACH or absf(middle.z - eye.z) > DOUBT_REACH:
-			continue
-		seen.append([i, StringName(), middle, prop["id"], frame.origin, false])
+	var table := _doubt_pieces(map, props)
+	if table == null:
+		_doubt_walk(props, eye, seen)
+	else:
+		var kept: PackedInt32Array = table.call(&"scan", eye, forward, profile.fov, DOUBT_REACH)
+		doubt_scans += 1
+		for i in kept:
+			var prop: Dictionary = props[i]
+			var frame: Transform3D = prop["transform"]
+			seen.append([i, StringName(), frame.origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0), prop["id"], frame.origin, false])
+		if doubt_verify:
+			_doubt_check(props, eye, forward, profile.fov, kept)
 
 	# The props, still and disguised (a moving one is prey, not a doubt).
 	for other in (game.call("players_on", PROPS) as Array):
@@ -585,6 +605,71 @@ func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
 		doubt[key] = float(doubt.get(key, 0.0)) + step * odd * (0.5 + closeness) * (0.6 + profile.aggression * 0.8)
 		if careful and odd < 1.0:
 			doubt[key] = minf(float(doubt[key]), SUSPECT_AT * 0.9)
+
+
+## The script's walk over the map's pieces: every whole one inside the square reach of
+## [param eye], appended to [param seen] as a doubt row.
+static func _doubt_walk(props: Array, eye: Vector3, seen: Array) -> void:
+	for i in range(props.size()):
+		var prop: Dictionary = props[i]
+		if bool(prop.get("broken", false)):
+			continue
+		var frame: Transform3D = prop["transform"]
+		var middle := frame.origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0)
+		if absf(middle.x - eye.x) > DOUBT_REACH or absf(middle.z - eye.z) > DOUBT_REACH:
+			continue
+		seen.append([i, StringName(), middle, prop["id"], frame.origin, false])
+
+
+## The native piece table for [param map], written again whenever its pieces changed; null when
+## [member native_doubt] is off or the library has no doubt module.
+func _doubt_pieces(map: Object, props: Array) -> RefCounted:
+	if not native_doubt:
+		return null
+	if _doubt_table == null:
+		if not DotSim.has(&"doubt"):
+			return null
+		_doubt_table = ClassDB.instantiate(DotSim.MODULES[&"doubt"])
+	var version := int(map.get("props_version"))
+	if map != _doubt_map or version != _doubt_version:
+		var middles := PackedVector3Array()
+		middles.resize(props.size())
+		for i in range(props.size()):
+			var prop: Dictionary = props[i]
+			var frame: Transform3D = prop["transform"]
+			middles[i] = frame.origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0)
+		_doubt_table.call(&"set_pieces", middles)
+		for i in range(props.size()):
+			if bool((props[i] as Dictionary).get("broken", false)):
+				_doubt_table.call(&"set_broken", i, true)
+		_doubt_map = map
+		_doubt_version = version
+	return _doubt_table
+
+
+## The map's pieces the script keeps for a doubt from [param eye] along [param forward]: its walk,
+## then the row loop's reach and field of view tests. What the native scan must equal.
+static func doubt_script_kept(props: Array, eye: Vector3, forward: Vector3, fov: float) -> PackedInt32Array:
+	var rows: Array = []
+	_doubt_walk(props, eye, rows)
+	var want := PackedInt32Array()
+	for row: Array in rows:
+		var middle: Vector3 = row[2]
+		var d := eye.distance_to(middle)
+		if d > DOUBT_REACH or d < 0.5:
+			continue
+		if rad_to_deg(forward.angle_to(middle - eye)) > fov * 0.5:
+			continue
+		want.append(int(row[0]))
+	return want
+
+
+## The script's pieces against the native [param kept]; a difference is counted and reported.
+func _doubt_check(props: Array, eye: Vector3, forward: Vector3, fov: float, kept: PackedInt32Array) -> void:
+	var want := doubt_script_kept(props, eye, forward, fov)
+	if want != kept:
+		doubt_mismatches += 1
+		push_error("doubt_verify: native %s, script %s (eye %s, forward %s, fov %s)" % [kept, want, eye, forward, fov])
 
 
 ## How wrong [param row] looks to [param player]: [index, player id, middle, kind, feet, tilted].

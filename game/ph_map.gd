@@ -35,6 +35,9 @@ var doc: Dictionary = {}
 ## Every prop in the map: `{id, transform, size, shapes, broken}`. The transform's origin is the
 ## middle of the prop's footprint on the floor.
 var props: Array[Dictionary] = []
+## Bumped whenever [member props] is rebuilt or a piece breaks or comes back: what a copy of
+## the pieces (the bots' native doubt table) checks before it is trusted.
+var props_version: int = 0
 
 ## Prop index -> where it is drawn: `[[MultiMesh, instance, Transform3D], ...]`, or a stand-in
 ## node. What [method break_prop] hides and [method restore_all] puts back.
@@ -139,6 +142,7 @@ func clear() -> void:
 		child.queue_free()
 
 	props.clear()
+	props_version += 1
 	_drawn_at.clear()
 	_missing.clear()
 	_bounds = AABB()
@@ -298,6 +302,7 @@ func _build_props() -> void:
 			shapes.append(shape)
 
 		props.append({"id": prop_id, "transform": frame, "size": size, "shapes": shapes, "broken": false})
+		props_version += 1
 
 		if draw_world and _shades_floor(prop_id, raw):
 			# Its box casts and takes none: bands on a cabinet's own sides would float off its model.
@@ -551,6 +556,7 @@ func break_prop(index: int) -> bool:
 		return false
 
 	props[index]["broken"] = true
+	props_version += 1
 
 	for shape: CollisionShape3D in props[index]["shapes"]:
 		shape.disabled = true
@@ -574,6 +580,7 @@ func restore_all() -> void:
 			continue
 
 		props[index]["broken"] = false
+		props_version += 1
 
 		for shape: CollisionShape3D in props[index]["shapes"]:
 			shape.disabled = false
