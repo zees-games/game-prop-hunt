@@ -352,7 +352,8 @@ func _adopt(candidate: PhPlayer) -> void:
 	if hud != null:
 		hud.bind(game, player)
 
-	_bind_touch_sampler(player.sampler)
+	if touch != null:
+		touch.bind_sampler(player.sampler)
 
 	_restore_loadout.call_deferred()
 
@@ -769,19 +770,11 @@ func _build_touch() -> void:
 	touch.pressed.connect(_on_touch_button.bind(true))
 	touch.released.connect(_on_touch_button.bind(false))
 	add_child(touch)
-	_bind_touch_sampler(_sampler)
-
-
-## The overlay drives this sampler (offline play keeps its own on the player).
-func _bind_touch_sampler(sampler: DotFpsSampler) -> void:
-	if touch != null and sampler is DotFpsTouchSampler:
-		touch.bind_sampler(sampler)
 
 
 ## Whether a screen position is the Menu button, which the overlay leaves to the button.
 func touch_ignores(at: Vector2) -> bool:
-	var button: Control = settings.menu.menu_button if settings != null and settings.menu != null else null
-	return button != null and button.is_visible_in_tree() and button.get_global_rect().has_point(at)
+	return PhTouch.over_menu_button(settings, at)
 
 
 ## Whether auto-fire and aim assist may act: a living hunter who is not watching somebody.
@@ -791,11 +784,7 @@ func touch_live() -> bool:
 
 ## A button press does what its key does: the same asks, the same held states.
 func _on_touch_button(id: StringName, down: bool) -> void:
-	var sampler := player.sampler if _offline and player != null and player.sampler != null else _sampler
-
 	match id:
-		&"jump":
-			pass  # held on the sampler by the overlay (the row's `hold`)
 		&"fire":
 			_firing = down and is_hunter() and not is_spectating()
 		&"reload":
@@ -1068,9 +1057,7 @@ func _stamp(command: DotFpsCommand) -> void:
 	if command == null:
 		return
 
-	# A thumb on FIRE sets `_firing`; auto-fire (the server's `sv_autofire`, off by default) is read here, the Fire key's own path.
-	var auto := touch != null and touch.is_held(&"fire") and is_hunter() and not is_spectating()
-	command.set_button(PhNetCommand.BUTTON_FIRE, _firing or auto)
+	command.set_button(PhNetCommand.BUTTON_FIRE, _firing or (touch != null and touch.is_held(&"fire") and is_hunter() and not is_spectating()))
 	command.set_button(PhNetCommand.BUTTON_ALT, _alt)
 	command.set_button(PhNetCommand.BUTTON_RELOAD, _reloading)
 
@@ -1181,8 +1168,7 @@ func _on_hit(point: Vector3, killed: bool, headshot: bool) -> void:
 
 func _process(delta: float) -> void:
 	if touch != null:
-		touch.show_for(is_hunter())
-		touch.sync(_covered() or (platform != null and platform.is_input_blocked()))
+		touch.sync(_covered() or (platform != null and platform.is_input_blocked()), is_hunter())
 
 	var _shown := present_frame(net, game, player, not third_person, delta, -1.0, _watched_through_eyes())
 	_present_hide()
@@ -1534,11 +1520,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_roam_mouse(event as InputEventMouseMotion)
 		return
 
-	# dot-mobile's overlay forwards every touch to the sampler itself, and Godot's mouse from a touch would turn the view
-	# and fire a second time.
-	if event is InputEventScreenTouch or event is InputEventScreenDrag:
-		return
-	if touch != null and touch.takes(event):
+	# dot-mobile's overlay forwards every touch itself; Godot's mouse from a touch would turn and fire twice.
+	if event is InputEventScreenTouch or event is InputEventScreenDrag or (touch != null and touch.takes(event)):
 		return
 
 	if event is InputEventMouseButton:

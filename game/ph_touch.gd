@@ -85,10 +85,17 @@ func build(sampler: DotFpsSampler, rules: DotMobileRules = null) -> void:
 
 
 ## Another sampler (offline play keeps one on the player): the overlay drives it from now on.
+## A thumb on FIRE sets the client's `_firing`; auto-fire (`sv_autofire`, off by default) is read through [method is_held].
 func bind_sampler(sampler: DotFpsSampler) -> void:
-	if controls != null and sampler != controls.sampler:
+	if controls != null and sampler is DotFpsTouchSampler and sampler != controls.sampler:
 		controls.setup(sampler, rows(_hunter, _loadout))
 		_fit()
+
+
+## True over the Menu button, which the overlay leaves to the button.
+static func over_menu_button(settings: Object, at: Vector2) -> bool:
+	var button: Control = settings.menu.menu_button if settings != null and settings.menu != null else null
+	return button != null and button.is_visible_in_tree() and button.get_global_rect().has_point(at)
 
 
 ## A declared button held by a thumb, or Fire held by auto-fire.
@@ -109,7 +116,10 @@ func active() -> bool:
 
 
 ## Called every frame by the client: the overlay is down while a menu, a line of chat, the console or the cover has the screen.
-func sync(busy: bool) -> void:
+## A bool [param hunter] also swaps the button set to that side ([method show_for]).
+func sync(busy: bool, hunter: Variant = null) -> void:
+	if hunter is bool:
+		show_for(hunter)
 	if controls != null:
 		controls.paused = busy
 

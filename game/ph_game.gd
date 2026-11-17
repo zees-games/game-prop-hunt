@@ -107,8 +107,7 @@ var physics: DotPhysicsLayout = null
 var taunts: DotPropTaunts = null
 var rules: DotPropDisguiseRules = null
 
-## A hunter's loadout (dot-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed
-## by [method storage_key]. Null on a world that keeps none.
+## A hunter's loadout (dot-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed by [method storage_key]; null if none kept.
 var loadouts: DotLoadoutManager = null
 
 ## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
@@ -119,16 +118,13 @@ var loadout_command: Object = null
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
 var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
 
-## dot-mobile's touch, aim assist and auto-fire cvars (`sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*`): bound by the module
-## (REPLICATED), followed by the client's overlay. Auto-fire stays off: a hunter pays health for shooting real furniture.
+## dot-mobile's `sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*` (module-bound, REPLICATED, client-followed); auto-fire stays off, as shooting real furniture costs a hunter health.
 var mobile_rules: DotMobileRules = DotMobileRules.new()
 
-## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED) and client-followed because the client draws bodies.
-## A person's body only; a disguised prop that dies is drawn as `PhConfig.prop_death` says (docs/design.md, "A death").
+## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED), client-followed. A person's body only; a prop's death is `PhConfig.prop_death` (docs/design.md, "A death").
 var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
 
-## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate at once, how hard a
-## walk pushes one). Bound by the module (REPLICATED) and followed by a client, which draws them.
+## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate, how hard a walk pushes one): module-bound (REPLICATED), client-followed.
 var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
 
 ## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
