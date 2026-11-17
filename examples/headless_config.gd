@@ -119,6 +119,7 @@ func _hello_carries_movement(config: PhConfig) -> void:
 const QUERY_FUNCS := {
 	"game/ph_game.gd": ["_look", "_make_room"],
 	"game/ph_game_report.gd": ["clear_between"],
+	"game/ph_bots_seek.gd": ["_sense_hunters"],  # binds the native seek batch's ray to the space, from _step via _drive_bots
 	"game/ph_client.gd": ["_process"],
 	"game/ph_touch.gd": ["_crosshair", "crosshair_kind"],  # the auto-fire crosshair, from the overlay's _process
 }

@@ -23,21 +23,41 @@ var _doubt_version: int = -1
 ## Suspicion of everything in view: real furniture and props alike, as a person who knows the
 ## map so well and heard what they heard would weigh it.
 func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
+	var rows := _doubt_rows(player, state, careful)
+	_doubt_add(state, rows[0], rows[1], rows[2])
+
+
+## Doubt fades for what is out of view, then each row in view adds to its key: [param keys] in the
+## rows' order, [param deltas] the additions, [param capped] 1 where a careful hunter holds the
+## row under the testing mark.
+func _doubt_add(state: Dictionary, keys: PackedStringArray, deltas: PackedFloat64Array, capped: PackedByteArray) -> void:
+	var doubt: Dictionary = state["doubt"]
+	var step := 4.0 * dt()
+	for key: Variant in doubt.keys():
+		doubt[key] = maxf(float(doubt[key]) - step * 0.15, 0.0)
+	for n in range(keys.size()):
+		var key := keys[n]
+		doubt[key] = float(doubt.get(key, 0.0)) + deltas[n]
+		if capped[n] != 0:
+			doubt[key] = minf(float(doubt[key]), SUSPECT_AT * 0.9)
+
+
+## The doubt rows a hunter weighs this tick, in the script: `[keys, deltas, capped]` as
+## [method _doubt_add] takes them. Reads the cleared list and casts the rays; changes nothing.
+func _doubt_rows(player: PhPlayer, state: Dictionary, careful: bool) -> Array:
 	var profile := settings().profile
 	var config: Object = game.get("config")
 	var base := float(config.get("bot_suspicion")) / 100.0
 	var eye := player.eye_position()
 	var forward := player.aim_direction()
-	var doubt: Dictionary = state["doubt"]
 	var cleared: Dictionary = state["cleared"]
 	var map: Node3D = game.get("map")
 	var props: Array = map.get("props")
 	var step := 4.0 * dt()
 	var t := now()
-
-	# Doubt fades for what is out of view.
-	for key: Variant in doubt.keys():
-		doubt[key] = maxf(float(doubt[key]) - step * 0.15, 0.0)
+	var keys := PackedStringArray()
+	var deltas := PackedFloat64Array()
+	var capped := PackedByteArray()
 
 	var seen: Array = []
 
@@ -82,9 +102,10 @@ func _doubt(player: PhPlayer, state: Dictionary, careful: bool) -> void:
 			continue
 		var odd := _oddness(player, row, props, base, t)
 		var closeness := clampf(1.0 - d / DOUBT_REACH, 0.0, 1.0)
-		doubt[key] = float(doubt.get(key, 0.0)) + step * odd * (0.5 + closeness) * (0.6 + profile.aggression * 0.8)
-		if careful and odd < 1.0:
-			doubt[key] = minf(float(doubt[key]), SUSPECT_AT * 0.9)
+		keys.append(key)
+		deltas.append(step * odd * (0.5 + closeness) * (0.6 + profile.aggression * 0.8))
+		capped.append(1 if careful and odd < 1.0 else 0)
+	return [keys, deltas, capped]
 
 
 ## The script's walk over the map's pieces: every whole one inside the square reach of

@@ -1,4 +1,4 @@
-extends "ph_bots_doubt.gd"
+extends "ph_bots_seek.gd"
 
 ## The stand-ins: props that hide as something that belongs where they stand, and hunters that
 ## search the rooms and test what looks wrong. The survey is the base script; what is below drives.
@@ -22,32 +22,49 @@ func drive() -> void:
 	if phase != 0:
 		_prepare()
 
+	# The props first, then the hunters: a hunter's senses read the props as they are after
+	# their own turn (a new disguise, a taunt), all hunters' in one native call when there is one.
+	var seekers: Array[PhPlayer] = []
 	for id: StringName in players:
 		var player: PhPlayer = players[id]
 
 		if not player.is_bot or not player.is_alive() or player.watching:
 			continue
 
-		var command := DotFpsCommand.new()
-		command.yaw = player.controller.state.yaw
-		command.pitch = player.controller.state.pitch
-		aim_of(player).view_from(command.yaw, command.pitch)
-
 		var side: int = game.call("team_of", id)
 
-		if phase == 0:
-			pass
-		elif side == PROPS:
+		if phase == 2 and side != PROPS:
+			seekers.append(player)
+			continue
+
+		var command := _command_for(player)
+
+		if phase != 0 and side == PROPS:
 			_hide(player, command)
-		elif phase == 2:
-			_seek(player, command)
 
 		player.controller.apply_command(command)
+
+	if not seekers.is_empty():
+		_sense_hunters(seekers)
+		for player in seekers:
+			var command := _command_for(player)
+			_seek(player, command)
+			player.controller.apply_command(command)
+		_sensed.clear()
 
 	var t := now()
 	for i in range(_taunts.size() - 1, -1, -1):
 		if t - float(_taunts[i]["t"]) > 12.0:
 			_taunts.remove_at(i)
+
+
+## This tick's command for [param player], starting from where it looks.
+func _command_for(player: PhPlayer) -> DotFpsCommand:
+	var command := DotFpsCommand.new()
+	command.yaw = player.controller.state.yaw
+	command.pitch = player.controller.state.pitch
+	aim_of(player).view_from(command.yaw, command.pitch)
+	return command
 
 
 func _state_of(player: PhPlayer) -> Dictionary:
@@ -61,7 +78,7 @@ func _state_of(player: PhPlayer) -> Dictionary:
 			"spot": {}, "bad": [], "sprint": false,
 			"search": null, "doubt": {}, "test": {}, "tested_at": -INF, "cleared": {},
 			"prey": StringName(), "prey_seen_at": -INF, "prey_at": Vector3.INF,
-			"hunter_seen_at": -INF, "hunter_at": Vector3.INF,
+			"hunter_seen_at": -INF, "hunter_at": Vector3.INF, "seek_dirty": true,
 		}
 	return _state[player.player_id]
 
@@ -345,7 +362,8 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 
 	var careful := player.health != null and player.health.health < player.health.max_health * 0.4
 
-	var prey := _prey(player, state)
+	var sensed: Array = _sensed.get(player.player_id, [])
+	var prey := _seek_prey(player, state, sensed)
 	if prey != null:
 		_chase(player, command, state, prey, t, at)
 		return
@@ -355,6 +373,7 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 		var where: Vector3 = state["prey_at"]
 		if _walk_to(player, command, state, where, true):
 			search.heard(where, t, 8.0)
+			state["seek_dirty"] = true
 			state["prey"] = StringName()
 		return
 	state["prey"] = StringName()
@@ -374,13 +393,13 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 			continue
 		var vague := where + Vector3(stream.next_range_f(-1.0, 1.0), 0.0, stream.next_range_f(-1.0, 1.0)) * minf(d * 0.12, 4.0)
 		search.heard(vague, t, 6.0)
+		state["seek_dirty"] = true
 		state["goal_place"] = {"at": nav.closest(vague) if nav.is_ready() else vague, "since": t, "picked_at": t}
 		state["path"] = PackedVector3Array()
 
 	# Doubt what is in view; test the most doubtful once it is doubtful enough.
 	if int(game.get("_tick")) % 4 == 0:
-		var _crossed := search.observe(player.eye_position(), player.aim_direction(), profile.fov, profile.sight, _los, t, 0.5)
-		_doubt(player, state, careful)
+		_seek_sense(player, state, careful, search, t, sensed)
 		if t - float(state["tested_at"]) > TEST_GAP:
 			var started := _start_test(player, state, careful)
 			if started:
@@ -478,6 +497,7 @@ func _goal_place(player: PhPlayer, state: Dictionary, search: DotBotSearch, at: 
 		place["since"] = t
 		place["picked_at"] = t
 		state["goal_place"] = place
+		state["seek_dirty"] = true
 		state["path"] = PackedVector3Array()
 	return place
 
