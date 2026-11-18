@@ -108,7 +108,29 @@ func _sense_hunters(hunters: Array[PhPlayer]) -> void:
 	var mask: int = (int(physics.layer_mask(&"world")) | int(physics.layer_mask(&"prop"))) if physics != null else 1
 	_seek_ray.call(&"bind", world.direct_space_state if world != null else null, mask, _no_rids, null, null, 0, Vector3.ZERO, 0.0, 0.0)
 
-	# The props, as players_on lists them.
+	var index_of := _seek_send_props(table)
+	var taunt_at := PackedVector3Array()
+	var taunt_t := PackedFloat64Array()
+	for heard: Dictionary in _taunts:
+		taunt_at.append(heard["at"])
+		taunt_t.append(float(heard["t"]))
+
+	var profile := settings().profile
+	var t := now()
+	var rows := _seek_hunter_rows(table, hunters, index_of, profile, t)
+	var flags: PackedInt32Array = rows[3]
+	var config: Object = game.get("config")
+	var rules := PackedFloat64Array([t, 4.0 * dt(), float(config.get("bot_suspicion")) / 100.0, profile.fov, profile.sight,
+		profile.memory, profile.map_knowledge, profile.aggression, float(int(game.get("round_number")))])
+	var out: Array = table.call(&"sense", rules, taunt_at, taunt_t, rows[0], rows[1], rows[2], flags, rows[4], rows[5], rows[6])
+	if out.size() != 2:
+		push_error("DotSimHunterSeek.sense refused the batch: the hunters ask in script this tick")
+		return
+	_seek_take_answers(hunters, flags, out)
+
+
+## The props, as players_on lists them, into the native table; returns each prop's index by player id.
+func _seek_send_props(table: Object) -> Dictionary:
 	_seek_props = game.call("players_on", PROPS)
 	var n := _seek_props.size()
 	var p_at := PackedVector3Array()
@@ -138,15 +160,12 @@ func _sense_hunters(hunters: Array[PhPlayer]) -> void:
 		p_kinds[i] = int(_seek_kinds.get(String(prop.disguise.prop_id), -1)) if disguised else -1
 		p_ids[i] = String(prop.player_id)
 	table.call(&"set_props", p_at, p_velocity, p_hull, p_flags, p_kinds, p_ids)
+	return index_of
 
-	var taunt_at := PackedVector3Array()
-	var taunt_t := PackedFloat64Array()
-	for heard: Dictionary in _taunts:
-		taunt_at.append(heard["at"])
-		taunt_t.append(float(heard["t"]))
 
-	var profile := settings().profile
-	var t := now()
+## Each hunter's row for [code]sense[/code] (its native mind refreshed first where the script's
+## search moved): [ids, eye, forward, flags, found, found_at, clearing].
+func _seek_hunter_rows(table: Object, hunters: Array[PhPlayer], index_of: Dictionary, profile: DotBotProfile, t: float) -> Array:
 	var doubt_tick := int(game.get("_tick")) % 4 == 0
 	var m := hunters.size()
 	var ids := PackedStringArray()
@@ -208,14 +227,12 @@ func _sense_hunters(hunters: Array[PhPlayer]) -> void:
 		found[k] = int(index_of.get(state.get("found", StringName()), -1))
 		found_at[k] = float(state.get("found_at", -INF))
 		clearing[k] = String(test["key"]) if not test.is_empty() and not holding and not remembering else ""
+	return [ids, eye, forward, flags, found, found_at, clearing]
 
-	var config: Object = game.get("config")
-	var rules := PackedFloat64Array([t, 4.0 * dt(), float(config.get("bot_suspicion")) / 100.0, profile.fov, profile.sight,
-		profile.memory, profile.map_knowledge, profile.aggression, float(int(game.get("round_number")))])
-	var out: Array = table.call(&"sense", rules, taunt_at, taunt_t, ids, eye, forward, flags, found, found_at, clearing)
-	if out.size() != 2:
-		push_error("DotSimHunterSeek.sense refused the batch: the hunters ask in script this tick")
-		return
+
+## Unpacks the native [code]sense[/code] answer into [member _sensed], one entry per hunter.
+func _seek_take_answers(hunters: Array[PhPlayer], flags: PackedInt32Array, out: Array) -> void:
+	var m := hunters.size()
 	seek_scans += 1
 	var ints: PackedInt32Array = out[0]
 	var floats: PackedFloat64Array = out[1]
@@ -239,7 +256,6 @@ func _sense_hunters(hunters: Array[PhPlayer]) -> void:
 			a += 2
 		_sensed[hunters[k].player_id] = [prey, sensed, flags[k] & _OBSERVE != 0, crossed, keys, floats.slice(f, f + rows), capped]
 		f += rows
-
 
 ## The prop [param player] has in sight and knows for one: the native answer when there is one
 ## (checked against the script's with [member seek_verify]), else the script's.
