@@ -26,5 +26,4 @@ Run it as the user that holds the box key (gamedev), from the checkout or a `~/w
 ## Known
 
 - `bone_pop` reads 92 to 111 degrees on the walk, run, crouch and jump cycles of the shared humanoid figure (dot-player-char), not this game; filed on the nightly board.
-- `prop_real_size` fails for a few oversized props that converted maps stack other props on (keyboard, screen, laptop, coffee tables, toaster, melon): mg-prop-hunt-maps bakes their heights, so rescaling them alone floats what stands on them. They change together with a maps `--sync-sizes` rebuild (nightly `ph-props-real-size-restack-1`).
 - The prop cameras stand off by the prop's own size, so an apple fills the frame as a sofa does; compare props by `prop_real_size`, not by how big they look in the sheets.

@@ -1196,16 +1196,16 @@
       "title": "Computer keyboard",
       "kit": "furniture",
       "model": "assets/props/furniture/computerKeyboard.glb",
-      "scale": 2.3,
+      "scale": 1.7,
       "size": [
-        0.649,
-        0.063,
-        0.272
+        0.48,
+        0.047,
+        0.201
       ],
       "offset": [
-        -0.325,
+        -0.24,
         0.0,
-        0.136
+        0.1
       ],
       "disguise": true,
       "breaks": 10.0
@@ -1234,16 +1234,16 @@
       "title": "Computer screen",
       "kit": "furniture",
       "model": "assets/props/furniture/computerScreen.glb",
-      "scale": 2.3,
+      "scale": 1.65,
       "size": [
-        0.903,
-        0.677,
-        0.239
+        0.648,
+        0.486,
+        0.172
       ],
       "offset": [
-        -0.452,
+        -0.324,
         0.0,
-        0.12
+        0.086
       ],
       "disguise": true,
       "breaks": 25.0
@@ -1820,16 +1820,16 @@
       "title": "Laptop",
       "kit": "furniture",
       "model": "assets/props/furniture/laptop.glb",
-      "scale": 2.3,
+      "scale": 1.45,
       "size": [
-        0.607,
-        0.372,
-        0.552
+        0.383,
+        0.235,
+        0.348
       ],
       "offset": [
-        -0.304,
+        -0.191,
         0.0,
-        0.276
+        0.174
       ],
       "disguise": true,
       "breaks": 20.0
@@ -2443,16 +2443,16 @@
       "title": "Table coffee",
       "kit": "furniture",
       "model": "assets/props/furniture/tableCoffee.glb",
-      "scale": 2.3,
+      "scale": 1.9,
       "size": [
-        1.52,
-        0.529,
-        0.92
+        1.256,
+        0.437,
+        0.76
       ],
       "offset": [
-        0.3,
+        0.248,
         0.0,
-        0.23
+        0.19
       ],
       "disguise": true
     },
@@ -2461,16 +2461,16 @@
       "title": "Table coffee glass",
       "kit": "furniture",
       "model": "assets/props/furniture/tableCoffeeGlass.glb",
-      "scale": 2.3,
+      "scale": 1.9,
       "size": [
-        1.52,
-        0.529,
-        0.92
+        1.256,
+        0.437,
+        0.76
       ],
       "offset": [
-        0.3,
+        0.248,
         0.0,
-        0.23
+        0.19
       ],
       "disguise": true
     },
@@ -2479,16 +2479,16 @@
       "title": "Table coffee glass square",
       "kit": "furniture",
       "model": "assets/props/furniture/tableCoffeeGlassSquare.glb",
-      "scale": 2.3,
+      "scale": 1.9,
       "size": [
-        0.92,
-        0.529,
-        0.92
+        0.76,
+        0.437,
+        0.76
       ],
       "offset": [
-        0.6,
+        0.496,
         0.0,
-        0.23
+        0.19
       ],
       "disguise": true
     },
@@ -2497,16 +2497,16 @@
       "title": "Table coffee square",
       "kit": "furniture",
       "model": "assets/props/furniture/tableCoffeeSquare.glb",
-      "scale": 2.3,
+      "scale": 1.9,
       "size": [
-        0.92,
-        0.529,
-        0.92
+        0.76,
+        0.437,
+        0.76
       ],
       "offset": [
-        0.6,
+        0.496,
         0.0,
-        0.23
+        0.19
       ],
       "disguise": true
     },
@@ -2643,11 +2643,11 @@
       "title": "Toaster",
       "kit": "furniture",
       "model": "assets/props/furniture/toaster.glb",
-      "scale": 2.3,
+      "scale": 1.75,
       "size": [
-        0.432,
-        0.299,
-        0.23
+        0.329,
+        0.227,
+        0.175
       ],
       "offset": [
         0.0,
@@ -2825,15 +2825,15 @@
       "title": "Melon",
       "kit": "nature",
       "model": "assets/props/nature/crop_melon.glb",
-      "scale": 2.5,
+      "scale": 1.9,
       "size": [
-        1.044,
-        0.87,
-        0.904
+        0.793,
+        0.661,
+        0.687
       ],
       "offset": [
         0.0,
-        0.125,
+        0.095,
         0.0
       ],
       "disguise": true,
