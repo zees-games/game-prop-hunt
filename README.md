@@ -1,3 +1,5 @@
+![Prop Hunt banner](https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/banner.png)
+
 This is a game to demonstrate the capabilities of the [**GameSpice collection**](https://gamespice.net) built on-top of [Godot 4](https://godotengine.org/) and [**GameSpice**](https://gamespice.net). In this 3D game, most players are **props**: they hide by turning into a piece of furniture, a plant or a rock somewhere on the map and keeping still. The rest are **hunters**, who are blindfolded while the props hide and then have a few minutes to find them, with every wrong guess costing them health. This is inspired by the classic prop hunt game mode!
 
 **This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with GameSpice, you will need to build and integrate your own back-end infrastructure.
