@@ -13,4 +13,3 @@ game/ph_hud.gd::_weapon_hint::alloc_array	1
 game/ph_hud.gd::_weapon_hint::string_build	3
 game/ph_hud.gd::present_blind::string_build	2
 game/ph_projectile_view.gd::present::alloc_dict	1
-tools/load_probe.gd::_process::string_build	2
