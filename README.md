@@ -1,6 +1,6 @@
-This is a game to demonstrate the capabilities of the [**Gamespice collection**](https://gamespice.net) built on-top of [Godot 4](https://godotengine.org/) and [Gamespice](https://gamespice.net). In this 3D game, most players are **props**: they hide by turning into a piece of furniture, a plant or a rock somewhere on the map and keeping still. The rest are **hunters**, who are blindfolded while the props hide and then have a few minutes to find them, with every wrong guess costing them health. This is inspired by the classic prop hunt game mode!
+This is a game to demonstrate the capabilities of the [**GameSpice collection**](https://gamespice.net) built on-top of [Godot 4](https://godotengine.org/) and [**GameSpice**](https://gamespice.net). In this 3D game, most players are **props**: they hide by turning into a piece of furniture, a plant or a rock somewhere on the map and keeping still. The rest are **hunters**, who are blindfolded while the props hide and then have a few minutes to find them, with every wrong guess costing them health. This is inspired by the classic prop hunt game mode!
 
-**This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with Gamespice, you will need to build and integrate your own back-end infrastructure.
+**This project and the assets under it are COMPLETELY OPEN SOURCE**. You are free to use, modify, and distribute them under the terms of the MIT license. The only thing not open source is the back-end web infrastructure. So if you opt into using your own authentication backend instead of integrating with GameSpice, you will need to build and integrate your own back-end infrastructure.
 
 This game was built with Claude Code and has had little testing with real players, so please report anything odd you run into.
 
@@ -12,7 +12,7 @@ Each round starts with the **hide**. By default the props get 30 seconds to run 
 - **Hunters** get an SMG, a shotgun and a hatchet. Shooting a prop hurts it. Shooting real furniture hurts **you**, so guess carefully. Run out of health and you blow apart.
 - **The beacon.** When only one prop is left (by default; you can also set a time left), every prop still hiding pings out a sound and a ring everybody can see, every two seconds.
 
-The props win if any of them is still hidden when the clock runs out, or if every hunter is gone. The hunters win if they find every prop. By default winning is worth 10 points to everyone on that side, finding a prop 5 and surviving a round 5 (all three are settings). Points, rounds won, props found and the rest go to your stats and the leaderboards on Gamespice.
+The props win if any of them is still hidden when the clock runs out, or if every hunter is gone. The hunters win if they find every prop. By default winning is worth 10 points to everyone on that side, finding a prop 5 and surviving a round 5 (all three are settings). Points, rounds won, props found and the rest go to your stats and the leaderboards on GameSpice.
 
 A round draws the hunters fresh: one hunter for every 3 players by default, and at most 8. Say **!hunter** or **!prop** in chat to ask for a side. Anybody who is out watches the rest of the round. After a few rounds on a map, players vote for the next one (`!rtv`, `!nominate ph_house`).
 
@@ -43,7 +43,7 @@ The game has a small practice house built in. The separate [mg-prop-hunt-maps](h
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
 ## Getting started
-You need [Godot 4.7](https://godotengine.org/download). The game is built from many Gamespice addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
+You need [Godot 4.7](https://godotengine.org/download). The game is built from many GameSpice addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
 
 ```bash
 git clone https://github.com/gamespice-platform/bootstrap.git
