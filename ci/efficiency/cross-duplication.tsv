@@ -1,0 +1,28 @@
+# duplication (cross-game)
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+examples/dedicated.gd	171
+examples/dedicated_base.gd	87
+examples/headless_native_motor.gd	136
+examples/headless_net.gd	48
+examples/headless_run_base.gd	35
+game/net/ph_events.gd	202
+game/net/ph_net_bridge.gd	34
+game/net/ph_net_link.gd	121
+game/net/ph_player_net.gd	40
+game/net/ph_toy_net.gd	32
+game/ph_audio.gd	96
+game/ph_avatars.gd	50
+game/ph_catalogue.gd	53
+game/ph_client.gd	31
+game/ph_figure.gd	98
+game/ph_game_rotation.gd	40
+game/ph_kill_pov_view.gd	51
+game/ph_killcam.gd	138
+game/ph_map_doc.gd	101
+game/ph_materials.gd	340
+game/ph_player.gd	49
+game/ph_progress.gd	91
+game/ph_props.gd	72
+game/ph_services.gd	120
+tools/measure_props.gd	109
+tools/visual_qa.gd	42
