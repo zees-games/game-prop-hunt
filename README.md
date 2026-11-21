@@ -6,6 +6,26 @@ This is a game to demonstrate the capabilities of the [**GameSpice collection**]
 
 This game was built with Claude Code and has had little testing with real players, so please report anything odd you run into.
 
+## Screenshots
+
+<table>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/hidden-among-props.png" alt="A classroom full of furniture: any chair, desk or bin could be a hiding player."><br><sub>A classroom full of furniture: any chair, desk or bin could be a hiding player.</sub></td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/hide-phase-hud.png" alt="The hide phase as a prop: the controls, the countdown and the taunt meter."><br><sub>The hide phase as a prop: the controls, the countdown and the taunt meter.</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/hunter-view.png" alt="A hunter seeking on Maple Grove School, with the round clock and props left."><br><sub>A hunter seeking on Maple Grove School, with the round clock and props left.</sub></td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/hunter-firing.png" alt="Shooting real furniture costs the hunter health."><br><sub>Shooting real furniture costs the hunter health.</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/scoreboard.png" alt="The Tab scoreboard, props against hunters."><br><sub>The Tab scoreboard, props against hunters.</sub></td>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/loadout.png" alt="The hunter loadout screen: weapon cards and stats."><br><sub>The hunter loadout screen: weapon cards and stats.</sub></td>
+</tr>
+<tr>
+<td><img src="https://raw.githubusercontent.com/zees-games/game-prop-hunt/main/docs/screenshots/map-overview.png" alt="A map from above: the whole school and its grounds."><br><sub>A map from above: the whole school and its grounds.</sub></td>
+</tr>
+</table>
+
 ## How it plays
 Each round starts with the **hide**. By default the props get 30 seconds to run off and pick a spot while the hunters stand at their spawn with a black screen (they can still see their HUD and menus, just not the map or anybody on it). Then the hunters are let go and have 5 minutes. Both times are settings (see below), and a map may ask for less.
 
