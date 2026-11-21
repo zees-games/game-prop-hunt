@@ -222,7 +222,7 @@ func _pick_spot(player: PhPlayer, state: Dictionary, near: float = INF, kind: St
 					continue
 			if kind != &"" and StringName(spot["kind"]) != kind:
 				continue
-			# What dot-bot's choose weighs as exposure: how much the place is seen, and how out
+			# What gs-bot's choose weighs as exposure: how much the place is seen, and how out
 			# of place its piece would be there; an annotated place is also judged by how tucked
 			# in it is (a chair in a corner, not mid-floor).
 			var scored := spot.duplicate()
@@ -582,7 +582,7 @@ func _start_test(player: PhPlayer, state: Dictionary, careful: bool) -> bool:
 	return true
 
 
-## Aims at [param at] (target [param id]) and says whether to fire this tick: dot-bot's
+## Aims at [param at] (target [param id]) and says whether to fire this tick: gs-bot's
 ## [GSBotAim], so the view turns at `bot_turn_rate`, the first shots miss by `bot_aim_error`
 ## and settle, and the trigger waits `bot_reaction` after first sight.
 func shoot(player: PhPlayer, command: GSFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:

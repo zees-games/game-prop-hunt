@@ -10,7 +10,7 @@ const PhProps := preload("ph_props.gd")
 
 const CHANNEL := "ph.map"
 
-const CONTACT_SHADE_SCRIPT := "res://addons/dot_lighting/runtime/dot_contact_shade.gd"
+const CONTACT_SHADE_SCRIPT := "res://addons/gs_lighting/runtime/gs_contact_shade.gd"
 
 ## Metres of world one batched mesh covers. See the class notes.
 const CHUNK := 12.0
@@ -43,7 +43,7 @@ var props_version: int = 0
 ## node. What [method break_prop] hides and [method restore_all] puts back.
 var _drawn_at: Dictionary = {}
 
-## The map's toys (dot-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
+## The map's toys (gs-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
 var toys: GSPropBodyBox = null
@@ -58,7 +58,7 @@ var _drawn: Node3D = null
 var _shade_boxes: Array = []
 var _environment: WorldEnvironment = null
 
-## Source units to metres, which dot-lighting's fog distances are written in.
+## Source units to metres, which gs-lighting's fog distances are written in.
 const METRES_PER_UNIT := 0.01905
 var _sun: DirectionalLight3D = null
 var _bounds: AABB = AABB()
@@ -182,7 +182,7 @@ func _build_boxes() -> void:
 			cube.size = size
 			shape.shape = cube
 			shape.transform = frame
-			# What a footstep on it sounds like (dot-audio's GSAudioFootsteps reads the hit
+			# What a footstep on it sounds like (gs-audio's GSAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "tile_small" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			_solid.add_child(shape)
@@ -211,10 +211,10 @@ func _build_boxes() -> void:
 		var tool: SurfaceTool = batch["tool"]
 		var mesh := MeshInstance3D.new()
 		mesh.name = "Boxes"
-		# dot-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# gs-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so.
 		if bool(batch["ghost"]):
-			mesh.set_meta(&"dot_no_collision", true)
+			mesh.set_meta(&"gs_no_collision", true)
 		mesh.mesh = tool.commit()
 		mesh.material_override = PhMaterials.material(batch["mat"], batch["tint"])
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF \
@@ -232,10 +232,10 @@ func _shades_floor(prop_id: StringName, raw: Dictionary) -> bool:
 	return is_zero_approx(float(raw.get("pitch", 0.0))) and is_zero_approx(float(raw.get("roll", 0.0)))
 
 
-## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the Compatibility renderer has no ambient occlusion.
+## gs-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the Compatibility renderer has no ambient occlusion.
 ## Glass and water neither cast nor take one. By path, behind the level, so an older client shell still runs the map without it.
 func _add_contact_shade(boxes: Array) -> void:
-	if boxes.is_empty() or GSAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
+	if boxes.is_empty() or GSAddonApi.build_level("gs_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
 		return
 	var shade: Variant = (load(CONTACT_SHADE_SCRIPT) as GDScript).call(&"node", boxes)
 	if shade is MeshInstance3D and (shade as MeshInstance3D).mesh != null:
@@ -361,7 +361,7 @@ func _build_lights() -> void:
 		_drawn.add_child(omni)
 
 
-## The sky and the sun: a dot-lighting document made from the map's `environment` ([method light_document]), so every map has the family's light
+## The sky and the sun: a gs-lighting document made from the map's `environment` ([method light_document]), so every map has the family's light
 ## while keeping its own sun angle, colour and sky.
 func _build_environment() -> void:
 	var env_doc: Dictionary = doc["environment"]
@@ -373,7 +373,7 @@ func _build_environment() -> void:
 
 	if _sun != null:
 		# The map's own angle, in Godot's degrees as the map document has always written it,
-		# rather than through dot-lighting's source convention.
+		# rather than through gs-lighting's source convention.
 		_sun.rotation_degrees = Vector3(float(env_doc["sun_pitch"]), float(env_doc["sun_yaw"]), 0.0)
 		# The rig aimed its fill opposite the sun it was given; turned with the sun here, or it
 		# lights the faces the sun already does.
@@ -398,7 +398,7 @@ func _build_environment() -> void:
 				material.ground_bottom_color = material.sky_top_color
 
 
-## The dot-lighting document a map's `environment` describes.
+## The gs-lighting document a map's `environment` describes.
 ## Brightness is 380 times the square of `sun_energy`; the ambient is a near-neutral pale grey at the map's strength ([method light_profile]) with the map's `ambient` mixed in a quarter, so a cold fill does not turn every room lavender.
 ## The fog is the map's own when it has `fog_end`, else its horizon from 120 m out (source units, metres / 0.01905), so it hazes the distance and never a room.
 static func light_document(env_doc: Dictionary) -> Dictionary:
@@ -435,7 +435,7 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 	}
 
 
-## What this machine draws of a map's light: dot-lighting's `painted()`, with the map's fill.
+## What this machine draws of a map's light: gs-lighting's `painted()`, with the map's fill.
 ## Shadows stay on in the browser, unlike `web()`: a prop's shadow is part of what a hunter reads, and the boxes are batched into a few dozen meshes.
 ## Ambient is the map's `ambient_energy` times 4 of `painted()`'s and the fill times 2.8, keeping a room (lit by fill and lamps, not sun) as light as before while the yard loses its glare.
 static func light_profile(ambient_energy: float = 0.5) -> GSLightProfile:
@@ -448,7 +448,7 @@ static func light_profile(ambient_energy: float = 0.5) -> GSLightProfile:
 	# trunks, pines and furniture in shade went to black at 1.12 (2 % of a woods frame).
 	p.contrast = 1.04
 	# Glow only from what is brighter than white (the lamps), not from every pale wall: at
-	# dot-lighting's 0.85 a room of near-white pastels glowed into one milky veil.
+	# gs-lighting's 0.85 a room of near-white pastels glowed into one milky veil.
 	p.glow_threshold = 1.0
 	return p
 

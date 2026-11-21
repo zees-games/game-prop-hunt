@@ -1,6 +1,6 @@
 extends Node
 
-## The cameras and bodies in the real offline game: the third-person and spectator chase cameras flown round the start and every checkpoint (dot-core's GSCameraCheck), `mp_forceview` through the view key's path, and with `--render` the player's eyes before and after.
+## The cameras and bodies in the real offline game: the third-person and spectator chase cameras flown round the start and every checkpoint (gs-core's GSCameraCheck), `mp_forceview` through the view key's path, and with `--render` the player's eyes before and after.
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop.
 ##   tools/camera_check.sh [--render]   # headless; exit 1 on a failure; frames in screenshots/cameras/
 

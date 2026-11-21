@@ -9,7 +9,7 @@ signal player_armed(player_id: StringName, weapon_id: StringName)
 ## Aim-down-sights numbers (`zee_ads_rules`, REPLICATED): the server's cfg over the shipped defaults, handed to every weapon
 ## rig. Bound by the module and followed by a client, so its prediction agrees. Nothing sets the aim bit yet.
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
-## The burst drawn where a grenade went off (dot-fx).
+## The burst drawn where a grenade went off (gs-fx).
 const BLAST_FX := &"blast"
 var effects: GSFxManager = null
 ## Who has had the hunters' role, for [GSTeamRotation].
@@ -216,7 +216,7 @@ func _set_side(id: StringName, side: int) -> void:
 
 
 ## The next map, built; also every map this server plays, as the map menu (M) lists them: `{id, name, detail, current}`.
-## Solo the client's list, online the server's (the module hands it to dot-vote's map menu), so both say the same.
+## Solo the client's list, online the server's (the module hands it to gs-vote's map menu), so both say the same.
 func map_rows() -> Array:
 	var out: Array = []
 	if catalogue == null:

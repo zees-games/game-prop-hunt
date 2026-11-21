@@ -1,6 +1,6 @@
 # This game's descriptor: what a server runs when it installs this repository's pack.
 #
-# It travels INSIDE the pack (dot-ci's package.sh --pack keeps it at the root), so a
+# It travels INSIDE the pack (gs-ci's package.sh --pack keeps it at the root), so a
 # server started with `TMC_GAMES=<owner>/<repo>` needs nothing but the content origin:
 # `./server install-games` fetches the pack, verifies it, and writes this file to
 # content/<repo>/game.yml, where an operator can then edit cvars and player counts.
@@ -23,7 +23,7 @@ client_scene: game/ph.tscn
 module: game/ph_module.gd
 
 # No maps pack is named here. Which maps a server runs is the server owner's choice, made in
-# their deployment's map config (dot-server-deploy's cfg/content.yml, gamemann/mg-prop-hunt-maps
+# their deployment's map config (gs-server-deploy's cfg/content.yml, gamemann/mg-prop-hunt-maps
 # for the stock set); the module fetches what the server names. This game's own pack ships
 # only its built-in the practice map.
 

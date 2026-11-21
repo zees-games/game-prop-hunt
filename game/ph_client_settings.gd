@@ -14,7 +14,7 @@ var bridge: PhNetBridge = null
 ## The player's console (the platform's).
 var console: GSConsoleController = null
 var link: Node = null
-## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
+## gs-menu's loadout menu, or null on a host whose gs-menu predates it (API 6).
 var loadout_menu: Object = null
 var _offline: bool = true
 const PhAudio := preload("ph_audio.gd")
@@ -24,7 +24,7 @@ const PhTouch := preload("ph_touch.gd")
 const PhWeaponIcons := preload("ph_weapon_icons.gd")
 ## How long a found prop's own pieces take to shrink away as it pops.
 const PROP_POP_SECONDS := 0.35
-## Where the dead lie: dot-player-char's ragdolls under the game's (the server's) rules.
+## Where the dead lie: gs-player-char's ragdolls under the game's (the server's) rules.
 var ragdolls: GSPlayerRagdolls = null
 var _sampler: GSFpsSampler = null
 ## The phone's buttons; null on a device without touch.
@@ -116,10 +116,10 @@ func _on_death(session_id: int, by: int, why: StringName, weapon_id: StringName 
 	chat.say_locally(line, Color(0.80, 0.82, 0.86))
 
 
-## B: a hunter's primary and secondary, as cards. Solo the world's loadouts answer; connected the server does (dot-loadout's `/loadout`).
-## A prop may choose too, kept for the round they hunt. Guarded on the host's dot-menu and dot-loadout levels, so an older shell runs without it.
+## B: a hunter's primary and secondary, as cards. Solo the world's loadouts answer; connected the server does (gs-loadout's `/loadout`).
+## A prop may choose too, kept for the round they hunt. Guarded on the host's gs-menu and gs-loadout levels, so an older shell runs without it.
 func _use_loadout_menu() -> void:
-	if GSAddonApi.build_level("dot_menu") < 6 or GSAddonApi.build_level("dot_loadout") < 2:
+	if GSAddonApi.build_level("gs_menu") < 6 or GSAddonApi.build_level("gs_loadout") < 2:
 		return
 	if settings == null or not settings.has_method(&"use_loadout"):
 		return
@@ -171,7 +171,7 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 	return out
 
 
-## dot-team's block rules followed from the server, or, solo, the F9 tuning panel over this process's own config.
+## gs-team's block rules followed from the server, or, solo, the F9 tuning panel over this process's own config.
 func _add_noblock_and_workbench() -> void:
 	if link != null and not _offline:
 		GSLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
@@ -208,7 +208,7 @@ func _build_settings() -> void:
 	platform.look_position_fn = _look_position
 	platform.board_snapshot_fn = board_snapshot
 	# M: the map list. Solo a choice changes the map at once; connected the server decides by `sv_map_menu_flag`, and anybody without it gets a vote
-	# (dot-vote's map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt list's `picked` handler.
+	# (gs-vote's map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt list's `picked` handler.
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
 	platform.maps_change_fn = func(id: StringName) -> GSResult: return game.change_map_now(id)
 	GSLog.result(CHANNEL, "the platform", platform.setup())
@@ -333,7 +333,7 @@ func _on_taunt_picked(id: StringName) -> void:
 		ask_taunt(id)
 
 
-## Where a roster row's player stands, for dot-game's look-to-gag key (G, K).
+## Where a roster row's player stands, for gs-game's look-to-gag key (G, K).
 func _look_position(row: Dictionary) -> Variant:
 	if game == null:
 		return null

@@ -5,7 +5,7 @@ const PhPlayer := preload("ph_player.gd")
 ## What [PhGame] reports about itself and about a hit, kept out of the simulation file: the death a body gets, the hit confirmations, the describe text.
 
 
-## The fall a death gets: dot-player-char's reaction rule over the server's weights, seeded from
+## The fall a death gets: gs-player-char's reaction rule over the server's weights, seeded from
 ## the player and the tick. A hunter's gun is a weapon def (a shotgun may launch); the
 ## furniture's cost and a fall carry no direction, and push nothing.
 static func decide_death(

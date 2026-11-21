@@ -4,7 +4,7 @@ const PhConfig := preload("ph_config.gd")
 const PhGame := preload("ph_game.gd")
 
 ## What a [GSServer] loads as its game scene. Never a client. Small on purpose: everything a dedicated server does is in `ph_module.gd`.
-## It exists because dot-server loads a SCENE, and the world must be in the tree under [constant PhGame.SERVICE] before the module looks for it.
+## It exists because gs-server loads a SCENE, and the world must be in the tree under [constant PhGame.SERVICE] before the module looks for it.
 ## It lives in `game/`, not `scenes/`: a vendored game copies only the `.tscn` from `scenes/`, so a script there never reaches the build.
 
 const CHANNEL := "ph.server"

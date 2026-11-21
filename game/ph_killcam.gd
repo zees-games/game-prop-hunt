@@ -3,7 +3,7 @@ extends Node
 const PhPlayer := preload("ph_player.gd")
 const PhWeaponIcons := preload("ph_weapon_icons.gd")
 
-## The killcam at a round's end, client side: frames go into dot-replay's [GSKillcamBuffer], decisive moments are noted,
+## The killcam at a round's end, client side: frames go into gs-replay's [GSKillcamBuffer], decisive moments are noted,
 ## and [GSKillcam] replays the last from the eyes of the player it happened to. Length is `mp_killcam_time`; 0 skips to [signal over].
 
 const KillPov := preload("ph_kill_pov.gd")
@@ -11,7 +11,7 @@ const KillPov := preload("ph_kill_pov.gd")
 const CHANNEL := "prophunt.killcam"
 
 ## Skip keys: jump, the use key and Escape.
-const SKIP_ACTIONS: PackedStringArray = ["dot_fps_jump", "ui_cancel"]
+const SKIP_ACTIONS: PackedStringArray = ["gs_fps_jump", "ui_cancel"]
 
 ## The killcam is over (or never began); the end-of-round flow goes on from here.
 signal over(skipped: bool)

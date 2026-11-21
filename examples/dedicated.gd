@@ -107,7 +107,7 @@ func _shut_down() -> void:
 func _boot() -> void:
 	_section("booting")
 
-	# `startup_config`, because `sv_tickrate` is startup-only and dot-server execs this file
+	# `startup_config`, because `sv_tickrate` is startup-only and gs-server execs this file
 	# before the listener for exactly that reason.
 	var cfg_path := "%s/server.cfg" % SERVER_DIR
 	var cfg := FileAccess.open(cfg_path, FileAccess.WRITE)
@@ -180,7 +180,7 @@ func _test_the_module_loads() -> void:
 
 	var module := _module()
 	_check(game != null and game.progress != null and game.progress.durable_key_fn.is_valid(),
-		"progress is filed under dot-game's stable stats key")
+		"progress is filed under gs-game's stable stats key")
 	_check(module != null and module.get("net") != null and module.get("bridge") != null,
 		"with its netcode and the game's bridge")
 
@@ -210,13 +210,13 @@ func _test_stats_report() -> void:
 	script.source_code = "extends Node\nfunc post_integration(_a = null, _b = null, _c = null): return null\n"
 	var _reloaded := script.reload()
 	client.set_script(script)
-	GSRegistry.register(&"dot_backbone_client", client)
+	GSRegistry.register(&"gs_backbone_client", client)
 	var _r0 := cv.set_value("0")
 	var _r1 := cv.set_value("1")
 	_check(progress.stats.report_to_backbone, "on with a backbone client makes the tracker report")
 	var _r2 := cv.set_value("0")
 	_check(not progress.stats.report_to_backbone, "off stops it again")
-	GSRegistry.unregister_instance(&"dot_backbone_client", client)
+	GSRegistry.unregister_instance(&"gs_backbone_client", client)
 	client.free()
 
 	var zoned := GSDamage.make(1, 2, 5.0, game.combat.damage_type(&"kinetic"))
@@ -226,7 +226,7 @@ func _test_stats_report() -> void:
 	progress.report_hit(&"ph-test", &"ph-victim", zoned)
 	_check(
 		progress.stats.session_values(&"ph-test").get_cell(GSStatsHitzones.HITS, "zone:neck") >= 1.0,
-		"a hit with a hit_group is filed by body zone through the dot-stats hitzone hook"
+		"a hit with a hit_group is filed by body zone through the gs-stats hitzone hook"
 	)
 	_check(progress.stats.schema.has(&"rank_score") and progress.rank != null, "rank_score is declared and the rank is set up")
 	var _held := GSStatsValues.new()
@@ -236,7 +236,7 @@ func _test_stats_report() -> void:
 	_check(_life == 20.0, "a stored lifetime baseline (10 wins) is what the published rank is built on")
 
 
-## Config cvars, the workbench, and dot-team's block rules through dot-game's GSGameNoblock.
+## Config cvars, the workbench, and gs-team's block rules through gs-game's GSGameNoblock.
 func _noblock_and_config(module: GSModule) -> void:
 	var teamblock := server.console.find_cvar("mp_teamblock")
 	var enemyblock := server.console.find_cvar("mp_enemyblock")
@@ -285,7 +285,7 @@ func _test_the_commands() -> void:
 	_check(game.config.min_hunters == 20, "the least hunters takes any count too", "%d" % game.config.min_hunters)
 	var _min_back := _run_command("ph_min_hunters 1")
 	var _max_back := _run_command("ph_max_hunters 8")
-	# And it is REPLICATED: dot-server sends it to every client before its scene loads and on
+	# And it is REPLICATED: gs-server sends it to every client before its scene loads and on
 	# every change, so a client's own combat manager (following its link) predicts tracers
 	# under the server's level rather than its default.
 	var shared := server.console.find_cvar("mp_teammate_passthrough")
@@ -296,7 +296,7 @@ func _test_the_commands() -> void:
 		str(server.console.replicated_values()))
 	var _one := _run_command("mp_teammate_passthrough 1")
 
-	# Dead bodies are the owner's: dot-player-char's sv_ragdoll* set, REPLICATED (a client draws
+	# Dead bodies are the owner's: gs-player-char's sv_ragdoll* set, REPLICATED (a client draws
 	# the bodies) and on the world's own rules, which the server picks each death's fall from.
 	var ragdoll := server.console.find_cvar("sv_ragdoll")
 	var _no_ragdolls := _run_command("sv_ragdoll 0")
@@ -356,7 +356,7 @@ func _test_a_round_runs() -> void:
 	var quota_bridge: Object = quota_module.get("bridge") if quota_module != null else null
 	_check(server.console.find_cvar("bot_quota") != null and server.console.find_cvar("bot_quota_mode") != null,
 		"the shared bot_quota cvars are registered")
-	# How the stand-ins aim and shoot is dot-bot's: the family's names, medium by default.
+	# How the stand-ins aim and shoot is gs-bot's: the family's names, medium by default.
 	var bot_settings := GSBotSettings.of(game)
 	_check(server.console.get_string("bot_difficulty", "") == "medium" and bot_settings.difficulty() == "medium",
 		"bot_difficulty is the module's and medium is the default")
@@ -393,7 +393,7 @@ func _test_a_round_runs() -> void:
 	_finished()
 
 
-## A seat behind its client's loading cover cannot be hurt or eliminated (dot-game's "still loading"): a real peer marked loading takes a lethal hit that must be refused,
+## A seat behind its client's loading cover cannot be hurt or eliminated (gs-game's "still loading"): a real peer marked loading takes a lethal hit that must be refused,
 ## and once the cover lifts the same hit lands. Stand-in rounds never reach this, a bot never being loading.
 func _covered_seat_cannot_be_harmed(module: Object, bridge: Object) -> void:
 	_section("a covered seat cannot be harmed")
@@ -464,7 +464,7 @@ func _test_finish_round_waits_for_a_live_round() -> void:
 
 
 ## A director under `time_up: finish_round` carrying [param hook], its clock run out with a
-## winner already decided: what dot-vote's own suite builds, with the game's answer in it.
+## winner already decided: what gs-vote's own suite builds, with the game's answer in it.
 func _finish_round_probe(hook: Callable, applied: Array) -> GSVoteDirector:
 	var source := GSVoteListSource.new()
 	var _a := source.add(GSVoteChoice.of(&"a", "A"))
@@ -510,10 +510,10 @@ func _finish_round_probe(hook: Callable, applied: Array) -> GSVoteDirector:
 
 
 ## A reload keeps the maps the server names: `ph_reload` calls `load_from`, which forgets everything read before, and every delivered map vanished until a restart with nothing logged.
-## A pack "mounted" on disk and a descriptor naming it stand in for dot-cloud and the deployment's `cfg/content.yml`.
+## A pack "mounted" on disk and a descriptor naming it stand in for gs-cloud and the deployment's `cfg/content.yml`.
 func _test_a_reload_keeps_delivered_maps() -> void:
 	_section("a reload keeps the maps the server names")
-	var key := "dot-test/ph-delivered@1.0.0"
+	var key := "gs-test/ph-delivered@1.0.0"
 	var mount := GSGameContent.mount_of(key)
 	var dir := mount.path_join("maps")
 	var id := &"ph_delivered_check"
@@ -572,10 +572,10 @@ func _test_a_reload_keeps_delivered_maps() -> void:
 
 	DirAccess.remove_absolute(dir.path_join("delivered_check.json"))
 	var path := dir
-	while path != "res://dot_cloud":
+	while path != "res://gs_cloud":
 		DirAccess.remove_absolute(path)
 		path = path.get_base_dir()
-	DirAccess.remove_absolute("res://dot_cloud")
+	DirAccess.remove_absolute("res://gs_cloud")
 	_finished()
 
 

@@ -9,7 +9,7 @@ const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 
 ## What a player needs on screen: the clock, their side and how much of them is left, what they are hiding as, and a blindfold for hunters while the props hide.
 ## The blindfold is a black rect UNDER every widget; the server also holds a blindfolded hunter still ([PhController]) and fires their gun, so it relies on no honest client.
-## Glance pieces are dot-ui's ([GSScoreStrip], [GSVitals], [GSKeyPrompt]); key hints are read from the bindings table, so a rebound key is never a hint that lies.
+## Glance pieces are gs-ui's ([GSScoreStrip], [GSVitals], [GSKeyPrompt]); key hints are read from the bindings table, so a rebound key is never a hint that lies.
 
 const BLIND_FADE_SEC := 0.25
 const BLIND_COLOUR := Color(0.01, 0.01, 0.015)
@@ -36,8 +36,8 @@ static func piece_theme() -> Theme:
 	return t
 
 
-## The Escape menu, whose theme this HUD follows (dot-menu's `follow_hud`): it sets the theme on the HUD's root now and at every change, and applies the player's HUD size.
-## Duck-typed and called by name, for a client shell older than dot-menu 7.
+## The Escape menu, whose theme this HUD follows (gs-menu's `follow_hud`): it sets the theme on the HUD's root now and at every change, and applies the player's HUD size.
+## Duck-typed and called by name, for a client shell older than gs-menu 7.
 var _menu: Object = null
 
 
@@ -56,7 +56,7 @@ var player: PhPlayer = null
 
 ## `func(action: StringName) -> String`: the key an action is on, from the bindings.
 var key_fn: Callable = Callable()
-## Whether B opens a hunter's loadout here (the client has dot-menu's loadout menu): the
+## Whether B opens a hunter's loadout here (the client has gs-menu's loadout menu): the
 ## blindfold and a hunter's hints then name its key.
 var loadout_offered: bool = false
 
@@ -101,8 +101,8 @@ var _crosshair: Control = null
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
 var aim_fraction: float = 0.0
-## Whether the host's dot-ui has `GSCrosshair.opacity_for_aim` (API 5).
-var _fades: bool = GSAddonApi.build_level("dot_ui") >= 5
+## Whether the host's gs-ui has `GSCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = GSAddonApi.build_level("gs_ui") >= 5
 var _shout_for: float = 0.0
 
 
@@ -476,7 +476,7 @@ func _draw_hints(side: int) -> void:
 		lines.append(_weapon_hint())
 		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
 		if loadout_offered and not GSPlatform.has_touch():
-			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
+			lines.append("%s  Loadout (next round)" % _key(&"gs_menu_loadout"))
 
 	if side == PhGame.PROPS and player.reveal_wait > 0.0 and player.is_disguised():
 		lines.append("show yourself again in %d s" % int(ceilf(player.reveal_wait)))
@@ -560,7 +560,7 @@ func present_blind(delta: float) -> void:
 			_blindfold_label.text = "Blindfolded while the props hide\n%s" % GSScoreStrip.clock_text(left)
 			# The hide is when a new loadout goes straight into the hands (PhGame.rearm_if_allowed).
 			if loadout_offered and not GSPlatform.has_touch():
-				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"dot_menu_loadout")
+				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"gs_menu_loadout")
 
 
 ## The client's hands this frame: the scope follows their progressive fade-in and the crosshair gives way as it rises.
@@ -579,19 +579,19 @@ func set_aim(fraction: float, scoped: bool) -> void:
 		_crosshair.modulate.a = 0.0 if scoped else crosshair_opacity(aim_fraction)
 
 
-## How much of the dot [param fraction] leaves: dot-ui's curve where the host has it, else the
+## How much of the dot [param fraction] leaves: gs-ui's curve where the host has it, else the
 ## dot stays (an older shell had no aim to fade for).
 func crosshair_opacity(fraction: float) -> float:
 	if not _fades:
 		return 1.0
-	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
+	# Through a Variant: named directly, an older gs-ui without it fails to compile this script.
 	var crosshair: Variant = GSCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
 
 
-## dot-ui's GSCrosshair as a plain dot (API 14; aim fade and scope stay on `modulate`), else the old square.
+## gs-ui's GSCrosshair as a plain dot (API 14; aim fade and scope stay on `modulate`), else the old square.
 func _make_crosshair() -> Control:
-	if GSAddonApi.build_level("dot_ui") >= 14:
+	if GSAddonApi.build_level("gs_ui") >= 14:
 		var shape: Variant = GSCrosshair
 		var cross := (shape as GDScript).new() as Control
 		cross.name = "Crosshair"

@@ -204,7 +204,7 @@ func _test_map(id: StringName) -> void:
 
 ## The map's toys: all built, none inside a wall, a car or a shelf, and none moved off its place after two seconds of physics.
 func _check_toys(game: PhGame, doc: Dictionary) -> void:
-	# The toys (dot-props', loose only): all built, none inside a wall, a car or a shelf, and two
+	# The toys (gs-props', loose only): all built, none inside a wall, a car or a shelf, and two
 	# seconds of physics later every one still where the map put it, not through a floor.
 	var box := game.map.toys
 	var placed := (doc.get("toys", []) as Array).size()
@@ -228,7 +228,7 @@ func _check_toys(game: PhGame, doc: Dictionary) -> void:
 				stuck.append("%s %d at %s" % [toy.def["id"], toy.index, toy.global_position.snapped(Vector3.ONE * 0.1)])
 				break
 	_check(box.count() == placed and placed > 0 and box.missing.is_empty() and stuck.is_empty(),
-		"%d toys, every one dot-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
+		"%d toys, every one gs-props', standing clear" % placed, "%d built; %s" % [box.count(), "; ".join(stuck.slice(0, 6))])
 	for _i in range(120):
 		await get_tree().physics_frame
 	var strayed: Array = []
@@ -313,7 +313,7 @@ func _world(id: StringName, drawn := false) -> PhGame:
 	return game
 
 
-## dot-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing in `Drawn` and its shapes in `Solid` and `Furniture`,
+## gs-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing in `Drawn` and its shapes in `Solid` and `Furniture`,
 ## so the audit is the lenient one (a touching mesh passes); [method _partly_covered] is the stricter half for furniture a hunter or disguised prop walks into.
 func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	var drawn := await _world(id, true)
@@ -334,7 +334,7 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 		print("    %s" % line)
 
 	_check(res.ok and (res.value as GSCollisionAudit).examined > 0 and found.is_empty(),
-		"everything drawn has collision, or says it is decoration (dot_no_collision)",
+		"everything drawn has collision, or says it is decoration (gs_no_collision)",
 		"; ".join(found.slice(0, 6)) if res.ok else res.error.message)
 	await _dispose(drawn)
 	# Both worlds share one physics space: let the drawn one's bodies go before the checks that

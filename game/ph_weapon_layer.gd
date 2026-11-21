@@ -1,6 +1,6 @@
 extends Node
 
-## Guns lying in the world: dot-weapon's drop layer under the `sv_weapon_drop*` rules, built on the
+## Guns lying in the world: gs-weapon's drop layer under the `sv_weapon_drop*` rules, built on the
 ## server (simulates; hands a gun to a hunter with a free slot) and on a client (draws what it is told).
 ## A hunter throws the gun in hand with the drop key, and a dead hunter leaves it where they fell.
 

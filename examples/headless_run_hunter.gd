@@ -129,7 +129,7 @@ func _test_hunter_weapons() -> void:
 func _check_wheel_step(client: Node, drawn: ZeeWeaponRig) -> void:
 	var ring: Array = drawn.arsenal.slots()
 	var step := InputEventAction.new()
-	step.action = &"dot_menu_weapon_next"
+	step.action = &"gs_menu_weapon_next"
 	step.pressed = true
 	# The pointer is never captured headless, so only that one clause of the block is lifted.
 	client.call("_wheel_pressed", InputEventAction.new())

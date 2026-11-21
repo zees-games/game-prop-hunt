@@ -89,7 +89,7 @@ func _set_vote_hooks(world: PhGame) -> void:
 		return world.match_node == null or world.match_node.is_live()
 
 
-## The players' vote for the next map, over dot-vote: `!vote`, `!rtv`, `!nominate`.
+## The players' vote for the next map, over gs-vote: `!vote`, `!rtv`, `!nominate`.
 ## Opened [member PhVote.open_after_sec] into the last round and applied when it ends; configured in
 ## `user://cfg/prophunt_vote.json` or `game.yml`. A vote that cannot be built is a WARN, never a server that won't start.
 func _build_vote(world: PhGame) -> void:
@@ -112,9 +112,9 @@ func _build_vote(world: PhGame) -> void:
 	var commanded := vote.install_commands(self)
 	GSLog.result(CHANNEL, "the map vote's commands", commanded)
 
-	# The map menu (M), dot-vote's: a player holding the owner's `sv_map_menu_flag` changes the
+	# The map menu (M), gs-vote's: a player holding the owner's `sv_map_menu_flag` changes the
 	# map now, not after its rounds, and sees the same rows a solo player does. Read by name,
-	# because a server on a dot-vote older than the menu has no `map_menu` and runs without it.
+	# because a server on a gs-vote older than the menu has no `map_menu` and runs without it.
 	var menu_half: Variant = vote.commands.get(&"map_menu") if vote.commands != null else null
 	if menu_half is Object:
 		(menu_half as Object).set(&"change_fn", world.change_map_now)

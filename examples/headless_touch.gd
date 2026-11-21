@@ -2,7 +2,7 @@ extends GSGameCheckSuite
 
 const PhTouch := preload("../game/ph_touch.gd")
 
-## The touch layout: the buttons fit a phone at three sizes without overlapping; dot-mobile's overlay drives the sampler and sits under menus; the crosshair calls only a living prop an enemy.
+## The touch layout: the buttons fit a phone at three sizes without overlapping; gs-mobile's overlay drives the sampler and sits under menus; the crosshair calls only a living prop an enemy.
 ## Run: `godot --headless --path . res://examples/headless_touch.tscn`
 
 const CHECKS := 46
@@ -85,7 +85,7 @@ func _overlay() -> void:
 		bound[cvar_name] = true
 		return null
 	rules.bind_cvars(record, 0)
-	_check(bound.has("sv_autofire") and bound.has("sv_mobile_touch"), "the server binds dot-mobile's cvars", str(bound.keys()))
+	_check(bound.has("sv_autofire") and bound.has("sv_mobile_touch"), "the server binds gs-mobile's cvars", str(bound.keys()))
 	_check(FileAccess.get_file_as_string("res://game/ph_game.gd").contains("mobile_rules: GSMobileRules"), "PhGame carries the rules the module binds")
 	GSPlatform.touch_override = 1
 	var host := Control.new()

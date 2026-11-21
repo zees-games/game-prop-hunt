@@ -4,7 +4,7 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 
-## Bot soak on the real game: N stand-ins play rounds back to back on one map for M simulated minutes through dot-bot's GSBotSoak.
+## Bot soak on the real game: N stand-ins play rounds back to back on one map for M simulated minutes through gs-bot's GSBotSoak.
 ## Run: ./game.sh soak [map] [minutes]; the harness's own flags work too. Writes .godot/test-logs/soak-<map>.json and exits 1 on failure.
 ## Only a live hunter in the seek counts as a mover with a goal: props stand still by design and hunters are held in the hide.
 

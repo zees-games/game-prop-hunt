@@ -1,6 +1,6 @@
 extends RefCounted
 
-## A hunter's loadout, as dot-loadout data: what B offers and what `PhGame._arm_hunters` hands out. Data only; the manager and command live on [code]PhGame[/code].
+## A hunter's loadout, as gs-loadout data: what B offers and what `PhGame._arm_hunters` hands out. Data only; the manager and command live on [code]PhGame[/code].
 ## Three slots: primary and secondary from the config's `hunter_weapons` (defaults) and `hunter_choices`, and an optional grenade (`thrown`, empty by default).
 ## Melee is not a choice: every hunter carries the hatchet, their quiet way to test a chair. No points budget; the choice is how a hunter likes to search. A blast that finds nobody costs as a decoy (`PhGame.blast_cost`).
 

@@ -192,7 +192,7 @@ func _test_vote() -> void:
 	_completed += 1
 
 
-## A world laid out with [param host] as the `dot_solo` service (none when null): the id of its first map.
+## A world laid out with [param host] as the `gs_solo` service (none when null): the id of its first map.
 func _first_map(host: Object) -> String:
 	if host != null:
 		GSRegistry.register(PhGame.SOLO_SERVICE, host)

@@ -1,8 +1,8 @@
 extends RefCounted
 
-## A hunter's grenades in flight, and what happens where they go off; copied from game-fatal-contact's `FcProjectiles` because dot-weapon spawns nothing.
+## A hunter's grenades in flight, and what happens where they go off; copied from game-fatal-contact's `FcProjectiles` because gs-weapon spawns nothing.
 ## Everything is a pure function of the tick, so the wire carries one LAUNCH per grenade; a client's copies resolve no damage and only draw the burst.
-## A blast is a dot-combat shot with a splash; what it COSTS is the game's ([signal blasted], docs/design.md "Grenades").
+## A blast is a gs-combat shot with a splash; what it COSTS is the game's ([signal blasted], docs/design.md "Grenades").
 
 ## One projectile, mid-air, rolling, or stuck to something.
 class Flying extends RefCounted:
@@ -43,7 +43,7 @@ const THROWER_GRACE_TICKS := 8
 ## Emitted where a projectile went off, everywhere (a client draws the burst from it).
 signal detonated(at: Vector3, spawn: GSWeaponSpawn)
 
-## This game's: emitted on the authority after dot-combat resolved the blast, with the shot it
+## This game's: emitted on the authority after gs-combat resolved the blast, with the shot it
 ## resolved (its `damages` are who it hurt), for what the blast costs and what it throws.
 signal blasted(at: Vector3, spawn: GSWeaponSpawn, shot: GSShot)
 
@@ -94,9 +94,9 @@ func launch(spawn: GSWeaponSpawn, id: int = 0) -> Flying:
 	return f
 
 
-## The bodies a projectile launched at [param spawn]'s origin passes through: dot-combat's answer
+## The bodies a projectile launched at [param spawn]'s origin passes through: gs-combat's answer
 ## for a shot from the same muzzle, so the policy is written once. Called by name, because a
-## delivered pack runs on the host's dot-combat and an older one must still load this.
+## delivered pack runs on the host's gs-combat and an older one must still load this.
 func _passes_at_launch(spawn: GSWeaponSpawn) -> Array:
 	if _combat == null or not _combat.has_method(&"pass_through_sets"):
 		return []
@@ -166,7 +166,7 @@ func tick(delta: float) -> void:
 			_live.remove_at(i)
 
 
-## A fused spawn whose fuse has run out, and one with no fuse AND no speed: what dot-weapon
+## A fused spawn whose fuse has run out, and one with no fuse AND no speed: what gs-weapon
 ## gives for a grenade cooked past its fuse, at the thrower's own position, which means now.
 func _due(f: Flying) -> bool:
 	if f.spawn.fuse_ticks > 0:
@@ -227,7 +227,7 @@ func _body_of(hit: GSHitbox.Hit) -> Node3D:
 
 
 ## Traces one tick of flight, a swept segment rather than a point test: a wall is thinner than a fast grenade's step.
-## The trace is dot-combat's (`PhGame._build_combat`), so a grenade bounces off a sofa as a shot stops on it.
+## The trace is gs-combat's (`PhGame._build_combat`), so a grenade bounces off a sofa as a shot stops on it.
 func _sweep(f: Flying, step: Vector3) -> GSHitbox.Hit:
 	if _combat == null or _combat.trace == null:
 		return null
@@ -259,7 +259,7 @@ func _sweep(f: Flying, step: Vector3) -> GSHitbox.Hit:
 	return hit if hit.ok() else null
 
 
-## Turns an arrival into an ordinary [GSShot] with a splash and lets dot-combat do the rest.
+## Turns an arrival into an ordinary [GSShot] with a splash and lets gs-combat do the rest.
 ## The impact is set by hand and `max_range` is 0 so nothing re-traces it; no believed origin is pinned, so the blast is not moved back to the thrower.
 func _detonate(f: Flying, at: Vector3) -> void:
 	if _combat != null and _combat.is_authority:

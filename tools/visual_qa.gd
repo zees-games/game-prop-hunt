@@ -1,12 +1,12 @@
 extends GSGameVisualQaCapture
 
-## Prop Hunt's visual QA capture (docs/visual-qa.md; the loop is dot-game's docs/visual-qa.md). Three kinds of item, each recorded
+## Prop Hunt's visual QA capture (docs/visual-qa.md; the loop is gs-game's docs/visual-qa.md). Three kinds of item, each recorded
 ## frame by frame at --fps in three views (f first person, t behind-right, o an opponent in front):
 ##   person_<letter>  one of the six people (PhFigure) walking, running, crouching, jumping; f is a hunter's eye a few metres in front.
 ##   weapon_<id>      a hunter's weapon: f is the real view model (ZeeViewModel with its arms) at the eye, t and o draw the person
 ##                    holding it (PhFigure.hold) through draw, fire and reload.
 ##   prop_<id>        a catalogue prop on a turntable, one full turn in two seconds; f is an eye scaled to the prop looking at it.
-## The outside views and frame saving are dot-game's GSGameVisualQaViews, through GSGameVisualQaCapture.
+## The outside views and frame saving are gs-game's GSGameVisualQaViews, through GSGameVisualQaCapture.
 
 const PhFigure := preload("../game/ph_figure.gd")
 const PhProps := preload("../game/ph_props.gd")

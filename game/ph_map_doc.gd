@@ -32,7 +32,7 @@ static var max_spawns: int = 0
 ## drawn, and the Compatibility renderer lights a mesh with at most eight. 0 is no warning.
 static var lights_warn: int = 128
 
-## The ambience beds dot-audio ships (CC0, its stock/CREDITS.md), which a map may name.
+## The ambience beds gs-audio ships (CC0, its stock/CREDITS.md), which a map may name.
 const AMBIENCE_BEDS := ["amb_wind", "amb_outdoor", "amb_night", "amb_city", "amb_indoor", "amb_eerie", "amb_industrial", "amb_cave", "amb_rain"]
 
 ## Every top-level field, and what a missing one becomes.
@@ -95,7 +95,7 @@ static func validate(source: Dictionary) -> GSResult:
 
 	doc["environment"] = _environment(source)
 
-	# The beds under the map: outdoors, and indoors under any ceiling. Only dot-audio's stock ones.
+	# The beds under the map: outdoors, and indoors under any ceiling. Only gs-audio's stock ones.
 	for key: String in ["ambience", "ambience_indoor"]:
 		if source.has(key):
 			var bed := str(source[key])
@@ -188,9 +188,9 @@ static func _spawns(source: Dictionary) -> GSResult:
 
 
 static func _toys(source: Dictionary) -> GSResult:
-	# Toys: dot-props' GSPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
+	# Toys: gs-props' GSPropBodyBox placements, `{toy, at, yaw}`. Which ids exist is the
 	# catalogue's to say when the map is built (an unknown one is left out and listed), so a map
-	# with a toy a newer dot-props has still plays on an older server.
+	# with a toy a newer gs-props has still plays on an older server.
 	var toys: Array = []
 	for raw: Variant in source.get("toys", []):
 		var toy := GSPropBodyBox.normal_placement(raw)

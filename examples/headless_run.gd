@@ -2,7 +2,7 @@ extends "headless_run_hunter.gd"
 
 
 ## The simulation, headless: the prop catalogue and map documents, the draw, the hide, taunts, shots at props and furniture, the beacon, and how a round is decided.
-## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. dot-settings has the story.
+## Counts sections AND checks: a script error inside a section aborts that function while the section counter is already satisfied. gs-settings has the story.
 ## Every number about the map is the built-in practice house's ([method PhCatalogue.practice]), whose comment lists where everything is.
 
 const SECTIONS := 33
@@ -629,7 +629,7 @@ func _test_the_aim_button() -> void:
 	_finished()
 
 
-## dot-props' toys in the practice garden: walked into and sent on, shot and sent off while the
+## gs-props' toys in the practice garden: walked into and sent on, shot and sent off while the
 ## combat's trace sees straight through them (no cover, nothing a hunter pays for), and home
 ## again at the next round.
 func _test_toys() -> void:
@@ -944,7 +944,7 @@ func _test_bots() -> void:
 	await _step(game, TICK_RATE * 6)
 	_check(game.phase == PhGame.Phase.SEEK or game.phase == PhGame.Phase.IDLE, "and the round goes on without anybody at the keyboard")
 
-	# A stand-in hunter's shot is dot-bot's GSBotAim: turned onto the prop at bot_turn_rate,
+	# A stand-in hunter's shot is gs-bot's GSBotAim: turned onto the prop at bot_turn_rate,
 	# fired only bot_reaction after it first saw it. Driven through the game's own _bot_shoot.
 	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0] if not game.players_on(PhGame.HUNTERS).is_empty() else null
 	var profile := GSBotSettings.of(game).profile
@@ -1023,7 +1023,7 @@ func _test_the_client() -> void:
 	tab.pressed = false
 	(menu as GSMenu).handle_event(tab)
 
-		# A round started the way dot-match starts one, with this keyboard drawn to hunt. The round arms its hunters and THEN begins the hide,
+		# A round started the way gs-match starts one, with this keyboard drawn to hunt. The round arms its hunters and THEN begins the hide,
 		# so the client dropping every gun at the start of a hide left a hunter seeking with a gun nobody could see.
 	var world: PhGame = client.get("game")
 	world.wish_side(&"local", PhGame.HUNTERS)
@@ -1035,18 +1035,18 @@ func _test_the_client() -> void:
 		"a hunter's gun is in their hands through the hide",
 		"side %d, phase %d, weapons %s" % [world.team_of(&"local"), world.phase, client.get("weapons")])
 
-	# The HUD's glance pieces are dot-ui's, handed this world's numbers.
+	# The HUD's glance pieces are gs-ui's, handed this world's numbers.
 	var hud: Node = client.get("hud")
 	var me: PhPlayer = client.get("player")
 	hud.call("_process", 0.0)
-	# Down the sights the dot fades with the aim (dot-ui's curve), and a scope hides it.
+	# Down the sights the dot fades with the aim (gs-ui's curve), and a scope hides it.
 	hud.call("set_aim", 0.0, false)
 	var hip: float = (hud.get("_crosshair") as Control).modulate.a
 	hud.call("set_aim", 1.0, false)
 	var aimed: float = (hud.get("_crosshair") as Control).modulate.a
 	hud.call("set_aim", 1.0, true)
 	var scope: Control = hud.get("scope")
-	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("dot_ui") < 5)
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("gs_ui") < 5)
 		and (hud.get("_crosshair") as Control).modulate.a == 0.0 and is_equal_approx(float(scope.get("fraction")), 1.0)
 		and bool(hud.get("loadout_offered")) == (client.get("loadout_menu") != null),
 		"the crosshair is whole at the hip, gone down the sights, a scope replaces it; B is named when offered",
@@ -1101,13 +1101,13 @@ func _test_the_client() -> void:
 		"log reaches %.0f px off the bottom, the plate ends %.0f off it" % [log_top, plate_bottom]
 	)
 
-	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so
-	# the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
+	# A pack naming these classes does not parse on a shell whose gs-ui predates them, so
+	# the requires.json gs-ci derives must ask for gs-ui 4, and nothing may lower it.
 	var asks := GSAddonApi.derive()
 	_check(
-		int(asks.get("dot_ui", 0)) >= 13 and FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
-		"the pack asks a shell for dot-ui level 13, the weapon icons (requires.floor.json)",
-		str(asks.get("dot_ui"))
+		int(asks.get("gs_ui", 0)) >= 13 and FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
+		"the pack asks a shell for gs-ui level 13, the weapon icons (requires.floor.json)",
+		str(asks.get("gs_ui"))
 	)
 
 	await _client_rest(client)
@@ -1153,10 +1153,10 @@ func _test_help_and_menu() -> void:
 		"aim is the only row on the right mouse button, quick melee the only one on F",
 		"%s %s" % [keys.key_for(PhBindings.AIM), keys.key_for(PhBindings.BASH)])
 	# The wheel cycles a hunter's weapons, one row per direction, and no longer jumps.
-	_check(keys.key_for(&"dot_menu_weapon_previous") == "Wheel up" and keys.key_for(&"dot_menu_weapon_next") == "Wheel down"
+	_check(keys.key_for(&"gs_menu_weapon_previous") == "Wheel up" and keys.key_for(&"gs_menu_weapon_next") == "Wheel down"
 		and keys.defaults_on("Wheel up").size() == 1 and keys.defaults_on("Wheel down").size() == 1,
 		"the wheel is two rows, one per direction, with nothing else on it",
-		"%s %s" % [keys.key_for(&"dot_menu_weapon_previous"), keys.key_for(&"dot_menu_weapon_next")])
+		"%s %s" % [keys.key_for(&"gs_menu_weapon_previous"), keys.key_for(&"gs_menu_weapon_next")])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "J")
 	_check(keys.key_for(PhBindings.CHAT) == "J" and GSInputBinding.describe_action(PhBindings.CHAT) == "J"

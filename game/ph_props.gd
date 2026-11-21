@@ -10,7 +10,7 @@ const CHANNEL := "ph.props"
 
 const CATALOGUE := "res://props/catalogue.json"
 
-## The part-shaped collision `tools/measure_props.gd` cuts with dot-props' [GSPropPieces]: a tree as trunk, branches and leaf clumps, a table as top and legs.
+## The part-shaped collision `tools/measure_props.gd` cuts with gs-props' [GSPropPieces]: a tree as trunk, branches and leaf clumps, a table as top and legs.
 ## A map prop not in it collides as its box; a disguise never uses these, its hull and hitbox being functions of the size.
 const PIECES := "res://props/pieces.json"
 

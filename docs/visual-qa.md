@@ -1,6 +1,6 @@
 # Visual QA
 
-Every person, hunter weapon and catalogue prop gets its own test scene, recorded frame by frame at 60 fps and judged from the frames. The harness is dot-game's (`addons/dot_game/docs/visual-qa.md` in the dot-game repo); this game only supplies `tools/visual_qa.gd`, a subclass of `GSGameVisualQaCapture`, and a three-line `tools/visual_qa_shot.sh`. The outside cameras are the shared `GSGameVisualQaViews`.
+Every person, hunter weapon and catalogue prop gets its own test scene, recorded frame by frame at 60 fps and judged from the frames. The harness is gs-game's (`addons/gs_game/docs/visual-qa.md` in the gs-game repo); this game only supplies `tools/visual_qa.gd`, a subclass of `GSGameVisualQaCapture`, and a three-line `tools/visual_qa_shot.sh`. The outside cameras are the shared `GSGameVisualQaViews`.
 
 ## Items and clips
 
@@ -17,13 +17,13 @@ Prop rows: `prop_floor_m` (lowest point against the floor) and `prop_real_size` 
 ## Running
 
 ```
-bash addons/dot_game/tools/dot_game_visual_qa.sh --shot tools/visual_qa_shot.sh --fresh all
-bash addons/dot_game/tools/dot_game_visual_qa.sh --shot tools/visual_qa_shot.sh --fresh weapon_smg -- --only weapon_smg --clips fire,reload
+bash addons/gs_game/tools/gs_game_visual_qa.sh --shot tools/visual_qa_shot.sh --fresh all
+bash addons/gs_game/tools/gs_game_visual_qa.sh --shot tools/visual_qa_shot.sh --fresh weapon_smg -- --only weapon_smg --clips fire,reload
 ```
 
 Run it as the user that holds the box key (gamedev), from the checkout or a `~/wt` worktree. Output is `screenshots/visual_qa/` (ignored by git): `report.md`, per-item sheets and `.mp4` clips. Open the sheets and look; the numbers (foot_slide, floor_contact, bone_pop) only catch some of it.
 
 ## Known
 
-- `bone_pop` reads 92 to 111 degrees on the walk, run, crouch and jump cycles of the shared humanoid figure (dot-player-char), not this game; filed on the nightly board.
+- `bone_pop` reads 92 to 111 degrees on the walk, run, crouch and jump cycles of the shared humanoid figure (gs-player-char), not this game; filed on the nightly board.
 - The prop cameras stand off by the prop's own size, so an apple fills the frame as a sofa does; compare props by `prop_real_size`, not by how big they look in the sheets.

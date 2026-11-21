@@ -45,7 +45,7 @@ func _run() -> void:
 
 	OS.remove_logger(errors)
 	# Engine errors go to stderr and change no exit code: a toy pulled out of the tree after a
-	# mid-tick rebuild (dot-net history #30) printed `!is_inside_tree()` on green runs elsewhere.
+	# mid-tick rebuild (gs-net history #30) printed `!is_inside_tree()` on green runs elsewhere.
 	var seen := errors.seen()
 	_check(seen.is_empty(), "the engine reported no error over the whole run",
 		"%d: %s" % [seen.size(), ", ".join(seen.slice(0, 3))])
@@ -101,8 +101,8 @@ func _build() -> bool:
 
 	_server_net = _make_manager(true, &"server", 1, server_side, SERVER_TICK_RATE)
 	_client_net = _make_manager(false, &"client", CLIENT_PEER, client_side, CLIENT_ENGINE_TICK_RATE)
-		# This harness stamps every command itself (`_tick + INPUT_LEAD`), so the client must not ask for dot-net's input-lead report:
-		# steered by reports about commands it never stamped, the clock runs away. By the constant map, so this parses against a dot-net from before the report.
+		# This harness stamps every command itself (`_tick + INPUT_LEAD`), so the client must not ask for gs-net's input-lead report:
+		# steered by reports about commands it never stamped, the clock runs away. By the constant map, so this parses against a gs-net from before the report.
 	var lead_bit := int((GSNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 
@@ -795,7 +795,7 @@ func _workbench_asks(w: Dictionary, flags: Dictionary, state: Dictionary) -> voi
 func _test_the_remote_workbench() -> void:
 	_section("[a flagged admin edits the server's profiles, and nobody else can]")
 	if not GSGameWorkbench.available():
-		print("  dot-workbench is not linked: skipped")
+		print("  gs-workbench is not linked: skipped")
 		_passed += 16
 		_finished()
 		return

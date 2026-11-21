@@ -122,12 +122,12 @@ extends GSConfig
 
 @export_group("Hunters")
 
-## The weapons a hunter is handed, by id from zee-dot-weapons; the first is drawn first.
+## The weapons a hunter is handed, by id from zee-gs-weapons; the first is drawn first.
 ## One per slot: a weapon takes the slot its document names and a second in that slot replaces the first, so the defaults
 ## are the hatchet (1), pistol (2) and SMG (3), the keys' order. `PhGame._arm_hunters` warns of a clash.
 @export var hunter_weapons: PackedStringArray = PackedStringArray(["smg", "pistol", "hatchet"])
 
-## What else a hunter may pick on B (dot-menu's loadout), by id: primaries, sidearms and the optional grenade (`ph_loadout.gd`).
+## What else a hunter may pick on B (gs-menu's loadout), by id: primaries, sidearms and the optional grenade (`ph_loadout.gd`).
 ## [member hunter_weapons]' primary and sidearm are the defaults and always offered; an owner narrows or locks it with `mp_loadout_*`.
 @export var hunter_choices: PackedStringArray = PackedStringArray([
 	"smg", "shotgun", "carbine", "pistol", "revolver", "machine_pistol", "frag", "sticky",
@@ -148,7 +148,7 @@ extends GSConfig
 @export_enum("none", "limbs", "explode") var hunter_break: int = 2
 
 ## What a disguised prop does when it is found: 0 bursts into its own pieces, as shot furniture
-## does; 1 topples over as the prop (dot-player-char's one-piece body, under `sv_ragdoll*`); 2
+## does; 1 topples over as the prop (gs-player-char's one-piece body, under `sv_ragdoll*`); 2
 ## vanishes. A person's body (a hunter, a prop out of disguise) is a ragdoll either way.
 @export_enum("burst", "topple", "vanish") var prop_death: int = 0
 
@@ -198,7 +198,7 @@ extends GSConfig
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
-## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (dot-map's `GSMapRotationFile`).
+## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (gs-map's `GSMapRotationFile`).
 ## Empty, or no such file, rotates every map; one the rotation leaves out stays installed (`ph_map <id>` queues it) but is never drawn or balloted. `sv_map_rotation_file`.
 @export var map_rotation_file: String = "cfg/maps.yml"
 
@@ -229,7 +229,7 @@ extends GSConfig
 ## How many players the server keeps in the round by adding stand-ins.
 @export_range(0, 24, 1, "or_greater") var minimum_players: int = 4
 
-# How a stand-in hunter turns, aims and how quickly it fires are dot-bot's `bot_*` settings,
+# How a stand-in hunter turns, aims and how quickly it fires are gs-bot's `bot_*` settings,
 # shared by every game (`bot_difficulty`, `bot_reaction`, `bot_aim_error`, ...).
 
 ## How much a stand-in hunter doubts a piece of furniture it has no other reason to doubt, in hundredths: the base its suspicion grows from.
@@ -248,7 +248,7 @@ extends GSConfig
 ## Metres a stand-in prop's move to another place may reach.
 @export_range(2.0, 60.0, 0.5) var bot_relocate_range: float = 12.0
 
-## Whether stand-ins read the map's annotations (dot-npc-ai's hiding spots and chokepoints) to hide and sweep.
+## Whether stand-ins read the map's annotations (gs-npc-ai's hiding spots and chokepoints) to hide and sweep.
 ## Off scores a place beside each piece of furniture by sight lines alone. See `ph_bots.gd`.
 @export var bot_nav: bool = true
 

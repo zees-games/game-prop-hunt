@@ -3,7 +3,7 @@ extends "headless_net_base.gd"
 
 
 ## Every encoder against its decoder. Nothing checks that two ends of a serialisation are
-## inverses for you: dot-moderation once wrote "voice muted" and read back a warning.
+## inverses for you: gs-moderation once wrote "voice muted" and read back a warning.
 func _test_the_codec() -> void:
 	_section("every event decodes to what was encoded")
 

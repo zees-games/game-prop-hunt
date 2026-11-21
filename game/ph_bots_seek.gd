@@ -1,6 +1,6 @@
 extends "ph_bots_doubt.gd"
 
-## The hunters' senses for a tick, all of them in one call into dot-sim ([code]GSSimHunterSeek[/code]):
+## The hunters' senses for a tick, all of them in one call into gs-sim ([code]GSSimHunterSeek[/code]):
 ## who each can see is a prop ([method _prey]), the places each crosses off ([method GSBotSearch.observe])
 ## and the doubt rows each weighs ([method _doubt_rows]), the same answers in the same order as the
 ## script, rays and all. What a hunter does with them (chase, test, walk, look) stays in script.

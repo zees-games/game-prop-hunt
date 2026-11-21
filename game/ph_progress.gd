@@ -3,7 +3,7 @@ extends Node
 const PhPlayer := preload("ph_player.gd")
 
 ## What a player keeps from a round: the numbers this game produces, and what they earn.
-## Numbers (rounds survived as furniture; props found and real chairs shot) are declared once in [method schema] and reported by dot-stats as a DELTA, so two servers reporting one player add up.
+## Numbers (rounds survived as furniture; props found and real chairs shot) are declared once in [method schema] and reported by gs-stats as a DELTA, so two servers reporting one player add up.
 ## Achievements are rules over them through [GSAchievementStatsLink]; stand-ins are never counted. Filed under the scoped profile key when there is one ([member durable_key_fn]), else the world's id.
 
 const CHANNEL := "ph.progress"
@@ -31,7 +31,7 @@ const FORCED_TAUNTS := &"ph.forced_taunts"
 const DECOYS_SHOT := &"ph.decoys_shot"
 const DECOY_DEATHS := &"ph.decoy_deaths"
 const DEATHS := &"ph.deaths"
-## The published skill figure the site orders by (dot-stats' GSStatsRank).
+## The published skill figure the site orders by (gs-stats' GSStatsRank).
 const RANK_SCORE := &"rank_score"
 
 signal earned(player_id: StringName, title: String, points: int)
@@ -45,7 +45,7 @@ var stats: GSStatsTracker = null
 ## The skill rank: weighted lifetime figures, filed when a round ends.
 var rank: GSStatsRank = null
 
-## Kills and hits by body zone, through dot-stats' event feed.
+## Kills and hits by body zone, through gs-stats' event feed.
 var feed: GSStatsEventFeed = null
 var achievements: GSAchievementTracker = null
 var link: GSAchievementStatsLink = null
@@ -61,7 +61,7 @@ var _in_round: Dictionary = {}
 var _round_found: Dictionary = {}
 
 ## `func(player_id: StringName) -> String`: the durable key to file this player under, or
-## "" for none. Set by the module from dot-platform; see the class note.
+## "" for none. Set by the module from gs-platform; see the class note.
 var durable_key_fn: Callable = Callable()
 
 ## World id -> the key their numbers are filed under, and back. Fixed at [method record]'s

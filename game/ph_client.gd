@@ -12,7 +12,7 @@ const PhProjectileView := preload("ph_projectile_view.gd")
 
 ## One local player, a camera and a HUD over a [PhGame], offline or against a server. The offline half is not a demo mode:
 ## the same world class with `authoritative` true, and all the difference is [PhNetBridge]. A [GSClientLink] in the registry
-## under `dot_client_link` means connected; `--offline` forces solo. A prop sees itself in third person (F5 swaps), a hunter down a gun.
+## under `gs_client_link` means connected; `--offline` forces solo. A prop sees itself in third person (F5 swaps), a hunter down a gun.
 
 
 ## How far behind a prop the camera hangs: this plus its size.
@@ -36,7 +36,7 @@ var workbench_remote: GSGameWorkbenchRemoteClient = null
 ## Whether the camera hangs behind the player. Follows the side; F5 swaps it.
 var third_person: bool = false
 
-## The flashlight on the eye and the others' beams (dot-flashlight); the server owns on/off.
+## The flashlight on the eye and the others' beams (gs-flashlight); the server owns on/off.
 var flash: GSFlashlight = null
 var flash_crowd: GSFlashlightCrowd = null
 var _flash_msec := -100000
@@ -179,7 +179,7 @@ func _start_offline() -> void:
 	GSLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
 
-## A solo stand-in's name: the server's list, through dot-bot's pick, so solo and a server
+## A solo stand-in's name: the server's list, through gs-bot's pick, so solo and a server
 ## name them alike.
 static func _bot_name(index: int) -> String:
 	var taken: Array = []
@@ -697,7 +697,7 @@ func _place_camera() -> void:
 
 		return
 
-	# dot-core's boom (it was a spring arm, which cast a ray and snapped to its hit), swept
+	# gs-core's boom (it was a spring arm, which cast a ray and snapped to its hit), swept
 	# from the eye or the prop's middle, the height above it added in the world's up.
 	var size := player.disguise.standing_size() if player.is_disguised() else Vector3(0.7, 1.8, 0.7)
 	_arm = GSCameraBoom.new()
@@ -855,7 +855,7 @@ func _build_killcam() -> void:
 	add_child(winner_reveal)
 
 
-## dot-game's chat box and microphone, with this game's channels and voice format.
+## gs-game's chat box and microphone, with this game's channels and voice format.
 func _build_chat() -> void:
 	chat = GSGameChatClient.new()
 	chat.name = "Chat"
@@ -1306,7 +1306,7 @@ func _drive_spectator_camera() -> bool:
 
 	_roam_seeded = false
 
-	# Chase and death cameras pulled out of the house by dot-spectate, given the level.
+	# Chase and death cameras pulled out of the house by gs-spectate, given the level.
 	var manager: GSSpectatorManager = game.spectate.manager
 	if manager != null and manager.camera_world == null and game.physics != null:
 		manager.camera_world = camera.get_world_3d()
@@ -1355,9 +1355,9 @@ func _drive_free_camera() -> void:
 
 	if not _covered() and not (platform != null and platform.is_input_blocked()):
 		move = Vector3(
-			Input.get_axis(&"dot_fps_left", &"dot_fps_right"),
-			Input.get_axis(&"dot_fps_crouch", &"dot_fps_jump"),
-			Input.get_axis(&"dot_fps_back", &"dot_fps_forward"))
+			Input.get_axis(&"gs_fps_left", &"gs_fps_right"),
+			Input.get_axis(&"gs_fps_crouch", &"gs_fps_jump"),
+			Input.get_axis(&"gs_fps_back", &"gs_fps_forward"))
 
 	var shift := Input.is_physical_key_pressed(KEY_SHIFT)
 	var alt := Input.is_physical_key_pressed(KEY_ALT)
@@ -1513,7 +1513,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_roam_mouse(event as InputEventMouseMotion)
 		return
 
-	# dot-mobile's overlay forwards every touch itself; Godot's mouse from a touch would turn and fire twice.
+	# gs-mobile's overlay forwards every touch itself; Godot's mouse from a touch would turn and fire twice.
 	if event is InputEventScreenTouch or event is InputEventScreenDrag or (touch != null and touch.takes(event)):
 		return
 

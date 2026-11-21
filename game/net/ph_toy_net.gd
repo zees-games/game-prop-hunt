@@ -1,6 +1,6 @@
 extends GSNetBehaviour
 
-## One of the map's toys on the wire (dot-props' [GSPropBody]): where its moving part is and how it is turned, whether it is on, and how often it has been used.
+## One of the map's toys on the wire (gs-props' [GSPropBody]): where its moving part is and how it is turned, whether it is on, and how often it has been used.
 ## The server's physics, never predicted: Godot's rigid-body solver differs between machines, so the client's toy is frozen and posed from these ([method GSPropBody.show_state]).
 ## Paired by index, so the TOYS event carries only net ids in toy order. A use count rather than an event (eight bits, wraps): a client plays the sound when it moves, so a joiner or lost packet costs only a late sound.
 
@@ -22,7 +22,7 @@ func _register_net_vars() -> void:
 
 ## Authority only: the toy's state into the replicated fields.
 func pull() -> void:
-	# Out of the tree is a map rebuilt inside the netcode's own tick, which a dot-net from
+	# Out of the tree is a map rebuilt inside the netcode's own tick, which a gs-net from
 	# before history.md #30 still walks: a toy taken out has no transform to give.
 	if toy == null or not is_instance_valid(toy) or not toy.is_inside_tree():
 		return

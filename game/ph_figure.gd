@@ -2,7 +2,7 @@ extends Node3D
 
 const PhPaths := preload("ph_paths.gd")
 
-## What somebody ELSE looks like: a Kenney blocky character (dot-player-char's `GSHumanoidFigure`) scaled to the hull, in their side's [constant TEAM_TINT] on the torso. Client side only.
+## What somebody ELSE looks like: a Kenney blocky character (gs-player-char's `GSHumanoidFigure`) scaled to the hull, in their side's [constant TEAM_TINT] on the torso. Client side only.
 ## Top level and placed by its caller every frame (`PhClient.present_frame`): a node moving once a TICK would step while the camera is blended between ticks. See `PhPlayer.present_body`.
 ## The atlas letter is a look (`GSHumanoidLook.from_letter`), so old avatar documents dress the same person everywhere; the weapon is in the figure's own hand and legs keep walking under an upper-body swing.
 
@@ -92,9 +92,9 @@ func pose(at: Vector3, yaw_radians: float, speed: float) -> void:
 	rotation = Vector3(0.0, yaw_radians, 0.0)
 	if person == null:
 		return
-	# Game time, as the body moves: a wall-clock step skated the feet. frame_delta is dot_player_char level 11; called by name so an older host still parses.
+	# Game time, as the body moves: a wall-clock step skated the feet. frame_delta is gs_player_char level 11; called by name so an older host still parses.
 	var delta := get_process_delta_time()
-	if GSAddonApi.build_level("dot_player_char") >= 11:
+	if GSAddonApi.build_level("gs_player_char") >= 11:
 		delta = float(person.call(&"frame_delta"))
 	person.animate(speed, delta)
 	clip = person.clip

@@ -24,7 +24,7 @@ const BODY_STEP := 0.4
 @export var samples_input: bool = false
 @export var is_bot: bool = false
 
-## What this player looks like, as a dot-user-avatar document; null is the stock person.
+## What this player looks like, as a gs-user-avatar document; null is the stock person.
 var avatar: GSAvatar = null
 
 var config: PhConfig = null
@@ -125,7 +125,7 @@ var tick_rate: int = 64:
 		if controller != null:
 			controller.tick_rate = value
 
-## The key dot-weapon's player bridge identifies this carrier by.
+## The key gs-weapon's player bridge identifies this carrier by.
 var player_key: String:
 	get:
 		return String(player_id)
@@ -189,7 +189,7 @@ static func make_sampler(p_tunables: GSFpsTunables) -> GSFpsSampler:
 ## The movement actions, and the slow walk on shift.
 static func register_actions(p_sampler: GSFpsSampler = null) -> void:
 	var _added := GSFpsSampler.register_default_actions(p_sampler)
-	var walk := &"dot_fps_walk"
+	var walk := &"gs_fps_walk"
 
 	if not InputMap.has_action(walk):
 		return
@@ -249,7 +249,7 @@ func apply_disguise(next: GSPropDisguise) -> void:
 		return
 
 	if disguise.is_disguised() and rules != null:
-		# The leant box's hull: a bottle on its side is low and long (dot-props' standing_hull).
+		# The leant box's hull: a bottle on its side is low and long (gs-props' standing_hull).
 		var hull := disguise.standing_hull(rules)
 		t.radius = hull.x
 		t.stand_height = hull.y
@@ -378,7 +378,7 @@ func refit() -> void:
 		_fit_hitboxes()
 
 
-## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
+## The duck-typed lookup gs-weapon's player bridge asks a carrier for.
 func component(type_name: StringName) -> Object:
 	match String(type_name):
 		"GSPlayerController", "GSFpsController":
@@ -525,7 +525,7 @@ func _present_prop(shown: bool, at: Vector3) -> void:
 	prop_model.visible = shown
 
 	if shown:
-		# Lifted so the lowest corner rests on the floor whatever the lean (dot-props'
+		# Lifted so the lowest corner rests on the floor whatever the lean (gs-props'
 		# model_transform): turned about its foot, half a bottle on its side was under the floor.
 		prop_model.global_transform = disguise.model_transform(at, controller.state.yaw if controller != null else 0.0)
 

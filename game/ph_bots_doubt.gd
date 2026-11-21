@@ -3,7 +3,7 @@ extends "ph_bots_survey.gd"
 ## The hunters' doubt: what they weigh in view (the map's pieces, native or in script, and the still props), the layer between the survey and the stand-ins' drive.
 
 
-## The walk over the map's own pieces in dot-sim ([code]GSSimPropDoubt[/code], one call per
+## The walk over the map's own pieces in gs-sim ([code]GSSimPropDoubt[/code], one call per
 ## doubt instead of a dictionary, transform and size read per piece) when the library has it; off,
 ## or with no library, the script walks them. The same pieces in the same order either way
 ## ([code]headless_native_doubt[/code]).

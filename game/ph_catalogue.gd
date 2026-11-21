@@ -206,7 +206,7 @@ func _workshop_doc(entry: GSContentEntry) -> Dictionary:
 	return doc
 
 
-## The file a game pack states what it takes from subscriptions in (dot-cloud's
+## The file a game pack states what it takes from subscriptions in (gs-cloud's
 ## docs/workshop.md, "What a game accepts"). Read from there so the site and this list cannot drift.
 const PROVIDES_PATH := "res://provides.json"
 const ACCEPTED_MAP_KINDS_FALLBACK := ["prophunt"]
@@ -424,7 +424,7 @@ static func practice() -> Dictionary:
 		"blurb": "Two rooms and a garden.",
 		"boxes": boxes,
 		"props": props,
-		# dot-props' toys, loose only, in the garden: the suites push the football, shoot the
+		# gs-props' toys, loose only, in the garden: the suites push the football, shoot the
 		# beach ball, and watch a client see the kick.
 		"toys": [
 			{"toy": "football", "at": [14.0, 0.0, 3.0]},

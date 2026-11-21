@@ -43,12 +43,12 @@ const UI_DENY := &"ui_deny"
 
 var manager: GSAudioManager = null
 
-## Everybody's footsteps by what they stand on, and the bed under the whole game: dot-audio's
+## Everybody's footsteps by what they stand on, and the bed under the whole game: gs-audio's
 ## stock (Kenney's footsteps, generated beds, all CC0; the addon's stock/CREDITS.md).
 var steps: GSAudioFootsteps = null
 var ambience: GSAudioAmbience = null
 
-## Quiet moods under the map (dot-audio's stock set); the old bed plays only when none loaded.
+## Quiet moods under the map (gs-audio's stock set); the old bed plays only when none loaded.
 var ambient: GSAmbienceDirector = null
 
 ## path -> AudioStream, the taunts loaded so far.
@@ -117,7 +117,7 @@ static func sound_catalogue() -> GSAudioCatalogue:
 	deny.cooldown_ms = 250
 	c.add(deny)
 
-	# A body landing: dot-player-char's stock death sounds (Kenney, CC0), shipped in the addon.
+	# A body landing: gs-player-char's stock death sounds (Kenney, CC0), shipped in the addon.
 	for row: Dictionary in GSPlayerDeathSounds.rows():
 		var fall := _placed(row["id"], 45.0, 8.0, 3, 50, float(row["pitch_min"]), float(row["pitch_max"]))
 		fall.path = row["path"]
@@ -126,7 +126,7 @@ static func sound_catalogue() -> GSAudioCatalogue:
 		fall.cooldown_ms = int(row["cooldown_ms"])
 		c.add(fall)
 
-	# The map's toys: dot-props' stock toy sounds (Kenney, CC0), shipped in the addon.
+	# The map's toys: gs-props' stock toy sounds (Kenney, CC0), shipped in the addon.
 	for row: Dictionary in GSPropBodySounds.rows():
 		var toy := _placed(row["id"], float(row["distance"]), 6.0, 3, 30, float(row["pitch_min"]), float(row["pitch_max"]))
 		toy.path = row["path"]
@@ -160,7 +160,7 @@ static func sound_recipes() -> Dictionary:
 		BLAST: GSAudioSynth.Voice.SHOT_HEAVY,
 		UI_CLICK: GSAudioSynth.Voice.CLICK,
 		UI_DENY: GSAudioSynth.Voice.DENY,
-		# Stand-ins only for a build without dot-props' toy files.
+		# Stand-ins only for a build without gs-props' toy files.
 		GSPropBodySounds.BOUNCE: GSAudioSynth.Voice.IMPACT,
 		GSPropBodySounds.THUMP: GSAudioSynth.Voice.IMPACT,
 		GSPropBodySounds.KNOCK: GSAudioSynth.Voice.IMPACT,
@@ -174,7 +174,7 @@ static func sound_recipes() -> Dictionary:
 		GSPropBodySounds.WATER: GSAudioSynth.Voice.STEP,
 		GSPropBodySounds.BOING: GSAudioSynth.Voice.SPAWN,
 		GSPropBodySounds.HORN: GSAudioSynth.Voice.BLIP,
-		# Stand-ins only for a build without dot-player-char's files.
+		# Stand-ins only for a build without gs-player-char's files.
 		GSPlayerDeathReactions.SOUND_THUD: GSAudioSynth.Voice.IMPACT,
 		GSPlayerDeathReactions.SOUND_FACE_PLANT: GSAudioSynth.Voice.IMPACT,
 		GSPlayerDeathReactions.SOUND_SLUMP: GSAudioSynth.Voice.STEP,
@@ -233,7 +233,7 @@ func setup() -> GSResult:
 	manager.mixer = GSAudioMixer.new()
 	manager.register_as_service = false
 	manager.voices = 24
-		# Measured toward the family's -17 LUFS (dot-audio docs/loudness.md): a 40 s stand-in round read -20.1 LUFS integrated with the beds and steps in.
+		# Measured toward the family's -17 LUFS (gs-audio docs/loudness.md): a 40 s stand-in round read -20.1 LUFS integrated with the beds and steps in.
 	manager.loudness_trim_db = 7.0
 	add_child(manager)
 
@@ -420,8 +420,8 @@ func deny() -> bool:
 	return _flat_play(UI_DENY)
 
 
-## A dead body's sound (dot-player-char's ragdolls), where it landed.
-## A toy's sound (dot-props' toys): a bounce, a knock, where it happened.
+## A dead body's sound (gs-player-char's ragdolls), where it landed.
+## A toy's sound (gs-props' toys): a bounce, a knock, where it happened.
 func on_toy(id: StringName, at: Vector3, strength: float) -> bool:
 	return _at(id, at, clampf(strength, 0.25, 1.0))
 

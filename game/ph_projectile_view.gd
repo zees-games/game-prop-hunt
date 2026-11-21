@@ -3,7 +3,7 @@ extends Node3D
 const PhProjectiles := preload("ph_projectiles.gd")
 
 ## Every grenade the world is flying, drawn. Client side; game-fatal-contact's `FcProjectileView`, copied.
-## Reads the simulation's list once a frame and moves one node per entry, writing nothing back. A grenade is its own model from zee-dot-weapons' art table with a small red fuse light:
+## Reads the simulation's list once a frame and moves one node per entry, writing nothing back. A grenade is its own model from zee-gs-weapons' art table with a small red fuse light:
 ## without one a frag fourteen metres away was two brown pixels, and a grenade nobody sees is one nobody gets away from.
 
 const ROUND_RADIUS := 0.11

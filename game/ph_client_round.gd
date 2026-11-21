@@ -35,7 +35,7 @@ var _round_end_why: String = ""
 var _round_board_open: bool = false
 var _hud_was_visible: bool = true
 var _started_msec: int = Time.get_ticks_msec()
-## dot-game's client platform: the cover, settings and menu, console, HUD theme, Tab, M, the
+## gs-game's client platform: the cover, settings and menu, console, HUD theme, Tab, M, the
 ## pointer and the input block. See [GSGameClient].
 var platform: GSGameClient = null
 

@@ -115,7 +115,7 @@ func _hello_carries_movement(config: PhConfig) -> void:
 
 
 ## Every function in game/ that asks the physics space a question, by grep. On a physics thread a
-## query only works inside the step; a new caller fails here until listed in dot-physics docs/threading.md.
+## query only works inside the step; a new caller fails here until listed in gs-physics docs/threading.md.
 const QUERY_FUNCS := {
 	"game/ph_game.gd": ["_look", "_make_room"],
 	"game/ph_game_report.gd": ["clear_between"],
@@ -243,7 +243,7 @@ func _templates(binder: GSGameConfigBinder) -> void:
 	for path: String in files:
 		if not FileAccess.file_exists("res://" + path) or FileAccess.get_file_as_string("res://" + path) != files[path]:
 			stale.append(path)
-	_check(stale.is_empty(), "the shipped files match the config (run addons/dot_game/qa/dot_game_cfg_templates.gd)", ",".join(stale))
+	_check(stale.is_empty(), "the shipped files match the config (run addons/gs_game/qa/gs_game_cfg_templates.gd)", ",".join(stale))
 
 
 ## The killcam banner's weapon icon: DEATH carries the id, the moment keeps it, the banner draws it.

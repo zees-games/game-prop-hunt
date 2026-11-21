@@ -1,6 +1,6 @@
 extends GSNpcAiNavAnnotator
 
-## dot-npc-ai's map annotator, told what a prop-hunt hiding place is: beside floor furniture a prop may become, among others of its kind, out of sight and tucked in.
+## gs-npc-ai's map annotator, told what a prop-hunt hiding place is: beside floor furniture a prop may become, among others of its kind, out of sight and tucked in.
 ## The score is overridden rather than filtered afterwards: the base score puts a prop in an empty corner (nothing to be) and the annotator keeps only the better third, so the right places never reach the list.
 ## Each spot is stamped with the piece a prop would copy (`prop`, `kind`, `yaw`, `kin`), which the bots read. No `class_name`: a mounted pack cannot register one.
 

@@ -16,14 +16,14 @@ const PhMapDoc := preload("ph_map_doc.gd")
 const ROSTER_INTERVAL := 2.0
 
 ## Where the services keep punishments; empty is [GSGameServices]'s default, the real store.
-## Static because dot-server constructs the module from a path, so no instance exists to set a field on;
+## Static because gs-server constructs the module from a path, so no instance exists to set a field on;
 ## `examples/dedicated.tscn` points it elsewhere so a run does not append to the real store.
 static var punishments_file: String = ""
 
 ## The `ph_bots` cvar, held so the tick does not look it up sixty times a second.
 var _bots: GSConVar = null
 
-## How many stand-ins, from how many people: dot-server's one rule for every game. See
+## How many stand-ins, from how many people: gs-server's one rule for every game. See
 ## [method _keep_the_round_full].
 var _quota: GSBotQuota = null
 
@@ -37,7 +37,7 @@ func _module_name() -> String:
 	return "prophunt"
 
 
-## The cvars a map's per-map file may set (dot-game's GSGameMapConfig); the file is cfg/game/mg-prop-hunt/dot_map/map/<map>.yml.
+## The cvars a map's per-map file may set (gs-game's GSGameMapConfig); the file is cfg/game/mg-prop-hunt/gs_map/map/<map>.yml.
 func _map_config_keys() -> Dictionary:
 	return {
 		"ph_hide_seconds": {"type": "float", "min": 0.0, "max": 600.0},
@@ -105,7 +105,7 @@ func _make_services() -> Node:
 
 
 ## Profiles, avatars and admission: [GSPlatformIdentity] over this game's one-slot schema.
-## Authentication is the host's `dot_auth_server`, not this layer's; with it off everybody is a guest
+## Authentication is the host's `gs_auth_server`, not this layer's; with it off everybody is a guest
 ## with a profile of their own, which is what a LAN server is.
 func _make_identity() -> Node:
 	var identity_layer := GSPlatformIdentity.new()
@@ -124,7 +124,7 @@ func _game_load() -> GSResult:
 	add_command("ph_status", _cmd_status, "Show the round, the map and who is hiding as what")
 	add_command("ph_net", _cmd_net, "Show what the netcode is doing")
 	# maps.yml, before the commands: its `commands: names:` block renames ph_maps / ph_map (roles
-	# of those names) as it does dot-vote's, and the ballot reads the marks it sets.
+	# of those names) as it does gs-vote's, and the ballot reads the marks it sets.
 	var _rotation := world.load_rotation()
 	add_command(world.command_name("ph_maps", "ph_maps"), _cmd_maps, "List the maps, and any refused file")
 	add_command("ph_reload", _cmd_reload, "Read the map directory again (from the next map)")
@@ -136,7 +136,7 @@ func _game_load() -> GSResult:
 	add_command("any", _cmd_wish.bind(0), "Either side in the next draw", "")
 	add_command("ph_say", _cmd_say, "Say something to everybody, as the server")
 
-	# dot-game's "still loading": the server refuses to hurt or eliminate a seat whose client is
+	# gs-game's "still loading": the server refuses to hurt or eliminate a seat whose client is
 	# behind its cover (see PhGame.harm_gate). Asked by peer, resolved through the bridge.
 	world.harm_gate = func(player_id: StringName) -> bool:
 		if bridge == null:
@@ -151,7 +151,7 @@ func _game_load() -> GSResult:
 	_add_tunables(world)
 
 	# Whether shots pass through team-mates: `mp_teammate_passthrough` 0 never, 1 a muzzle-holder (default),
-	# 2 every team-mate in the line; dot-combat's cvar. NOTIFY so players know; REPLICATED because every
+	# 2 every team-mate in the line; gs-combat's cvar. NOTIFY so players know; REPLICATED because every
 	# client's manager predicts its tracers under it (the client follows it through its link).
 	if world.combat != null:
 		var _passthrough := world.combat.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
@@ -159,8 +159,8 @@ func _game_load() -> GSResult:
 	_build_vote(world)
 
 	# B, a hunter's loadout: `/loadout` and its notice, and the owner's mp_loadout_menu,
-	# mp_loadout_allow and mp_loadout_fixed (dot-loadout's GSLoadoutCommand). Absent on a host
-	# whose dot-loadout predates it, and then B says the server did not answer.
+	# mp_loadout_allow and mp_loadout_fixed (gs-loadout's GSLoadoutCommand). Absent on a host
+	# whose gs-loadout predates it, and then B says the server did not answer.
 	if world.loadout_command != null:
 		world.loadout_command.call(&"bind", self)
 
@@ -174,7 +174,7 @@ func _game_load() -> GSResult:
 		"Automatic stand-ins: 1 keeps as many as bot_quota and bot_quota_mode say, 0 none at all."
 	)
 
-	# `bot_quota` and `bot_quota_mode` are dot-server's [GSBotQuota], so they mean the same on every server.
+	# `bot_quota` and `bot_quota_mode` are gs-server's [GSBotQuota], so they mean the same on every server.
 	# The default is this game's `minimum_players` in fill mode: stand-ins top the round up, a person who
 	# joins takes a stand-in's place. `ph_bots` stays the switch it always was.
 	_quota = GSBotQuota.install(self, world.config.minimum_players)
@@ -216,37 +216,37 @@ func _bind_killcam(world: PhGame) -> void:
 
 	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
 	var _camera := add_cvar("mp_killview_camera", "0",
-		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay GSKillcamFraming)",
+		"Killcam camera: 0 the killer's eye, 1 behind the killer (gs-replay GSKillcamFraming)",
 		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 
 ## The rule sets of the player, body and ambience addons, each as cvars: server-side only, or REPLICATED where a client draws or predicts under it.
 func _bind_rule_cvars(world: PhGame) -> void:
-	# sv_falldamage and its tunables: dot-combat's, on by default in this game. Server-side
+	# sv_falldamage and its tunables: gs-combat's, on by default in this game. Server-side
 	# only, so no REPLICATED: the damage is the server's and arrives as health.
 	var _fall := world.fall_rules.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY)
 
-	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
+	# gs-player-controller's mp_forceview: first or third person, the player's choice or one
 	# held. REPLICATED, because each client places its own camera under it.
 	var _views := world.view_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
-	# sv_mobile_*, sv_aim_assist*, sv_autofire*: dot-mobile's touch controls. REPLICATED, because the phone's overlay follows them.
+	# sv_mobile_*, sv_aim_assist*, sv_autofire*: gs-mobile's touch controls. REPLICATED, because the phone's overlay follows them.
 	var _mobile := world.mobile_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
-	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's reaction
+	# Dead bodies: gs-player-char's sv_ragdoll* set. The server only picks each death's reaction
 	# from them; REPLICATED, because the clients draw the bodies (see the client's netcode).
 	var _ragdolls := world.ragdoll_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
-	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
+	# The map's toys: gs-props' sv_toys* set. REPLICATED, because a client hides the toys the
 	# server took away.
 	var _toys := world.toy_rules.bind_cvars(
 		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
-	# sv_weapon_drop*: dot-weapon's drop rules. REPLICATED, because the drop key and the pickup reach follow them.
+	# sv_weapon_drop*: gs-weapon's drop rules. REPLICATED, because the drop key and the pickup reach follow them.
 	var _drops := world.drop_rules.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 	# zee_ads_rules: spread and pace while aimed are part of the prediction, so the numbers cross as one JSON cvar.
@@ -275,7 +275,7 @@ func _add_delivered_maps(world: PhGame) -> int:
 
 
 ## Who somebody is reaches the world: a face as they are seated, and the real name and face
-## once dot-platform has them. All three events end in [method PhNetBridge.refresh_player].
+## once gs-platform has them. All three events end in [method PhNetBridge.refresh_player].
 func _wire_identity() -> void:
 	var link := bridge as PhNetBridge
 
@@ -288,7 +288,7 @@ func _wire_identity() -> void:
 	hook_post("player_renamed", _on_profile)
 
 
-## What a session looks like: what dot-platform resolved for them, or the stock person.
+## What a session looks like: what gs-platform resolved for them, or the stock person.
 ## Through the platform module's `player_for`, never the hub by a key made here: the hub keys by scoped
 ## profile key, so a `u<session>` lookup finds nobody and reads as "no avatar". Duck-typed; no platform is a configuration.
 func _avatar_for(session_id: int) -> GSAvatar:
@@ -320,7 +320,7 @@ func _on_profile(event: GSEvent) -> void:
 
 
 func _add_tunables(world: PhGame) -> void:
-	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` and every `bot_*`
+	# [b]How the stand-ins aim and shoot is gs-bot's[/b]: `bot_difficulty` and every `bot_*`
 	# setting it bundles, the names every game in the family uses. On the game as metadata.
 	var _bot_cvars := GSBotSettings.of(world).bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY, add_command)
 
@@ -334,7 +334,7 @@ const ALIASES := {
 	"sv_map_rotation_file": "map_rotation_file",
 }
 
-## dot-workbench over the config; the F9 panel off a dedicated server, the HTTP page only with `workbench.enabled`.
+## gs-workbench over the config; the F9 panel off a dedicated server, the HTTP page only with `workbench.enabled`.
 var workbench: GSGameWorkbench = null
 
 var _killcam_cvar: GSConVar = null
@@ -465,7 +465,7 @@ func _noblock_side(id: Variant) -> Variant:
 	return (game as PhGame).team_of_side(id) if game != null else ""
 
 
-## mp_forcecamera, once bound. See where the module binds dot-spectate's cvars.
+## mp_forcecamera, once bound. See where the module binds gs-spectate's cvars.
 var _force_camera_cvar: GSConVar = null
 
 
@@ -509,7 +509,7 @@ func _game_tick(_tick: int, delta: float) -> void:
 	_note_pings()
 
 
-## Each session's ping onto its player, for the Tab board. dot-server already keeps it.
+## Each session's ping onto its player, for the Tab board. gs-server already keeps it.
 func _note_pings() -> void:
 	var world := game as PhGame
 	if world == null or server == null:
@@ -564,7 +564,7 @@ func _keep_the_round_full() -> void:
 
 
 ## Names for the stand-ins, so a scoreboard of four of them is readable: this game's own
-## furniture names through dot-bot's [GSBotNames], never one already in [param world] (drawn
+## furniture names through gs-bot's [GSBotNames], never one already in [param world] (drawn
 ## at random they could double up).
 static func _bot_name(world: PhGame) -> String:
 	var taken: Array = []
@@ -601,7 +601,7 @@ func _wire_progress(world: PhGame) -> void:
 	if bridge == null:
 		return
 
-	# Filed under dot-game's stable per-server key (guests too), so it outlives the connection
+	# Filed under gs-game's stable per-server key (guests too), so it outlives the connection
 	# and a restart; see [PhProgress].
 	if world.progress != null:
 		world.progress.durable_key_fn = func(id: StringName) -> String:

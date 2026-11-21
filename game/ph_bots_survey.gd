@@ -6,7 +6,7 @@ const PhPlayer := preload("ph_player.gd")
 const PhNavAnnotator := preload("ph_nav_annotator.gd")
 
 ## The stand-ins: props that hide as something that belongs where they stand, and hunters that search
-## the rooms and test what looks wrong, on dot-bot's settings and hiding helpers. The map is surveyed
+## the rooms and test what looks wrong, on gs-bot's settings and hiding helpers. The map is surveyed
 ## once when built; pure state per bot, every draw the bot's own GSRandomStream, the clock the game's tick.
 
 const CHANNEL := "ph.bots"
@@ -58,7 +58,7 @@ var _surveyed: String = ""
 var _baked: String = ""
 var _first_survey: String = ""
 
-## The map's annotations (dot-npc-ai), made after the first survey on every map so a suite can
+## The map's annotations (gs-npc-ai), made after the first survey on every map so a suite can
 ## measure against them; the bots use them only with `bot_nav`. Stepped a few slices a tick.
 var annotations: GSNpcAiNavAnnotations = null
 var _job: PhNavAnnotator = null

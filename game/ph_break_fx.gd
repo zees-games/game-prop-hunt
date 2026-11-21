@@ -1,6 +1,6 @@
 extends Node
 
-## Splinters, shards and chips where furniture breaks, drawn by dot-fx's GSFxBreak and following fx_quality.
+## Splinters, shards and chips where furniture breaks, drawn by gs-fx's GSFxBreak and following fx_quality.
 
 ## Catalogue ids containing one of these break as that material; anything else is wood.
 const MATERIAL_WORDS := {

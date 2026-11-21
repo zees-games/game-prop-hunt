@@ -47,7 +47,7 @@ func _test_the_map_vote() -> void:
 	_check(ids.has("ph_school") and ids.has("ph_house"), "it offers the delivered maps", str(ids))
 
 	# The map menu's server half (M): the owner's flag changes the map now, anybody else
-	# gets a nomination and a rock-the-vote. Contexts as dot-server makes them for a chat line.
+	# gets a nomination and a rock-the-vote. Contexts as gs-server makes them for a chat line.
 	var menu_half: Object = vote.get("commands").get("map_menu")
 	_check(menu_half != null and server.console.find_command("mapmenu") != null
 		and server.console.find_cvar("sv_map_menu_flag").get_string() == "generic"
@@ -104,7 +104,7 @@ func _test_the_map_vote() -> void:
 ## Rock the vote, typed at the console, on the director the map vote built.
 func _test_rock_the_vote(vote: Node, director: GSVoteDirector) -> void:
 		# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL a passed rtv answered "Rocked. 1 of 1." and no ballot came.
-		# Past dot-vote's cooldown, on the director alone so the map's own ballot timer does not open one first.
+		# Past gs-vote's cooldown, on the director alone so the map's own ballot timer does not open one first.
 	var laid := StringName(str(game.map_doc.get("id", "")))
 	_check(director.current_id() == laid and not director.is_voting(),
 		"the new map starts the vote over", "%s / %s" % [director.current_id(), laid])

@@ -297,7 +297,7 @@ func _test_fall_damage() -> void:
 
 
 ## A death: the server picks the fall and it rides DEATH; a client lays a person down as
-## dot-player-char's ragdoll from the figure it draws, and a disguised prop bursts into its own
+## gs-player-char's ragdoll from the figure it draws, and a disguised prop bursts into its own
 ## pieces (or, under `prop_death` 1, topples as the prop).
 func _test_bodies() -> void:
 	_section("the dead: a person falls as a ragdoll, a found prop bursts")
@@ -430,7 +430,7 @@ func _check_death_wire() -> void:
 
 
 ## The family's rule since the first play test: M opens the map list, and solo a choice
-## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and dot-vote.
+## changes it now. The server's half (the owner's flag, the vote) is in `dedicated` and gs-vote.
 func _test_the_map_menu() -> void:
 	_section("M opens the map list, and solo a choice changes it")
 	var game := await _world(func(c: PhConfig) -> void: c.map_ids = PackedStringArray())
@@ -476,7 +476,7 @@ func _test_the_map_menu() -> void:
 	_finished()
 
 
-## B, a hunter's loadout (dot-loadout's GSLoadoutCommand on the world's own manager, as the
+## B, a hunter's loadout (gs-loadout's GSLoadoutCommand on the world's own manager, as the
 ## solo client asks it): a primary and a secondary from the hunters' weapons, in the hands at
 ## once while the hunters are blindfolded, and only from the next round once the seek is on.
 func _test_hunter_loadout() -> void:

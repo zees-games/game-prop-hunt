@@ -2,16 +2,16 @@ extends GSMenuGameSettings
 
 const PhBindings := preload("ph_bindings.gd")
 
-## A player's own settings and the menu that changes them: dot-menu's `GSMenuGameSettings` with this game's spec (names, field of view, keys, help).
+## A player's own settings and the menu that changes them: gs-menu's `GSMenuGameSettings` with this game's spec (names, field of view, keys, help).
 ## Scopes are the family's: `sensitivity` is ACCOUNT (`tmc_account`), `field_of_view` SERVER_CLAMPED (a server may cap a wide view but cannot READ it), volumes this machine's.
 ## Use: `add_child(s); s.setup(); s.bind_look(...); s.bind_camera(...); s.bind_audio(...); s.open()`.
 
 const SCHEMA_VERSION := 1
 
-## Where this game's own document lives. The shared account document is dot-settings'.
+## Where this game's own document lives. The shared account document is gs-settings'.
 const SETTINGS_DIR := "user://prophunt_settings"
 
-## The app's namespace. ACCOUNT settings are shared under dot-menu's `tmc_account`.
+## The app's namespace. ACCOUNT settings are shared under gs-menu's `tmc_account`.
 const APP_NAMESPACE := &"prophunt"
 
 ## The field of view the camera had before this existed, and still the default.

@@ -17,7 +17,7 @@ func _ready() -> void:
 func _run() -> void:
 	print("mg-prop-hunt: per-map cvars")
 	if not ResourceLoader.exists(GSGameMapConfig.SCRIPT_PATH):
-		print("SKIPPED: dot-map is not linked")
+		print("SKIPPED: gs-map is not linked")
 		get_tree().quit(0)
 		return
 	_entered += 1

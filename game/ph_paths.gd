@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## Where this game's own files are, wherever this copy of it lives.
-## A delivered pack mounts at `res://dot_cloud/<id>/<version>/`, so an absolute `res://` reference to its OWN files resolves against the HOST root; the root here is this script's directory minus `game/`.
+## A delivered pack mounts at `res://gs_cloud/<id>/<version>/`, so an absolute `res://` reference to its OWN files resolves against the HOST root; the root here is this script's directory minus `game/`.
 ## Paths held from here are a `static var`, not a `const`, which folds at parse time: `load(PhPaths.rebase("res://textures/deck.png"))`.
 
 const _SELF := preload("ph_paths.gd")
@@ -31,7 +31,7 @@ static func rebase_onto(path: String, here: String) -> String:
 
 		# Idempotent: the publisher rewrites `res://` strings in a `.tscn`, `.tres` and `.import` onto the mount prefix but not those in a `.gd`.
 		# So a game holds both kinds, and rebasing an already rewritten path doubles the prefix into a load that fails with a path long enough to hide it.
-		# Built in, [param here] is `res://`, so this returns its argument unchanged. Other delivery forms: ../dot-server-deploy/docs/delivery-constraint.md.
+		# Built in, [param here] is `res://`, so this returns its argument unchanged. Other delivery forms: ../gs-server-deploy/docs/delivery-constraint.md.
 	if path.begins_with(here):
 		return path
 

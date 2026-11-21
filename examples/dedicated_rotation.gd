@@ -9,7 +9,7 @@ var game: PhGame = null
 
 
 ## maps.yml on the live module: a map outside the active rotation stays installed and loadable by `ph_map` but is never drawn, balloted or nominated;
-## a rotation switch takes effect; the game's and dot-vote's commands are renamed from `commands:`; no file changes nothing.
+## a rotation switch takes effect; the game's and gs-vote's commands are renamed from `commands:`; no file changes nothing.
 func _test_map_rotation_file() -> void:
 	_section("maps.yml")
 	var module := _module()

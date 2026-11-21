@@ -14,7 +14,7 @@ const PhFlashlight := preload("ph_flashlight.gd")
 
 ## The simulation: headless, authoritative, and the only thing that decides anything.
 ## A round is hiding then seeking: hunters stand blindfolded for [member PhConfig.hide_seconds] while props turn into furniture, then hunt.
-## The round and sides are dot-match's (via [PhRules]), hunters come from [GSTeamRotation], disguises from dot-props; the map and rules are this game's.
+## The round and sides are gs-match's (via [PhRules]), hunters come from [GSTeamRotation], disguises from gs-props; the map and rules are this game's.
 
 
 ## Where this world publishes itself, so a module can find it. A registry name and not an
@@ -23,7 +23,7 @@ const SERVICE := &"ph_game"
 
 ## Where a host that runs this game with no server (the client shell's Solo play) publishes
 ## the map packs it mounted for it. See [method solo_map_dirs].
-const SOLO_SERVICE := &"dot_solo"
+const SOLO_SERVICE := &"gs_solo"
 
 ## Snapshots a second. What a hunter reads continuously is a prop moving across a room.
 const NET_SNAPSHOT_RATE := 30
@@ -107,24 +107,24 @@ var physics: GSPhysicsLayout = null
 var taunts: GSPropTaunts = null
 var rules: GSPropDisguiseRules = null
 
-## A hunter's loadout (dot-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed by [method storage_key]; null if none kept.
+## A hunter's loadout (gs-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed by [method storage_key]; null if none kept.
 var loadouts: GSLoadoutManager = null
 
-## The B menu's server half (dot-loadout's `GSLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
-## Untyped and loaded by path because a host whose dot-loadout predates API 2 has no such class; null there, and B is not offered.
+## The B menu's server half (gs-loadout's `GSLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
+## Untyped and loaded by path because a host whose gs-loadout predates API 2 has no such class; null there, and B is not offered.
 var loadout_command: Object = null
 
-## dot-player-controller's `mp_forceview`: views switchable (0), held first person (1) or third (2); module-bound (REPLICATED), client-followed.
+## gs-player-controller's `mp_forceview`: views switchable (0), held first person (1) or third (2); module-bound (REPLICATED), client-followed.
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
 var view_rules: GSPlayerViewRules = GSPlayerViewRules.new()
 
-## dot-mobile's `sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*` (module-bound, REPLICATED, client-followed); auto-fire stays off, as shooting real furniture costs a hunter health.
+## gs-mobile's `sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*` (module-bound, REPLICATED, client-followed); auto-fire stays off, as shooting real furniture costs a hunter health.
 var mobile_rules: GSMobileRules = GSMobileRules.new()
 
-## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED), client-followed. A person's body only; a prop's death is `PhConfig.prop_death` (docs/design.md, "A death").
+## What a dead body does: gs-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED), client-followed. A person's body only; a prop's death is `PhConfig.prop_death` (docs/design.md, "A death").
 var ragdoll_rules: GSPlayerRagdollRules = GSPlayerRagdollRules.new()
 
-## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate, how hard a walk pushes one): module-bound (REPLICATED), client-followed.
+## gs-props' `sv_toys*` (whether a map's toys are there, how many simulate, how hard a walk pushes one): module-bound (REPLICATED), client-followed.
 var toy_rules: GSPropBodyRules = GSPropBodyRules.new()
 
 ## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
@@ -148,14 +148,14 @@ func ensure_runtime() -> GSProfileRuntime:
 			return typeof(actor) == TYPE_STRING_NAME and actor == &"local"
 	return profile_runtime
 
-## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so dot-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
+## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so gs-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
 var body_rules: GSPlayerBodyRules = GSPlayerBodyRules.new()
 
-## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
+## `sv_falldamage*`: landing hard hurts. On in this game (gs-combat's default is off); the
 ## server applies it through [member combat], a client never does.
 var fall_rules: GSFallDamageRules = make_fall_rules()
 
-## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`.
+## gs-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`.
 var block_rules: Object = null:
 	set(value):
 		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
@@ -196,7 +196,7 @@ var _prop_damage: Dictionary = {}
 ## The stand-ins' brains and the map's survey for them (`ph_bots.gd`). Server side and solo.
 var bots: PhBots = PhBots.new(self)
 
-## What the stand-ins are called, solo and on a server; past the end dot-bot numbers them.
+## What the stand-ins are called, solo and on a server; past the end gs-bot numbers them.
 const BOT_NAMES := ["Lamp", "Ottoman", "Houseplant", "Toaster", "Bookcase", "Teddy", "Fridge", "Stool"]
 
 
@@ -290,7 +290,7 @@ func _build_physics() -> void:
 		match layer.id:
 			&"player":
 				layer.collides_with = [&"world", &"prop"]
-			# A map's loose toy (dot-props'): the world, the furniture and the other toys, never a
+			# A map's loose toy (gs-props'): the world, the furniture and the other toys, never a
 			# person, who walks through it and pushes it (`_advance_toys`).
 			&"toy":
 				layer.collides_with = [&"world", &"prop", &"toy"]
@@ -531,7 +531,7 @@ func add_player(
 		var seated := match_node.add_player(String(player_id), display_name, _tick, side)
 
 		if not seated.ok:
-			GSLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
+			GSLog.error(CHANNEL, "gs-match refused a player", {"id": String(player_id), "why": seated.error.message})
 
 	place_one(player)
 	GSLog.debug(CHANNEL, "player joined", {"id": String(player_id), "side": side})
@@ -604,7 +604,7 @@ func team_of(player_id: StringName) -> int:
 	return int(sides.get(player_id, 0))
 
 
-## The side id dot-team's block rules compare ("" for none): props with props, hunters with hunters.
+## The side id gs-team's block rules compare ("" for none): props with props, hunters with hunters.
 func team_of_side(player_id: Variant) -> Variant:
 	var side := team_of(StringName(str(player_id)))
 	return str(side) if side > 0 else ""
@@ -759,7 +759,7 @@ static func _names(of: Array[PhPlayer]) -> PackedStringArray:
 
 
 ## The map menu's change: [param id] now, not after this map's rounds. The next map is set and
-## a fresh round begins on it (dot-match's `begin_round_now`: the round called off has no
+## a fresh round begins on it (gs-match's `begin_round_now`: the round called off has no
 ## winner); with no match running it is simply built. Authority only.
 func change_map_now(id: StringName) -> GSResult:
 	if not authoritative:
@@ -893,12 +893,12 @@ func arm_hunter(player: PhPlayer) -> void:
 			player.wanted_slot = def.slot
 
 
-const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loadout_command.gd"
+const LOADOUT_COMMAND_SCRIPT := "res://addons/gs_loadout/integrations/gs_loadout_command.gd"
 
 
-## The hunters' loadouts: dot-loadout's manager on a memory store (a server forgets them on a
+## The hunters' loadouts: gs-loadout's manager on a memory store (a server forgets them on a
 ## restart; the client remembers its own choice and sends it again on join), and the B menu's
-## server half where the host's dot-loadout has it (API 2).
+## server half where the host's gs-loadout has it (API 2).
 func _build_loadouts() -> void:
 	loadouts = GSLoadoutManager.new()
 	loadouts.name = "Loadouts"
@@ -914,7 +914,7 @@ func _build_loadouts() -> void:
 	loadouts.store = GSLoadoutStoreMemory.new()
 	add_child(loadouts)
 
-	if GSAddonApi.build_level("dot_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT):
+	if GSAddonApi.build_level("gs_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT):
 		return
 	loadout_command = (load(LOADOUT_COMMAND_SCRIPT) as GDScript).new()
 	loadout_command.set(&"manager", loadouts)
@@ -927,7 +927,7 @@ func _build_loadouts() -> void:
 
 
 ## The loadout key of [param player_id]: `ph-hunter-<id>`, with anything a key may not hold made
-## an underscore (dot-loadout keys are letters, digits and `-_.:`, at least eight long).
+## an underscore (gs-loadout keys are letters, digits and `-_.:`, at least eight long).
 static func storage_key(player_id: StringName) -> String:
 	var out := "ph-hunter-"
 	for c in String(player_id):
@@ -958,7 +958,7 @@ func rearm_if_allowed(id: StringName) -> bool:
 
 
 ## The hunter weapons in [param ids] that share a slot with an earlier one, as "a/b" pairs, or
-## an empty string. A second weapon in a slot replaces the first, silently, in dot-weapon.
+## an empty string. A second weapon in a slot replaces the first, silently, in gs-weapon.
 static func hunter_slot_clash(ids: PackedStringArray) -> String:
 	var by_slot := {}
 	var pairs := PackedStringArray()
@@ -1743,7 +1743,7 @@ func _watch_world() -> void:
 			var _applied := combat.apply_damage(fall)
 
 
-## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed (dot-props' `shot_along`). Server side.
+## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed (gs-props' `shot_along`). Server side.
 ## The shot goes on to the combat, whose trace never sees a toy, so a ball is never cover and hitting one costs nothing: it is no prop anybody could be.
 func _shoot_toys(shot: GSShot) -> void:
 	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
@@ -1758,7 +1758,7 @@ func _shoot_toys(shot: GSShot) -> void:
 const BLAST_TOY_SPEED := 12.0
 
 
-## A hunter's grenade went off and dot-combat resolved it ([param shot]'s damages are who it
+## A hunter's grenade went off and gs-combat resolved it ([param shot]'s damages are who it
 ## hurt). Server side and solo: the hit marker for a prop it found, the toys it throws, and what
 ## it costs when it found nobody (docs/design.md, "Grenades").
 func _on_blast(at: Vector3, spawn: GSWeaponSpawn, shot: GSShot) -> void:

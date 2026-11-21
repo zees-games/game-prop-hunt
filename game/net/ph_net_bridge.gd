@@ -16,8 +16,8 @@ const PhMapDoc := preload("../ph_map_doc.gd")
 const PhPlayer := preload("../ph_player.gd")
 
 ## Joins a [PhGame] to a [GSNetManager]: the netcode seam, and the only file that names both.
-## Usage: attach(game, net), open_link(...), then server_tick / client_tick; see the dot-game netcode.
-## The game's tick is whole-world while dot-net ticks per entity; [method ensure_game_ticked] reconciles them.
+## Usage: attach(game, net), open_link(...), then server_tick / client_tick; see the gs-game netcode.
+## The game's tick is whole-world while gs-net ticks per entity; [method ensure_game_ticked] reconciles them.
 
 const CHANNEL := "ph.net"
 
@@ -106,8 +106,8 @@ var _entities: Node = null
 ## session id -> [PhPlayerNet].
 var _behaviours: Dictionary = {}
 
-## The next session id for somebody the world made itself, well above anything dot-server issues.
-## A player id is `u<session>` and a name like `bot` parses back to session ZERO, so two bots would share an entry and dot-net's broadcast address.
+## The next session id for somebody the world made itself, well above anything gs-server issues.
+## A player id is `u<session>` and a name like `bot` parses back to session ZERO, so two bots would share an entry and gs-net's broadcast address.
 const FIRST_BOT_SESSION := 900000
 
 var _next_bot_session: int = FIRST_BOT_SESSION
@@ -269,8 +269,8 @@ func attach(p_game: Object, p_net: GSNetManager) -> GSResult:
 	return GSResult.success(true)
 
 
-## Hands dot-combat the rewind and restore callables that make lag compensation real.
-## Unset, dot-combat resolves every shot against the present while the flag claims it is on; dot-net already records the history.
+## Hands gs-combat the rewind and restore callables that make lag compensation real.
+## Unset, gs-combat resolves every shot against the present while the flag claims it is on; gs-net already records the history.
 ## The shooter is not excluded: `resolve_shot` fixes `shot.origin` before rewinding, and self damage is refused separately.
 func _wire_lag_compensation() -> void:
 	if game.combat == null or net == null:
@@ -410,7 +410,7 @@ func _on_player_added(id: StringName) -> void:
 	if _behaviours.has(session_id):
 		return
 
-	# Every id on the wire is `u<session>` and anything else parses back to zero, which is also dot-net's broadcast address.
+	# Every id on the wire is `u<session>` and anything else parses back to zero, which is also gs-net's broadcast address.
 	# A second player called `bot` would silently replace the first in this table, so it is refused with a line.
 	if player_key(session_id) != id:
 		GSLog.warn(CHANNEL, "a player whose id is not a session key is not replicated", {
@@ -820,7 +820,7 @@ func _on_request(message: GSNetMessage) -> void:
 	if ask == null or net == null or not net.is_server:
 		return
 
-	# [b]From the message, which dot-net stamped from the TRANSPORT.[/b] A peer id inside a
+	# [b]From the message, which gs-net stamped from the TRANSPORT.[/b] A peer id inside a
 	# body is a claim; `sender_peer_id` is what the socket said, which is the only version
 	# of it a server may act on.
 	var peer_id := ask.sender_peer_id
@@ -978,7 +978,7 @@ func _broadcast(kind: int, body: PackedByteArray) -> void:
 		_tell(int(peer_id), kind, body)
 
 
-## One peer, and never zero: `net.send(msg, 0)` is a BROADCAST in dot-net.
+## One peer, and never zero: `net.send(msg, 0)` is a BROADCAST in gs-net.
 ## Passing a missing peer id straight through would send one player's private message to everybody.
 func _tell(peer_id: int, kind: int, body: PackedByteArray) -> void:
 	if peer_id <= 0 or net == null or body.is_empty():
@@ -1258,10 +1258,10 @@ func _adopt_tick_rate(rate: int) -> void:
 	# The LIVE one, which is built from the config back at `setup()` and is therefore not
 	# updated by writing the config alone.
 	net.clock.tick_rate = game.tick_rate
-	# dot-net API 7 has GSNetClock.adopt_tick_rate(), which also raises the engine's step cap to
+	# gs-net API 7 has GSNetClock.adopt_tick_rate(), which also raises the engine's step cap to
 	# a quarter second of ticks, so a slow-frame client keeps up with the server. A shell built
 	# before it gets the same rule here; remove this branch when the oldest shell is API 7.
-	if GSAddonApi.build_level("dot_net") >= 7:
+	if GSAddonApi.build_level("gs_net") >= 7:
 		GSNetClock.adopt_tick_rate(game.tick_rate)
 	else:
 		Engine.max_physics_steps_per_frame = maxi(Engine.max_physics_steps_per_frame, ceili(0.25 * float(game.tick_rate)))
@@ -1364,7 +1364,7 @@ func _release_toys() -> void:
 
 
 ## Client, on TOYS: a mirror for every id at once, whether this end's toys for that map exist yet or not.
-## A client must know every entity a snapshot carries: dot-net stops reading at the first unknown one,
+## A client must know every entity a snapshot carries: gs-net stops reading at the first unknown one,
 ## freezing every player after it. Paired with its toy by index as soon as both are here.
 func _apply_toys(told: Dictionary) -> void:
 	if net == null or net.is_server:
@@ -1468,7 +1468,7 @@ func _apply_join(reader: GSNetReader) -> void:
 
 ## Who owns a mirrored player on this client: this client for its own player, the server's 0 otherwise.
 ## Never the local peer for anybody else, or this client would predict a person whose keys it never had.
-## A local peer of 0 claims nothing: dot-net's `is_owner` is already true of every owner-0 mirror there.
+## A local peer of 0 claims nothing: gs-net's `is_owner` is already true of every owner-0 mirror there.
 func _mirror_owner(session_id: int) -> int:
 	if net == null or net.local_peer_id <= 0:
 		return 0

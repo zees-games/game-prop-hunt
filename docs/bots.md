@@ -1,6 +1,6 @@
 # Bots
 
-The stand-ins are `game/ph_bots.gd`, built on dot-bot: its settings (`bot_difficulty` and every `bot_*` cvar, solo at the console too), its view turning and trigger (`GSBotAim`), and its hiding helpers (`GSBotNav`, `GSBotHiding`, `GSBotSearch`). `PhGame._drive_bots` calls `bots.drive()` before the bodies move; `_bot_shoot` and `_bot_aim_of` are kept as thin wrappers for the suites.
+The stand-ins are `game/ph_bots.gd`, built on gs-bot: its settings (`bot_difficulty` and every `bot_*` cvar, solo at the console too), its view turning and trigger (`GSBotAim`), and its hiding helpers (`GSBotNav`, `GSBotHiding`, `GSBotSearch`). `PhGame._drive_bots` calls `bots.drive()` before the bodies move; `_bot_shoot` and `_bot_aim_of` are kept as thin wrappers for the suites.
 
 ## What the first play test saw
 
@@ -12,13 +12,13 @@ When a map is built (on the server, or solo), `GSBotNav` bakes where a body can 
 
 ## The map's annotations
 
-After the first survey, `PhBots` runs dot-npc-ai's `GSNpcAiNavAnnotator` (`game/ph_nav_annotator.gd`, a subclass; no `class_name`) over the baked mesh, a fixed 48 slices a tick so a seeded round replays the same, and on every map whether or not the bots use it (the suite measures against it). The subclass overrides `_hide_score`: a spot only scores if a piece of floor furniture a prop may become stands within `ph_bot_beside` (1.3 m) of it, and then by sight (out of watchers' view), enclosure (tucked against a wall or a piece) and fit (others of the piece's kind within 6 m); each such spot is stamped with the piece (`prop`, `kind`, `yaw`, `kin`), so the disguise is chosen for where the prop goes, not the other way round.
+After the first survey, `PhBots` runs gs-npc-ai's `GSNpcAiNavAnnotator` (`game/ph_nav_annotator.gd`, a subclass; no `class_name`) over the baked mesh, a fixed 48 slices a tick so a seeded round replays the same, and on every map whether or not the bots use it (the suite measures against it). The subclass overrides `_hide_score`: a spot only scores if a piece of floor furniture a prop may become stands within `ph_bot_beside` (1.3 m) of it, and then by sight (out of watchers' view), enclosure (tucked against a wall or a piece) and fit (others of the piece's kind within 6 m); each such spot is stamped with the piece (`prop`, `kind`, `yaw`, `kin`), so the disguise is chosen for where the prop goes, not the other way round.
 
 With `ph_bot_nav` on (the default) the props' places are those spots, best first and 2.5 m apart (`GSBotHiding.choose` over exposure 0.3 sight + 0.3 misfit + 0.4 untucked), and the relocation (`ph_bot_relocate_*`) and fleeing use the same list. The hunters' search places are the same spots plus the chokepoints (later in the order), and a hunter knows at least `ph_bot_sweep` of them (0.7), which makes it sweep the best spots before the near ones. `ph_bot_nav 0` is the first way, kept so the suite can show what the annotations change (`headless_bots -- --nav 0`).
 
 Measured over the suite's 48 medium rounds, `--nav 0` against the default: props won 20 and 19 of 48; a prop lasts 135 s and 144 s; a prop ends tucked in on 0.24 and 0.28 of its sides; hunters pass 90% and 92% of the 16 best places in 30 s. Placement beside same-size furniture barely moves (99% and 98% next to a piece, 80% and 74% among two or more, seen by 16% and 15% of watchers). The seen check is relative: props are held to 0.4 of what a floor point picked blind is seen by (9% against 47% over 96 rounds, 801 samples), because an absolute share moves with a map's sight lines, and map-side stalls round prop groups moved the absolute figure while the bots stayed the same because the first survey already hid beside furniture of the prop's size. The annotations add a better choice between those places, a small gain; the sweep (`ph_bot_sweep`, default 0.1) is kept small because every larger value made the hunters win a map outright (woods 2 of 12, school 0 of 12): the round outcomes swing by several rounds per map between runs of the same code, so judge a change on the totals, not a single map. The bands that separate the two ways are the tucked-in share (0.26) and the hunters' coverage of the best places (91%); the lasting-time and win bands are too noisy to separate them.
 
-`tools/shot.sh --view=spots --ph-map-ids=ph_school` draws a map's annotations (dot-npc-ai's `GSNpcAiNavDebug`) from above.
+`tools/shot.sh --view=spots --ph-map-ids=ph_school` draws a map's annotations (gs-npc-ai's `GSNpcAiNavDebug`) from above.
 
 ## A prop hides as what belongs there
 

@@ -6,7 +6,7 @@ const PhNetCommand := preload("ph_net_command.gd")
 ## The three game buttons ride in [member GSFpsCommand.buttons] like a jump: per-tick, held, and ordered against the movement they were aimed with,
 ## where a reliable request would arrive a round trip later against a position already left. The slot is its own field ([GSFpsCommand] has eight buttons; see [member PhPlayer.wanted_slot]).
 
-## Fire. `BUTTON_USER_0`, which dot-player-controller reserves.
+## Fire. `BUTTON_USER_0`, which gs-player-controller reserves.
 const BUTTON_FIRE := GSFpsCommand.BUTTON_USER_0
 
 ## The alt-fire, which on every blaster in the pack is a bash.

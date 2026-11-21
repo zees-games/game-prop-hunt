@@ -65,11 +65,11 @@ The game has a small practice house built in. The separate [mg-prop-hunt-maps](h
 | **Esc** | Menu: settings (every key above can be rebound), help, and leave |
 
 ## Getting started
-You need [Godot 4.7](https://godotengine.org/download). The game is built from many GameSpice addons, each in its own repository, so the easiest way to get everything is [dot-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
+You need [Godot 4.7](https://godotengine.org/download). The game is built from many GameSpice addons, each in its own repository, so the easiest way to get everything is [gs-bootstrap](https://github.com/gamespice-platform/bootstrap). It clones every project and links the addons into each one:
 
 ```bash
 git clone https://github.com/gamespice-platform/bootstrap.git
-cd dot-bootstrap
+cd gs-bootstrap
 ./bootstrap.sh
 cd projects/mg-prop-hunt
 ./game.sh
@@ -77,7 +77,7 @@ cd projects/mg-prop-hunt
 
 On Windows, run `bootstrap.ps1` instead and open the project in Godot.
 
-The maps come from the mg-prop-hunt-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice map, and the server owner picks the maps pack (`gamemann/mg-prop-hunt-maps`, or their own) in dot-server-deploy's `cfg/content.yml`.
+The maps come from the mg-prop-hunt-maps checkout, which bootstrap links into `maps/` for you. On a deployed server they come from the server instead: the game ships only its built-in practice map, and the server owner picks the maps pack (`gamemann/mg-prop-hunt-maps`, or their own) in gs-server-deploy's `cfg/content.yml`.
 
 `game.sh` does everything else:
 
@@ -91,7 +91,7 @@ The maps come from the mg-prop-hunt-maps checkout, which bootstrap links into `m
 | `./game.sh shot` | Save a screenshot to `screenshots/`. `tools/shot.sh` lists the views |
 | `./game.sh help` | All of the options |
 
-`online` and `server` use [dot-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
+`online` and `server` use [gs-server-deploy](https://github.com/gamespice-platform/server-deploy), which bootstrap clones next to this one. Run its `./setup.sh` once first.
 
 ## Running a server
 Settings are cvars. Set them in the server's config, on the command line, or live from the console. Most of them take effect from the next round.
@@ -129,15 +129,15 @@ bot_difficulty medium          // how bot hunters turn, aim and react: easy, med
 ph_vote_after 20               // seconds into a map's last round before the vote opens
 ```
 
-A hunter who dies drops as a ragdoll ([dot-player-char](https://github.com/gamespice-platform/player-char)) and a prop that is found bursts into pieces; the server picks how each body goes down and everybody sees the same fall. `sv_ragdoll 0` makes it a quick fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off). On a player's own machine, `--ph-prop-death=1` topples a found prop instead of bursting it (2: it vanishes), and `--ph-hunter-break` says what the furniture does to a hunter it finishes (0 a ragdoll, 1 limbs, 2 bursts).
+A hunter who dies drops as a ragdoll ([gs-player-char](https://github.com/gamespice-platform/player-char)) and a prop that is found bursts into pieces; the server picks how each body goes down and everybody sees the same fall. `sv_ragdoll 0` makes it a quick fall with no physics, `sv_ragdoll_style` picks ragdoll, stiff, topple or hide, `sv_ragdoll_time` and `sv_ragdoll_max` say how long and how many, and `sv_ragdoll_reactions` weights the falls (`limp`, `face_plant`, `crumple`, `headshot_launch`, `power_launch`; 0 turns one off). On a player's own machine, `--ph-prop-death=1` topples a found prop instead of bursting it (2: it vanishes), and `--ph-hunter-break` says what the furniture does to a hunter it finishes (0 a ragdoll, 1 limbs, 2 bursts).
 
-The bot cvars are the family's shared ones: how many is dot-server's `GSBotQuota`, how they turn, aim and react is [dot-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
+The bot cvars are the family's shared ones: how many is gs-server's `GSBotQuota`, how they turn, aim and react is [gs-bot](https://github.com/gamespice-platform/bot)'s `bot_difficulty` and its `bot_*` settings (`bot_settings` lists them; any one can be changed on its own). The same names work at the console in solo, and `./game.sh -- --bot_difficulty hard` sets it at launch. `ph_min_players` still works and sets `bot_quota`; it is deprecated.
 
-`mp_teammate_passthrough` is the family's shared one from dot-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
+`mp_teammate_passthrough` is the family's shared one from gs-combat, live from the next shot. At 2 a team-mate in the line never stops a shot; splash still reaches them.
 
 A map document has no size limit. A map larger than one message (60,000 bytes deflated) is sent in pieces, so a browser client gets it too. A server can still set limits with `--ph-max-map-boxes`, `-props`, `-toys`, `-lights` and `-spawns` (default 0, no limit, any value). A document over a limit is refused with its count, never cut down. `--ph-map-lights-warn` (default 128, any value, 0 for none) logs a warning past that many lights; the cost of a light stays the map author's choice.
 
-`--ph-map-ids=<ids>` limits a server to some maps, and every other setting in `game/ph_config.gd` can be given the same way (`--ph-taunt-range=80`). The taunts are listed in `taunts/taunts.json`: edit it to add your own sounds. The vote's settings go in `user://cfg/prophunt_vote.json` (`{"enabled": false}` turns it off); dot-vote's README lists them.
+`--ph-map-ids=<ids>` limits a server to some maps, and every other setting in `game/ph_config.gd` can be given the same way (`--ph-taunt-range=80`). The taunts are listed in `taunts/taunts.json`: edit it to add your own sounds. The vote's settings go in `user://cfg/prophunt_vote.json` (`{"enabled": false}` turns it off); gs-vote's README lists them.
 
 Console commands:
 
@@ -151,7 +151,7 @@ Console commands:
 | `ph_net` | What the network code is doing |
 
 ### Admin commands
-These come from [dot-moderation](https://github.com/gamespice-platform/moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
+These come from [gs-moderation](https://github.com/gamespice-platform/moderation): `noclip`, `freeze`, `speed`, `gravity`, `god`, `buddha`, `hp`, `slay`, `slap`, `rename`, the teleports, `blind` and `beacon`. `respawn` puts somebody back at their side's spawn. `give` and `strip` are turned off, because what a hunter carries is the server's loadout and a prop carries nothing.
 
 ## Writing a map
 A map is a JSON file: the building as boxes, the furniture as props, the lights, and where each side starts. The maps are in [mg-prop-hunt-maps](https://github.com/zees-games/mg-prop-hunt-maps), whose `tools/build_maps.py` writes them (a wall with its doors and windows, or a furnished classroom, is one line there). [`maps/README.md`](https://github.com/zees-games/mg-prop-hunt-maps/blob/main/maps/README.md) in that repository describes the format. The server sends the map to each player when it changes, so players don't need the map files.
@@ -184,15 +184,15 @@ The bots are simple: a bot prop walks to the nearest thing it can be and stays t
 | Trees, plants, rocks | Kenney, Nature Kit; colours toned down at load | CC0 | each kit's licence |
 | The two climbing trees | [game-hide-n-seek](https://github.com/zees-games/game-hide-n-seek), made in the Nature Kit's style (`tools/climb_trees.py`) | CC0 | that repo |
 | Most-used props (about seventy, e.g. chair, table, sofa, fridge, laptop, campfire logs) | Rebuilt from the Kenney models with their own palette, refitted to the stock bounds; `art-src/build_props.py` (Blender), stock models kept in `art-src/base/` | CC0 | `art-src/` |
-| Players | Quaternius, [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), skinned from Kenney's Blocky Characters | CC0 1.0 | dot-player-char |
+| Players | Quaternius, [Zombie Apocalypse Kit](https://quaternius.com/packs/zombieapocalypsekit.html), skinned from Kenney's Blocky Characters | CC0 1.0 | gs-player-char |
 | Taunts | Kenney, Voiceover Pack and Music Jingles ([kenney.nl](https://kenney.nl)) | CC0 | `taunts/` |
-| Weapons | [zee-dot-weapons](https://github.com/zees-games/zee-dot-weapons) | see that repo | that repo |
+| Weapons | [zee-gs-weapons](https://github.com/zees-games/zee-gs-weapons) | see that repo | that repo |
 | Weapon silhouettes, grenade burst | [game-fatal-contact](https://github.com/zees-games/game-fatal-contact)'s renders and particles | see that repo | `assets/weapon_icons/`, `scenes/fx/explosion.tscn` |
 | Floors, walls, roofs | Kenney, Prototype Textures under a pastel | CC0 | each kit's licence |
 | Glass, boards, lockers, lines | Drawn in code | none | in code |
-| Footsteps | Kenney, Impact Sounds | CC0 | `addons/dot_audio/stock/CREDITS.md` |
-| Ambience beds | Generated by dot-audio | CC0 | `addons/dot_audio/stock/CREDITS.md` |
-| Toys | [dot-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/dot_props/toys/sounds/CREDITS.md` |
+| Footsteps | Kenney, Impact Sounds | CC0 | `addons/gs_audio/stock/CREDITS.md` |
+| Ambience beds | Generated by gs-audio | CC0 | `addons/gs_audio/stock/CREDITS.md` |
+| Toys | [gs-props](https://github.com/gamespice-platform/props), drawn in code; sounds by Kenney | CC0 | `addons/gs_props/toys/sounds/CREDITS.md` |
 
 If you made one of these assets and want it removed, open an issue.
 

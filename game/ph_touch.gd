@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## The phone's controls: dot-mobile's stick, drag-look and buttons over the HUD, driving the client's own [GSFpsTouchSampler].
+## The phone's controls: gs-mobile's stick, drag-look and buttons over the HUD, driving the client's own [GSFpsTouchSampler].
 ## The buttons are the side's: a hunter's fire, reload and aim, a prop's swap, lock and taunt, and jump for both
 ## ([method touch_layout]). Which set shows follows the side ([method show_for]); the client turns a press into what the
 ## key would have done. Auto-fire is the server's (`sv_autofire`, off here): a hunter pays in health for every piece of
@@ -21,7 +21,7 @@ var owner_client: Node = null
 var _hunter: bool = false
 var _loadout: bool = false
 
-## dot-ui's buttons inside the overlay.
+## gs-ui's buttons inside the overlay.
 var buttons: GSTouchButtons:
 	get:
 		return controls.buttons if controls != null else null
@@ -32,7 +32,7 @@ static func wanted() -> bool:
 	return GSPlatform.has_touch()
 
 
-## dot-game's fps preset, cut to what the side uses. A hunter keeps fire and reload and adds aim (and gear on a host with a loadout menu); a prop swaps fire for swap, lock and taunt. Jump keeps its home for both.
+## gs-game's fps preset, cut to what the side uses. A hunter keeps fire and reload and adds aim (and gear on a host with a loadout menu); a prop swaps fire for swap, lock and taunt. Jump keeps its home for both.
 static func touch_layout(hunter: bool, loadout: bool = false) -> GSGameTouchLayout:
 	var cut := {&"alt": null, &"crouch": null, &"use": null, &"next": null, &"prev": null, &"board": null, &"chat": null}
 	if hunter:
@@ -52,7 +52,7 @@ static func touch_layout(hunter: bool, loadout: bool = false) -> GSGameTouchLayo
 	return res.value
 
 
-## The set as dot-mobile rows: [method touch_layout]'s, with jump held on the sampler's jump bit.
+## The set as gs-mobile rows: [method touch_layout]'s, with jump held on the sampler's jump bit.
 static func rows(hunter: bool, loadout: bool = false) -> Array[Dictionary]:
 	var out := touch_layout(hunter, loadout).buttons()
 	for row in out:
@@ -76,7 +76,7 @@ func attach(host: Node, platform: Object, sampler: GSFpsSampler, rules: GSMobile
 	host.add_child(self)
 
 
-## Builds the overlay on [param sampler], following [param rules] (the server's; null keeps dot-mobile's defaults).
+## Builds the overlay on [param sampler], following [param rules] (the server's; null keeps gs-mobile's defaults).
 func build(sampler: GSFpsSampler, rules: GSMobileRules = null) -> void:
 	controls = GSMobileControls.new()
 	controls.name = "TouchControls"
