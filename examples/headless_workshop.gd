@@ -1,11 +1,11 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhCatalogue := preload("../game/ph_catalogue.gd")
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhVote := preload("../game/ph_vote.gd")
 
-## What a subscribed map pack does to this game's lists, against a fixture [DotContentIndex] and never the process's shared one. godot --headless --path . res://examples/headless_workshop.tscn
+## What a subscribed map pack does to this game's lists, against a fixture [GSContentIndex] and never the process's shared one. godot --headless --path . res://examples/headless_workshop.tscn
 ## A solo pack map is listed ("Name [Pack]") and can be chosen next, an online session lists none of it, a map kind the game does not accept is left out, and the game's own ids win. The client shell's `start_map` (`--solo-map`, a "Play map" link) is the first map laid out, from the map pack the shell mounted.
 
 const SECTIONS := 6
@@ -32,7 +32,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -63,8 +63,8 @@ func _write_fixture() -> void:
 
 ## A pack with a prop-hunt map, a map of a kind the game does not accept, and a map that claims
 ## the id of the built-in.
-func _index(session: StringName) -> DotContentIndex:
-	var index := DotContentIndex.new()
+func _index(session: StringName) -> GSContentIndex:
+	var index := GSContentIndex.new()
 	index.set_session(session)
 	var added := index.add_pack({
 		"content_id": "fixture/barns", "version": "1.0.0", "prefix": DIR,
@@ -79,7 +79,7 @@ func _index(session: StringName) -> DotContentIndex:
 	return index
 
 
-func _catalogue(index: DotContentIndex) -> PhCatalogue:
+func _catalogue(index: GSContentIndex) -> PhCatalogue:
 	var catalogue := PhCatalogue.new()
 	var _loaded := catalogue.load_from("maps")
 	catalogue.follow_content(index, PhCatalogue.accepted_map_kinds())
@@ -102,7 +102,7 @@ func _test_solo() -> void:
 	_entered += 1
 	print("")
 	print("solo")
-	var catalogue := _catalogue(_index(DotContentIndex.SESSION_SOLO))
+	var catalogue := _catalogue(_index(GSContentIndex.SESSION_SOLO))
 	_check(catalogue.playable(PackedStringArray()).has(MAP), "the accepted map is playable")
 	_check(catalogue.label_of(MAP) == "Fixture Barn [Fixture Pack]", "its label names the pack", catalogue.label_of(MAP))
 	_check(not catalogue.maps.has(&"fixture_run"), "a map kind the game does not accept is filtered out")
@@ -118,16 +118,16 @@ func _test_online() -> void:
 	_entered += 1
 	print("")
 	print("online")
-	var index := _index(DotContentIndex.SESSION_SOLO)
+	var index := _index(GSContentIndex.SESSION_SOLO)
 	var catalogue := _catalogue(index)
 	_check(catalogue.playable(PackedStringArray()).has(MAP), "listed while the index is solo")
-	index.set_session(DotContentIndex.SESSION_ONLINE)
+	index.set_session(GSContentIndex.SESSION_ONLINE)
 	_check(not catalogue.playable(PackedStringArray()).has(MAP), "gone from the same catalogue when the session turns online")
 	_check(not catalogue.maps.has(MAP), "and from its documents")
-	index.set_session(DotContentIndex.SESSION_SOLO)
+	index.set_session(GSContentIndex.SESSION_SOLO)
 	_check(catalogue.playable(PackedStringArray()).has(MAP), "back when it turns solo again")
-	var late := _index(DotContentIndex.SESSION_SOLO)
-	late.set_session(DotContentIndex.SESSION_ONLINE)
+	var late := _index(GSContentIndex.SESSION_SOLO)
+	late.set_session(GSContentIndex.SESSION_ONLINE)
 	_check(not _catalogue(late).playable(PackedStringArray()).has(MAP), "a catalogue built online never lists it")
 	_completed += 1
 
@@ -136,7 +136,7 @@ func _test_ids() -> void:
 	_entered += 1
 	print("")
 	print("the game's own ids")
-	var catalogue := _catalogue(_index(DotContentIndex.SESSION_SOLO))
+	var catalogue := _catalogue(_index(GSContentIndex.SESSION_SOLO))
 	_check(catalogue.maps[PhCatalogue.PRACTICE].get("name") == "Practice House" and not catalogue.is_workshop(PhCatalogue.PRACTICE),
 		"a pack map claiming ph_practice does not replace the built-in")
 	_completed += 1
@@ -149,7 +149,7 @@ func _labels(vote: PhVote) -> PackedStringArray:
 	return out
 
 
-func _vote(index: DotContentIndex, catalogue: PhCatalogue) -> PhVote:
+func _vote(index: GSContentIndex, catalogue: PhCatalogue) -> PhVote:
 	var vote := PhVote.new()
 	vote.config_path = ""
 	vote.content_index = index
@@ -168,7 +168,7 @@ func _test_vote() -> void:
 	_entered += 1
 	print("")
 	print("the ballot")
-	var index := _index(DotContentIndex.SESSION_SOLO)
+	var index := _index(GSContentIndex.SESSION_SOLO)
 	var catalogue := _catalogue(index)
 	var vote := _vote(index, catalogue)
 	# The game's own map the ballot must still carry: whatever the catalogue plays first. A checkout
@@ -183,7 +183,7 @@ func _test_vote() -> void:
 	_check(labels.has(own), "beside the game's own maps, unlabelled", "%s in %s" % [own, str(labels)])
 	_check(not labels.has("Fixture Run [Fixture Pack]"), "and not a kind the game does not accept")
 	_check(labels.count("Fixture Barn [Fixture Pack]") == 1, "once")
-	index.set_session(DotContentIndex.SESSION_ONLINE)
+	index.set_session(GSContentIndex.SESSION_ONLINE)
 	labels = _labels(vote)
 	_check(not labels.has("Fixture Barn [Fixture Pack]"), "online the same ballot lists none of it", str(labels))
 	_check(labels.has(own), "and still has the game's own")
@@ -195,7 +195,7 @@ func _test_vote() -> void:
 ## A world laid out with [param host] as the `dot_solo` service (none when null): the id of its first map.
 func _first_map(host: Object) -> String:
 	if host != null:
-		DotRegistry.register(PhGame.SOLO_SERVICE, host)
+		GSRegistry.register(PhGame.SOLO_SERVICE, host)
 	var config := PhConfig.new()
 	config.warmup_seconds = 0.0
 	config.minimum_players = 0
@@ -213,7 +213,7 @@ func _first_map(host: Object) -> String:
 	remove_child(game)
 	game.free()
 	if host != null:
-		DotRegistry.unregister_instance(PhGame.SOLO_SERVICE, host)
+		GSRegistry.unregister_instance(PhGame.SOLO_SERVICE, host)
 	await get_tree().process_frame
 	return id
 

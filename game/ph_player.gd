@@ -25,16 +25,16 @@ const BODY_STEP := 0.4
 @export var is_bot: bool = false
 
 ## What this player looks like, as a dot-user-avatar document; null is the stock person.
-var avatar: DotAvatar = null
+var avatar: GSAvatar = null
 
 var config: PhConfig = null
 var catalogue: PhProps = null
-var rules: DotPropDisguiseRules = null
+var rules: GSPropDisguiseRules = null
 
 var controller: PhController = null
-var sampler: DotFpsSampler = null
-var health: DotHealth = null
-var hitboxes: DotHitboxSet = null
+var sampler: GSFpsSampler = null
+var health: GSHealth = null
+var hitboxes: GSHitboxSet = null
 
 ## A hunter's weapons. Null on a prop.
 var weapons: ZeeWeaponRig = null
@@ -61,10 +61,10 @@ var warps: int = 0
 var watching: bool = false
 
 ## What they are hiding as. Empty: their own body.
-var disguise: DotPropDisguise = DotPropDisguise.new()
+var disguise: GSPropDisguise = GSPropDisguise.new()
 
 ## The disguise they took off to show their face, kept so the same key puts it back on.
-var set_aside: DotPropDisguise = null
+var set_aside: GSPropDisguise = null
 
 ## When they last showed their face, and when they may next; simulated seconds. Server side.
 var revealed_at: float = -1.0
@@ -90,7 +90,7 @@ var marked: bool = false
 var blinded: bool = false
 var beacon: bool = false
 
-var beacon_marker: DotFxBeacon = null
+var beacon_marker: GSFxBeacon = null
 
 ## The flashlight is on (server-owned, replicated); `flashlight_ready` is cleared on a new map so the next tick sets its start state.
 var flashlight: bool = false
@@ -102,7 +102,7 @@ var prop_model: Node3D = null
 
 ## How this player's body falls on their death: the server's pick ([method PhGame.decide_death]),
 ## carried on DEATH and set here before anybody hears of it. Null before a first death.
-var death: DotPlayerDeath = null
+var death: GSPlayerDeath = null
 var _drawn_prop: StringName = &""
 
 ## Which weapon slot they have asked for, from this game's input message.
@@ -137,7 +137,7 @@ func _ready() -> void:
 	controller.tick_rate = tick_rate
 	# EXTERNAL even offline: the world owns the tick, which is the shape a dedicated server
 	# needs and the one a predicting client replays.
-	controller.drive = DotFpsController.Drive.EXTERNAL
+	controller.drive = GSFpsController.Drive.EXTERNAL
 	controller.tunables = tunables_for(config)
 	controller.admin_abilities = true
 	add_child(controller)
@@ -149,9 +149,9 @@ func _ready() -> void:
 
 ## How a player moves in their own body. Static: a connected client builds a sampler before it
 ## has a player, and the two must agree.
-static func tunables_for(config: PhConfig) -> DotFpsTunables:
+static func tunables_for(config: PhConfig) -> GSFpsTunables:
 	# Pinned: the numbers below and the bots' pacing were tuned on the legacy motor, not the classic default.
-	var t := DotFpsTunables.with_profile("legacy")
+	var t := GSFpsTunables.with_profile("legacy")
 	t.max_speed = config.run_speed if config != null else 6.5
 	t.gravity = config.gravity if config != null else 20.0
 	t.jump_height = config.jump_height if config != null else 1.15
@@ -177,18 +177,18 @@ static func tunables_for(config: PhConfig) -> DotFpsTunables:
 
 
 ## Touch on a phone (a stick and a look drag; the client holds its buttons), the keyboard and mouse elsewhere.
-static func make_sampler(p_tunables: DotFpsTunables) -> DotFpsSampler:
-	if not DotPlatform.has_touch():
-		return DotFpsSampler.new(p_tunables)
+static func make_sampler(p_tunables: GSFpsTunables) -> GSFpsSampler:
+	if not GSPlatform.has_touch():
+		return GSFpsSampler.new(p_tunables)
 
-	var touch := DotFpsTouchSampler.new(p_tunables)
+	var touch := GSFpsTouchSampler.new(p_tunables)
 	touch.set_screen_width(1152.0)
 	return touch
 
 
 ## The movement actions, and the slow walk on shift.
-static func register_actions(p_sampler: DotFpsSampler = null) -> void:
-	var _added := DotFpsSampler.register_default_actions(p_sampler)
+static func register_actions(p_sampler: GSFpsSampler = null) -> void:
+	var _added := GSFpsSampler.register_default_actions(p_sampler)
 	var walk := &"dot_fps_walk"
 
 	if not InputMap.has_action(walk):
@@ -217,8 +217,8 @@ func simulate(tick: int, delta: float) -> void:
 
 	if sampler != null:
 		# Settling under the cover runs the body with its input off (falls, lands, no keys).
-		var gate := DotLoadGate.of(self) if is_inside_tree() else null
-		var sampled := sampler.sample(delta) if gate == null or gate.is_open() else DotFpsCommand.new()
+		var gate := GSLoadGate.of(self) if is_inside_tree() else null
+		var sampled := sampler.sample(delta) if gate == null or gate.is_open() else GSFpsCommand.new()
 
 		if command_stamp.is_valid():
 			command_stamp.call(sampled)
@@ -240,8 +240,8 @@ func is_disguised() -> bool:
 ## Wears [param next], or their own body for an empty one, and moves the hull to match.
 ## The hull is written into the live tunables, not swapped: the motor holds them by reference and reads them every sweep,
 ## and a new object would need the motor rebuilt, which mid-round resets the state a predicting client is replaying.
-func apply_disguise(next: DotPropDisguise) -> void:
-	disguise = next if next != null else DotPropDisguise.new()
+func apply_disguise(next: GSPropDisguise) -> void:
+	disguise = next if next != null else GSPropDisguise.new()
 
 	var t := controller.tunables if controller != null else null
 
@@ -304,35 +304,35 @@ func prop_basis() -> Basis:
 
 
 ## The hitboxes: a person's capsule and head, or one box the prop's size, turned.
-func build_hitboxes(combat: DotCombatManager) -> void:
-	hitboxes = DotHitboxSet.new()
+func build_hitboxes(combat: GSCombatManager) -> void:
+	hitboxes = GSHitboxSet.new()
 	hitboxes.name = "Hitboxes"
-	hitboxes.owner_ref = DotNodeRef.of_path(^"..")
+	hitboxes.owner_ref = GSNodeRef.of_path(^"..")
 	add_child(hitboxes)
 
-	var chest := DotHitbox.new()
+	var chest := GSHitbox.new()
 	chest.name = "Chest"
-	chest.group = DotHitGroup.CHEST
-	chest.shape = DotHitbox.Shape.CAPSULE
+	chest.group = GSHitGroup.CHEST
+	chest.shape = GSHitbox.Shape.CAPSULE
 	chest.radius = 0.34
 	chest.height = 1.25
 	chest.position = Vector3(0.0, 0.78, 0.0)
 	hitboxes.add_child(chest)
 
-	var head := DotHitbox.new()
+	var head := GSHitbox.new()
 	head.name = "Head"
-	head.group = DotHitGroup.HEAD
-	head.shape = DotHitbox.Shape.SPHERE
+	head.group = GSHitGroup.HEAD
+	head.shape = GSHitbox.Shape.SPHERE
 	head.radius = 0.19
 	head.position = Vector3(0.0, EYE_HEIGHT + 0.06, 0.0)
 	head.damage_scale = 2.0
 	head.precedence = 10
 	hitboxes.add_child(head)
 
-	var prop := DotHitbox.new()
+	var prop := GSHitbox.new()
 	prop.name = "Prop"
-	prop.group = DotHitGroup.CHEST
-	prop.shape = DotHitbox.Shape.BOX
+	prop.group = GSHitGroup.CHEST
+	prop.shape = GSHitbox.Shape.BOX
 	prop.enabled = false
 	hitboxes.add_child(prop)
 
@@ -348,9 +348,9 @@ func _fit_hitboxes() -> void:
 		return
 
 	var disguised := is_disguised()
-	var chest := hitboxes.get_node_or_null(^"Chest") as DotHitbox
-	var head := hitboxes.get_node_or_null(^"Head") as DotHitbox
-	var prop := hitboxes.get_node_or_null(^"Prop") as DotHitbox
+	var chest := hitboxes.get_node_or_null(^"Chest") as GSHitbox
+	var head := hitboxes.get_node_or_null(^"Head") as GSHitbox
+	var prop := hitboxes.get_node_or_null(^"Prop") as GSHitbox
 
 	if chest != null:
 		chest.enabled = not disguised
@@ -381,9 +381,9 @@ func refit() -> void:
 ## The duck-typed lookup dot-weapon's player bridge asks a carrier for.
 func component(type_name: StringName) -> Object:
 	match String(type_name):
-		"DotPlayerController", "DotFpsController":
+		"GSPlayerController", "GSFpsController":
 			return controller
-		"DotHealth":
+		"GSHealth":
 			return health
 		"ZeeWeaponRig":
 			return weapons
@@ -400,7 +400,7 @@ func place_at(at: Vector3, yaw_degrees: float) -> void:
 	if sampler != null:
 		sampler.look_at_angles(yaw_degrees, 0.0)
 
-	var facing := DotFpsCommand.new()
+	var facing := GSFpsCommand.new()
 	facing.yaw = yaw_degrees
 	controller.apply_command(facing)
 
@@ -415,7 +415,7 @@ func reset_round() -> void:
 	taunt_meter = 0.0
 	taunting_id = &""
 	marked = false
-	apply_disguise(DotPropDisguise.new())
+	apply_disguise(GSPropDisguise.new())
 
 
 func retune() -> void:
@@ -445,7 +445,7 @@ func present_beacon(delta: float, at: Vector3, local_view: bool, period: float) 
 		return false
 
 	if beacon_marker == null:
-		beacon_marker = DotFxBeacon.new()
+		beacon_marker = GSFxBeacon.new()
 		beacon_marker.name = "Beacon"
 		beacon_marker.period = period
 		# The rule's marker is the props' blue, so it reads as "a prop is here" and not as an
@@ -494,7 +494,7 @@ func present_body(hidden: bool, at: Vector3, team_colour: Color) -> bool:
 		_present_held()
 		var velocity := controller.state.velocity
 		figure.set_motion({
-			"on_floor": controller.state.mode == DotFpsState.Mode.GROUND,
+			"on_floor": controller.state.mode == GSFpsState.Mode.GROUND,
 			"vertical": velocity.y,
 			"crouched": controller.state.crouch_fraction > 0.5,
 			# The view's pitch: the upper body, the arms and the gun follow it.
@@ -531,7 +531,7 @@ func _present_prop(shown: bool, at: Vector3) -> void:
 
 
 ## Breaks this player's body apart: a hunter killed by the furniture. Client side.
-func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value: int) -> DotPlayerBodyBreak:
+func break_body(break_rules: GSPlayerBreakRules, direction: Vector3, seed_value: int) -> GSPlayerBodyBreak:
 	if figure == null or not figure.visible or break_rules == null:
 		return null
 
@@ -540,7 +540,7 @@ func break_body(break_rules: DotPlayerBreakRules, direction: Vector3, seed_value
 	if model == null:
 		return null
 
-	return DotPlayerBodyBreak.break_apart(
+	return GSPlayerBodyBreak.break_apart(
 		model, get_parent(), break_rules, figure.global_position, direction, seed_value, true, true
 	)
 

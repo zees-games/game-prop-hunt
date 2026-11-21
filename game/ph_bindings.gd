@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Every key this game reads, as one [DotMenuBindings] table (action, setting, words, default, card) that the client, settings, Controls page and help screen all read.
+## Every key this game reads, as one [GSMenuBindings] table (action, setting, words, default, card) that the client, settings, Controls page and help screen all read.
 ## A prop's keys and a hunter's never share a default (reload is R, so the rotation lock is C), and nothing defaults to H, which is help in every game.
 ## Right mouse aims (`ZeeViewModel.aim`); B is the hunter's loadout; chat is two rows on dot-ui's chat actions (Y to all, U to your side) so the Controls page moves them.
 
@@ -34,8 +34,8 @@ const CHAT_TEAM := &"chat_open_team"
 const SLOTS: Array[StringName] = [&"ph_slot_1", &"ph_slot_2", &"ph_slot_3", &"ph_slot_4", &"ph_slot_5"]
 
 
-static func make() -> DotMenuBindings:
-	var keys := DotMenuBindings.new()
+static func make() -> GSMenuBindings:
+	var keys := GSMenuBindings.new()
 	keys.add_movement()
 	var _wheel := keys.add_wheel_weapons(&"dot_menu_weapon_previous", &"dot_menu_weapon_next", "Hunters")
 	keys.add(DISGUISE, &"bind_disguise", "Become what you look at", "E", "Props")
@@ -61,6 +61,6 @@ static func make() -> DotMenuBindings:
 	keys.add(FLASHLIGHT, &"bind_flashlight", "Flashlight", "L", "General")
 	keys.add(SCOREBOARD, &"bind_scoreboard", "Scoreboard (hold)", "Tab", "General")
 	# B is a hunter's loadout (dot-menu's `dot_menu_loadout`), where the host has it (API 6).
-	if DotAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
+	if GSAddonApi.build_level("dot_menu") >= 6 and keys.has_method(&"add_loadout"):
 		var _l: Variant = keys.call(&"add_loadout", "Hunters")
 	return keys

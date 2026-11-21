@@ -21,7 +21,7 @@ const HIT_MARGIN := 0.06
 
 signal built()
 
-var physics: DotPhysicsLayout = null
+var physics: GSPhysicsLayout = null
 
 ## The catalogue every prop's size and model come from.
 var catalogue: PhProps = null
@@ -43,12 +43,12 @@ var props_version: int = 0
 ## node. What [method break_prop] hides and [method restore_all] puts back.
 var _drawn_at: Dictionary = {}
 
-## The map's toys (dot-props' [DotPropBodyBox]): loose ones only on this game's maps (barrels,
+## The map's toys (dot-props' [GSPropBodyBox]): loose ones only on this game's maps (barrels,
 ## tyres, balls, pins), simulated where [member authoritative], posed from snapshots elsewhere,
 ## under the game's `sv_toys*` [member toy_rules]. Set by the game before it builds.
-var toys: DotPropBodyBox = null
+var toys: GSPropBodyBox = null
 var authoritative: bool = true
-var toy_rules: DotPropBodyRules = null
+var toy_rules: GSPropBodyRules = null
 var gravity: float = 20.0
 
 var _solid: StaticBody3D = null
@@ -70,7 +70,7 @@ func id() -> StringName:
 
 
 ## Builds [param p_doc], which [PhMapDoc.validate] has already normalised.
-func build(p_doc: Dictionary) -> DotResult:
+func build(p_doc: Dictionary) -> GSResult:
 	clear()
 	doc = p_doc
 
@@ -100,22 +100,22 @@ func build(p_doc: Dictionary) -> DotResult:
 		_build_environment()
 
 	if not _missing.is_empty():
-		DotLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
+		GSLog.warn(CHANNEL, "a map names props this server's catalogue does not have; they are left out", {
 			"map": String(id()), "missing": ", ".join(_missing),
 		})
 
-	DotLog.debug(CHANNEL, "built a map", {
+	GSLog.debug(CHANNEL, "built a map", {
 		"id": String(id()), "boxes": (doc["boxes"] as Array).size(), "props": props.size(),
 	})
 	built.emit()
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## The toys, on their own layer: a loose one (a barrel, a ball) on `toy`, which the world, the
 ## furniture and other toys stop and a survivor or a zombie never does (they walk through it,
 ## and a survivor pushes it, `ZzGame._advance_toys`).
 func _build_toys() -> void:
-	toys = DotPropBodyBox.new()
+	toys = GSPropBodyBox.new()
 	toys.name = "Toys"
 	toys.authoritative = authoritative
 	toys.draw = draw_world
@@ -133,7 +133,7 @@ func _build_toys() -> void:
 	add_child(toys)
 	var built := toys.build(doc.get("toys", []))
 	if not built.ok:
-		DotLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
+		GSLog.warn(CHANNEL, "a map's toys would not build", {"map": String(id()), "why": built.error.message})
 
 
 func clear() -> void:
@@ -161,7 +161,7 @@ func _put_on(body: CollisionObject3D, layer: StringName) -> void:
 	var applied := physics.apply_to(body, layer)
 
 	if not applied.ok:
-		DotLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
+		GSLog.warn(CHANNEL, "a map body could not be put on its layer", {"layer": String(layer)})
 
 
 func _build_boxes() -> void:
@@ -182,7 +182,7 @@ func _build_boxes() -> void:
 			cube.size = size
 			shape.shape = cube
 			shape.transform = frame
-			# What a footstep on it sounds like (dot-audio's DotAudioFootsteps reads the hit
+			# What a footstep on it sounds like (dot-audio's GSAudioFootsteps reads the hit
 			# shape's meta; "wood_floor", "tile_small" and the rest fold onto its surfaces).
 			shape.set_meta(&"surface", str(box.get("mat", "")))
 			_solid.add_child(shape)
@@ -211,7 +211,7 @@ func _build_boxes() -> void:
 		var tool: SurfaceTool = batch["tool"]
 		var mesh := MeshInstance3D.new()
 		mesh.name = "Boxes"
-		# dot-core's DotCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
+		# dot-core's GSCollisionAudit: a chunk of `"solid": false` boxes is decoration by the
 		# map's own say-so.
 		if bool(batch["ghost"]):
 			mesh.set_meta(&"dot_no_collision", true)
@@ -235,7 +235,7 @@ func _shades_floor(prop_id: StringName, raw: Dictionary) -> bool:
 ## dot-lighting's contact shade (API 4) where a box meets the floor, a wall or another box: the Compatibility renderer has no ambient occlusion.
 ## Glass and water neither cast nor take one. By path, behind the level, so an older client shell still runs the map without it.
 func _add_contact_shade(boxes: Array) -> void:
-	if boxes.is_empty() or DotAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
+	if boxes.is_empty() or GSAddonApi.build_level("dot_lighting") < 4 or not ResourceLoader.exists(CONTACT_SHADE_SCRIPT):
 		return
 	var shade: Variant = (load(CONTACT_SHADE_SCRIPT) as GDScript).call(&"node", boxes)
 	if shade is MeshInstance3D and (shade as MeshInstance3D).mesh != null:
@@ -368,7 +368,7 @@ func _build_environment() -> void:
 	var lighting := Node3D.new()
 	lighting.name = "Lighting"
 	add_child(lighting)
-	_sun = DotLightRig.apply(lighting, DotLightDocument.from_dictionary(light_document(env_doc)),
+	_sun = GSLightRig.apply(lighting, GSLightDocument.from_dictionary(light_document(env_doc)),
 		light_profile(float(env_doc["ambient_energy"])))
 
 	if _sun != null:
@@ -379,7 +379,7 @@ func _build_environment() -> void:
 		# lights the faces the sun already does.
 		var fill := lighting.get_node_or_null("Fill") as DirectionalLight3D
 		if fill != null:
-			var aimed := DotLightRig.fill(DotLightDocument.from_dictionary(light_document(env_doc)), _sun.rotation,
+			var aimed := GSLightRig.fill(GSLightDocument.from_dictionary(light_document(env_doc)), _sun.rotation,
 				light_profile(float(env_doc["ambient_energy"])))
 			fill.rotation = aimed.rotation
 			aimed.free()
@@ -438,8 +438,8 @@ static func light_document(env_doc: Dictionary) -> Dictionary:
 ## What this machine draws of a map's light: dot-lighting's `painted()`, with the map's fill.
 ## Shadows stay on in the browser, unlike `web()`: a prop's shadow is part of what a hunter reads, and the boxes are batched into a few dozen meshes.
 ## Ambient is the map's `ambient_energy` times 4 of `painted()`'s and the fill times 2.8, keeping a room (lit by fill and lamps, not sun) as light as before while the yard loses its glare.
-static func light_profile(ambient_energy: float = 0.5) -> DotLightProfile:
-	var p := DotLightProfile.painted()
+static func light_profile(ambient_energy: float = 0.5) -> GSLightProfile:
+	var p := GSLightProfile.painted()
 	p.sun_shadows = true
 	p.sky_below_horizon = true
 	p.ambient_energy *= ambient_energy * 4.0
@@ -510,7 +510,7 @@ func prop_containing(point: Vector3) -> int:
 
 		# A shot through the gap under a tree's leaves hit no furniture, so it is no decoy.
 		if not pieces.is_empty():
-			if DotPropPieces.contains(pieces, local, HIT_MARGIN):
+			if GSPropPieces.contains(pieces, local, HIT_MARGIN):
 				return index
 			continue
 

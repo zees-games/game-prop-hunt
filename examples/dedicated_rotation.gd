@@ -4,7 +4,7 @@ extends "dedicated_base.gd"
 
 const PhGame := preload("../game/ph_game.gd")
 
-var server: DotServer = null
+var server: GSServer = null
 var game: PhGame = null
 
 
@@ -20,10 +20,10 @@ func _test_map_rotation_file() -> void:
 	if game == null or game.catalogue == null or vote == null or vote.get("director") == null:
 		return
 
-	var director: DotVoteDirector = vote.get("director")
+	var director: GSVoteDirector = vote.get("director")
 	var catalogue := game.catalogue
 	game.config.map_ids = PackedStringArray()
-	var built := DotMapRotationFile.from_trees([{"defaults": {
+	var built := GSMapRotationFile.from_trees([{"defaults": {
 		"rotation": "main",
 		"rotations": {
 			"main": {"mode": "cycle", "maps": ["ph_house", "ph_office"]},
@@ -36,7 +36,7 @@ func _test_map_rotation_file() -> void:
 	if not built.ok:
 		return
 
-	var kept_file: DotMapRotationFile = game.rotation_file
+	var kept_file: GSMapRotationFile = game.rotation_file
 	var all_ids: Array[StringName] = catalogue.playable(PackedStringArray())
 	_check(all_ids.size() > 2 and catalogue.in_rotation_fn.is_valid() == (kept_file != null and kept_file.has_rotations()),
 		"the catalogue holds more maps than the rotation will", str(all_ids.size()))
@@ -51,7 +51,7 @@ func _test_map_rotation_file() -> void:
 
 	_check_cycle_draws()
 
-	var ids := (vote.get("source") as DotVoteListSource).choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
+	var ids := (vote.get("source") as GSVoteListSource).choices().map(func(c: GSVoteChoice) -> StringName: return c.id)
 	_check(ids.has(&"ph_office") and ids.has(&"ph_house") and not ids.has(&"ph_school"),
 		"a map outside the rotation is not on the ballot, one inside is", str(ids))
 	var nominated := director.nominate(&"u77", &"ph_school")
@@ -74,13 +74,13 @@ func _test_map_rotation_file() -> void:
 	_check(_said(PackedStringArray(catalogue.describe_lines()), "not in rotation"),
 		"and so does the ph_maps list")
 
-	var rtv := DotVoteCommands.new()
+	var rtv := GSVoteCommands.new()
 	rtv.director = director
 	rtv.spec_fn = game.rotation_commands
 	var bound := rtv.bind(server.console)
 	_check(bound.ok and rtv.command_name("rtv") == "rockthevote" and server.console.find_command("rockthevote") != null,
 		"a renamed rtv command is registered from maps.yml's commands")
-	var vote_commands: DotVoteCommands = vote.get("commands")
+	var vote_commands: GSVoteCommands = vote.get("commands")
 	_check(vote_commands != null and vote_commands.spec_fn.is_valid(), "and the game's vote hands its commands the file")
 
 	_rotation_switch_and_reset(vote, kept_file)
@@ -88,14 +88,14 @@ func _test_map_rotation_file() -> void:
 
 
 ## The second half of the maps.yml checks: a rotation switch, then no file at all, then the file as it was.
-func _rotation_switch_and_reset(vote: Node, kept_file: DotMapRotationFile) -> void:
+func _rotation_switch_and_reset(vote: Node, kept_file: GSMapRotationFile) -> void:
 	var catalogue := game.catalogue
 	var switched := game.rotation_file.switch(game._rot, "alt")
 	game.apply_rotation()
 	vote.call("refresh_maps")
 	_check(switched.ok and game.in_rotation(&"ph_office") and not game.in_rotation(&"ph_house"),
 		"switching to the alt rotation takes effect")
-	var ids := (vote.get("source") as DotVoteListSource).choices().map(func(c: DotVoteChoice) -> StringName: return c.id)
+	var ids := (vote.get("source") as GSVoteListSource).choices().map(func(c: GSVoteChoice) -> StringName: return c.id)
 	_check(not ids.has(&"ph_house") and ids.has(&"ph_office"), "and the ballot follows it")
 	_check(not game.rotation_file.switch(game._rot, "nope").ok, "an unknown rotation is refused")
 
@@ -129,13 +129,13 @@ func _check_cycle_draws() -> void:
 		"six draws cycle the two written maps in turn and never leave them", str(drawn))
 
 
-func _module() -> DotModule:
+func _module() -> GSModule:
 	return server.modules.get_module("prophunt") if server != null and server.modules != null else null
 
 
 func _run_command(line: String) -> PackedStringArray:
 	var captured: Array[String] = []
-	var context := DotCmdContext.console("", PackedStringArray())
+	var context := GSCmdContext.console("", PackedStringArray())
 	context.reply_sink = func(text: String) -> void: captured.append(text)
 	server.console.execute(line, context)
 	return PackedStringArray(captured)

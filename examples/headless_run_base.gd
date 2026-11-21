@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## Shared constants and helpers for headless_run.gd: world builders, stepping and driving.
 
@@ -116,7 +116,7 @@ func _end_round(game: PhGame) -> void:
 
 
 func _kill(game: PhGame, victim: PhPlayer, by: PhPlayer) -> void:
-	var damage := DotDamage.make(by.entity_id if by != null else 0, victim.entity_id, 10000.0, null)
+	var damage := GSDamage.make(by.entity_id if by != null else 0, victim.entity_id, 10000.0, null)
 	damage.context = {"why": PhGame.DIED_SHOT}
 	var _applied := game.combat.apply_damage(damage)
 
@@ -143,7 +143,7 @@ func _dispose(game: PhGame) -> void:
 
 
 func _drive(player: PhPlayer, move: Vector2) -> void:
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = player.controller.state.yaw
 	command.move = move
 	player.controller.apply_command(command)
@@ -157,7 +157,7 @@ func _stand_facing(player: PhPlayer, at: Vector3, target: Vector3) -> void:
 
 func _aim(player: PhPlayer, target: Vector3) -> void:
 	var look := target - player.eye_position()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.yaw = rad_to_deg(atan2(-look.x, -look.z))
 	command.pitch = clampf(rad_to_deg(asin(clampf(look.normalized().y, -1.0, 1.0))), -89.0, 89.0)
 	player.controller.state.yaw = command.yaw
@@ -168,16 +168,16 @@ func _aim(player: PhPlayer, target: Vector3) -> void:
 func _fire(player: PhPlayer, on: bool) -> void:
 	var command := player.controller.current_command
 	if command == null:
-		command = DotFpsCommand.new()
-	command.set_button(DotFpsCommand.BUTTON_USER_0, on)
+		command = GSFpsCommand.new()
+	command.set_button(GSFpsCommand.BUTTON_USER_0, on)
 	player.controller.apply_command(command)
 
 
 func _reload(player: PhPlayer, on: bool) -> void:
 	var command := player.controller.current_command
 	if command == null:
-		command = DotFpsCommand.new()
-	command.set_button(DotFpsCommand.BUTTON_USER_2, on)
+		command = GSFpsCommand.new()
+	command.set_button(GSFpsCommand.BUTTON_USER_2, on)
 	player.controller.apply_command(command)
 
 
@@ -201,9 +201,9 @@ static func _spread(turns: Dictionary, ids: Array[StringName]) -> Vector2i:
 ## mp_forcecamera, and a free view survives the wire with nobody in it.
 func _test_free_roam() -> void:
 	_section("free roam: on by default, mp_freeroam and mp_forcecamera refuse it, the mode crosses the wire")
-	var stock_host: DotSpectatorHost = (load("res://game/ph_spectate.gd") as GDScript).new()
+	var stock_host: GSSpectatorHost = (load("res://game/ph_spectate.gd") as GDScript).new()
 	stock_host.tick_rate = TICK_RATE
-	var stock := stock_host.tune_rules(DotSpectatorRules.new())
+	var stock := stock_host.tune_rules(GSSpectatorRules.new())
 	stock_host.free()
 	_check(stock.allow_roaming and stock.force_camera == 0 and stock.roaming_permitted(),
 		"the stock policy allows roaming: the config's spectate_camera gives force_camera 0")
@@ -217,10 +217,10 @@ func _test_free_roam() -> void:
 		"somebody who is out is offered the free camera")
 
 	var res := spec.toggle_roam(dead.player_id)
-	_check(res.ok and spec.is_roaming(dead.player_id) and spec.mode_of(dead.player_id) == DotSpectatorView.Mode.ROAMING,
+	_check(res.ok and spec.is_roaming(dead.player_id) and spec.mode_of(dead.player_id) == GSSpectatorView.Mode.ROAMING,
 		"the key puts them in a free camera", "" if res.ok else res.error.message)
 
-	var cam := DotSpectatorFreeCam.new()
+	var cam := GSSpectatorFreeCam.new()
 	cam.rules = spec.manager.rules
 	cam.seed_from(Transform3D(Basis.IDENTITY, Vector3(0, 2, 0)))
 	var flown := cam.step(Vector3(0, 0, 1), false, false, 1.0)
@@ -249,26 +249,26 @@ func _test_free_roam() -> void:
 	_check(not spec.is_spectating(playing.player_id) and not refused.ok and not spec.can_roam(playing.player_id),
 		"somebody still playing cannot roam")
 
-	var wire := PhEvents.read_spectate(DotNetReader.new(PhEvents.write_spectate(
-		7, DotSpectatorView.Mode.ROAMING, 0, 0, Vector3.ZERO)))
-	_check(bool(wire["ok"]) and int(wire["mode"]) == DotSpectatorView.Mode.ROAMING and int(wire["target"]) == 0,
+	var wire := PhEvents.read_spectate(GSNetReader.new(PhEvents.write_spectate(
+		7, GSSpectatorView.Mode.ROAMING, 0, 0, Vector3.ZERO)))
+	_check(bool(wire["ok"]) and int(wire["mode"]) == GSSpectatorView.Mode.ROAMING and int(wire["target"]) == 0,
 		"a free view crosses the wire as ROAMING with nobody in it")
 
 	var mirror: Node = (load("res://game/ph_spectate.gd") as GDScript).new()
 	mirror.set(&"authoritative", false)
 	mirror.set(&"tick_rate", TICK_RATE)
 	add_child(mirror)
-	var made: DotResult = mirror.call(&"setup")
-	mirror.call(&"apply_view", &"u301", DotSpectatorView.Mode.ROAMING, &"", &"", Vector3.ZERO)
+	var made: GSResult = mirror.call(&"setup")
+	mirror.call(&"apply_view", &"u301", GSSpectatorView.Mode.ROAMING, &"", &"", Vector3.ZERO)
 	_check(made.ok and bool(mirror.call(&"is_roaming", &"u301")) and bool(mirror.call(&"is_spectating", &"u301")),
 		"a mirror told ROAMING with no target is roaming, not 'stopped watching'")
-	var told: DotResult = mirror.call(&"toggle_roam", &"u301")
+	var told: GSResult = mirror.call(&"toggle_roam", &"u301")
 	_check(not told.ok, "a spectating mirror cannot ask to roam; it is told")
 	remove_child(mirror)
 	mirror.free()
 
-	var ask := PhEvents.read_ask_spectate(DotNetReader.new(PhEvents.write_ask_spectate_roam()))
-	var step := PhEvents.read_ask_spectate(DotNetReader.new(PhEvents.write_ask_spectate(1)))
+	var ask := PhEvents.read_ask_spectate(GSNetReader.new(PhEvents.write_ask_spectate_roam()))
+	var step := PhEvents.read_ask_spectate(GSNetReader.new(PhEvents.write_ask_spectate(1)))
 	_check(bool(ask["ok"]) and bool(ask["roam"]) and not bool(step["roam"]) and int(step["direction"]) == 1,
 		"the roam request is its own value of the spectate ask; a step is still a step")
 
@@ -309,7 +309,7 @@ func _test_bodies() -> void:
 	for i in 8:
 		await get_tree().process_frame
 	var world: PhGame = client.get("game")
-	var ragdolls: DotPlayerRagdolls = client.get("ragdolls")
+	var ragdolls: GSPlayerRagdolls = client.get("ragdolls")
 	_check(ragdolls != null and ragdolls.rules == world.ragdoll_rules,
 		"the client keeps the dead under the game's sv_ragdoll* rules")
 	world.wish_side(&"local", PhGame.HUNTERS)
@@ -330,12 +330,12 @@ func _test_bodies() -> void:
 		elif world.team_of(id) == PhGame.PROPS and person != p:
 			prop_bots.append(p)
 	if person != null:
-		var slay := DotDamage.make(0, person.entity_id, person.health.max_health * 10.0, null)
+		var slay := GSDamage.make(0, person.entity_id, person.health.max_health * 10.0, null)
 		slay.tick = world._tick
 		slay.direction = Vector3(1, 0, 0)
 		var _applied: Variant = world.combat.apply_damage(slay)
 		await get_tree().process_frame
-		_check(person.death != null and DotPlayerDeathReactions.stock().has(person.death.reaction),
+		_check(person.death != null and GSPlayerDeathReactions.stock().has(person.death.reaction),
 			"the world picked how the body falls", str(person.death.describe()) if person.death != null else "none")
 		var bodies := ragdolls.live()
 		_check(bodies.size() == 1 and not person.figure.visible,
@@ -370,7 +370,7 @@ func _test_bodies() -> void:
 
 
 ## A found prop bursts (or topples under `prop_death` 1) and leaves no body.
-func _check_prop_bursts(world: PhGame, ragdolls: DotPlayerRagdolls, prop_bots: Array[PhPlayer]) -> void:
+func _check_prop_bursts(world: PhGame, ragdolls: GSPlayerRagdolls, prop_bots: Array[PhPlayer]) -> void:
 	var prop: PhPlayer = null
 	# A prop, disguised and drawn as what it is wearing: found, it bursts and leaves no body.
 	var burst := false
@@ -386,7 +386,7 @@ func _check_prop_bursts(world: PhGame, ragdolls: DotPlayerRagdolls, prop_bots: A
 			await get_tree().process_frame
 		var was := ragdolls.live().size()
 		var shown := prop.prop_model != null and prop.prop_model.visible
-		var slay := DotDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
+		var slay := GSDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
 		slay.tick = world._tick
 		var _applied: Variant = world.combat.apply_damage(slay)
 		await get_tree().process_frame
@@ -398,12 +398,12 @@ func _check_prop_bursts(world: PhGame, ragdolls: DotPlayerRagdolls, prop_bots: A
 		var _back := world.disguise_as(prop.player_id, &"furniture_bookcase_closed")
 		for i in 4:
 			await get_tree().process_frame
-		var again := DotDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
+		var again := GSDamage.make(0, prop.entity_id, prop.health.max_health * 10.0, null)
 		again.tick = world._tick
 		var _hit: Variant = world.combat.apply_damage(again)
 		await get_tree().process_frame
 		var live := ragdolls.live()
-		toppled = live.size() == was + 1 and live[live.size() - 1].style != DotPlayerRagdollRules.Style.RAGDOLL
+		toppled = live.size() == was + 1 and live[live.size() - 1].style != GSPlayerRagdollRules.Style.RAGDOLL
 		world.config.prop_death = 0
 	_check(burst, "a found prop bursts into its own pieces, and leaves no body")
 	_check(toppled, "and under prop_death 1 it topples as the prop, one stiff piece")
@@ -411,20 +411,20 @@ func _check_prop_bursts(world: PhGame, ragdolls: DotPlayerRagdolls, prop_bots: A
 
 ## The fall rides DEATH last and optional; the death sounds are in the catalogue.
 func _check_death_wire() -> void:
-	var fall := DotPlayerDeath.new()
+	var fall := GSPlayerDeath.new()
 	fall.reaction = &"face_plant"
 	fall.roll_seed = 1234
 	fall.direction = Vector3(1, 0, 0)
-	var died := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, fall)))
-	var carried: DotPlayerDeath = died.get("death")
-	var bare := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT)))
+	var died := PhEvents.read_death(GSNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, fall)))
+	var carried: GSPlayerDeath = died.get("death")
+	var bare := PhEvents.read_death(GSNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT)))
 	_check(bool(died["ok"]) and carried != null and carried.reaction == &"face_plant" and carried.roll_seed == 1234
 		and bool(bare["ok"]) and not bare.has("death"),
 		"a DEATH carries the fall the server picked, and one without a fall still reads")
 
-	var catalogue: DotAudioCatalogue = (load("res://game/ph_audio.gd") as GDScript).call("sound_catalogue")
-	var listed := not DotPlayerDeathSounds.rows().is_empty()
-	for row: Dictionary in DotPlayerDeathSounds.rows():
+	var catalogue: GSAudioCatalogue = (load("res://game/ph_audio.gd") as GDScript).call("sound_catalogue")
+	var listed := not GSPlayerDeathSounds.rows().is_empty()
+	for row: Dictionary in GSPlayerDeathSounds.rows():
 		listed = listed and catalogue.find(row["id"]) != null
 	_check(listed, "the death sounds are in the game's catalogue")
 
@@ -440,9 +440,9 @@ func _test_the_map_menu() -> void:
 	await _step(game, 4)
 	var settings := PhSettings.new()
 	add_child(settings)
-	var _built: DotResult = settings.setup(DotSettingsStoreMemory.new())
-	var keys: DotMenuBindings = settings.bindings
-	_check(keys.key_for(DotMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
+	var _built: GSResult = settings.setup(GSSettingsStoreMemory.new())
+	var keys: GSMenuBindings = settings.bindings
+	_check(keys.key_for(GSMenuBindings.MAPS_ACTION) == "M" and keys.defaults_on("M").size() == 1,
 		"the map menu is on M, and nothing else in the table defaults to M",
 		str(keys.defaults_on("M").map(func(r: Dictionary) -> String: return str(r["label"]))))
 	var rows: Array = game.map_rows()
@@ -456,7 +456,7 @@ func _test_the_map_menu() -> void:
 	_check(settings.menu.handle_event(m) and settings.menu.picker.is_open(), "M opens the picker")
 	var wanted: StringName = &""
 	var key := KEY_NONE
-	for row in range(1, DotMenuPicker.PAGE_SIZE + 1):
+	for row in range(1, GSMenuPicker.PAGE_SIZE + 1):
 		var it: Variant = settings.menu.picker.at_row(row)
 		if it is Dictionary and not bool((it as Dictionary)["current"]):
 			wanted = StringName(str((it as Dictionary)["id"]))
@@ -476,7 +476,7 @@ func _test_the_map_menu() -> void:
 	_finished()
 
 
-## B, a hunter's loadout (dot-loadout's DotLoadoutCommand on the world's own manager, as the
+## B, a hunter's loadout (dot-loadout's GSLoadoutCommand on the world's own manager, as the
 ## solo client asks it): a primary and a secondary from the hunters' weapons, in the hands at
 ## once while the hunters are blindfolded, and only from the next round once the seek is on.
 func _test_hunter_loadout() -> void:
@@ -484,7 +484,7 @@ func _test_hunter_loadout() -> void:
 	var game := await _hide_round()
 	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
 	var cmd: Object = game.loadout_command
-	var ready := game.loadouts != null and cmd != null and DotLoadoutKey.is_usable(PhGame.storage_key(hunter.player_id))
+	var ready := game.loadouts != null and cmd != null and GSLoadoutKey.is_usable(PhGame.storage_key(hunter.player_id))
 	_check(ready, "the world keeps loadouts, has the B menu's server half, and a usable key per player")
 	if not ready:
 		_finished()

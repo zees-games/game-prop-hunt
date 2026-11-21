@@ -1,4 +1,4 @@
-extends DotGameNetIo
+extends GSGameNetIo
 
 const PhEvent := preload("ph_event.gd")
 const PhEvents := preload("ph_events.gd")
@@ -15,13 +15,13 @@ const PhGame := preload("../ph_game.gd")
 const PhMapDoc := preload("../ph_map_doc.gd")
 const PhPlayer := preload("../ph_player.gd")
 
-## Joins a [PhGame] to a [DotNetManager]: the netcode seam, and the only file that names both.
+## Joins a [PhGame] to a [GSNetManager]: the netcode seam, and the only file that names both.
 ## Usage: attach(game, net), open_link(...), then server_tick / client_tick; see the dot-game netcode.
 ## The game's tick is whole-world while dot-net ticks per entity; [method ensure_game_ticked] reconciles them.
 
 const CHANNEL := "ph.net"
 
-## Bytes of acknowledgement in front of every input packet. [method DotNetManager.encode_ack].
+## Bytes of acknowledgement in front of every input packet. [method GSNetManager.encode_ack].
 const ACK_BYTES := 4
 
 ## Commands per input packet: this tick's and the four before it, so one lost ENet packet costs no tick.
@@ -55,7 +55,7 @@ signal hit_received(point: Vector3, killed: bool, headshot: bool)
 signal notice_received(text: String)
 
 ## Client side: the server moved this client's own camera. [param mode] is
-## [enum DotSpectatorView.Mode]; the view has already been adopted by the world's mirror.
+## [enum GSSpectatorView.Mode]; the view has already been adopted by the world's mirror.
 signal spectate_received(viewer: int, mode: int, target: int)
 
 ## Client side: somebody else used their weapon [param times] times since the last snapshot; [param kind] is a `ZeeWeaponNet.KIND_*`.
@@ -76,11 +76,11 @@ signal taunt_received(player_id: int, taunt_id: StringName, forced: bool)
 signal decoy_received(amount: float)
 
 ## Somebody pressed Enter. Server side; the bridge carries chat and decides nothing about it.
-## Who may say what is [DotChatRouter]'s, in the services layer.
+## Who may say what is [GSChatRouter]'s, in the services layer.
 signal say_requested(peer_id: int, channel_id: StringName, text: String)
 
 ## A voice frame arrived. Server side; the payload is unparsed and must not be trusted —
-## [method DotVoiceRouter.relay] is what stamps the speaker, from the peer id below.
+## [method GSVoiceRouter.relay] is what stamps the speaker, from the peer id below.
 signal voice_requested(peer_id: int, payload: PackedByteArray)
 
 ## Client side: one routed line, and one voice frame.
@@ -92,11 +92,11 @@ var game: PhGame = null
 ## Which session this process is. Zero on a server.
 var local_player_id: int = 0
 
-## Where a voice frame goes on the server. Assigned by [DotGameModule] to the services
+## Where a voice frame goes on the server. Assigned by [GSGameModule] to the services
 ## layer's `relay_voice`, because the bridge is the only thing that names both ends.
 var voice_relay_fn: Callable = Callable()
 
-## `func(session_id: int) -> DotAvatar`: what a player looks like, asked once as they are
+## `func(session_id: int) -> GSAvatar`: what a player looks like, asked once as they are
 ## seated. Assigned by the module, which is what has the identity layer; unset, or answering
 ## null, is the stock person, which is what everybody was before there was one.
 var avatar_fn: Callable = Callable()
@@ -116,7 +116,7 @@ var _player_of_peer: Dictionary = {}
 var _peer_of_player: Dictionary = {}
 var _ready_peers: Dictionary = {}
 ## Carries the game's profile runtime over this manager; null when the types would not register.
-var profile_link: DotNetProfileLink = null
+var profile_link: GSNetProfileLink = null
 ## Server: peers whose READY came before their seat ([method add_player]), admitted when seated.
 ## Over lossy ENet READY can overtake `loaded`, and dropping it left that client waiting for a world for ever.
 var _ready_unseated: Dictionary = {}
@@ -124,7 +124,7 @@ var _ready_unseated: Dictionary = {}
 var _tick: int = 0
 var _game_ticked_for: int = -1
 
-## Server only: whether [method DotNetManager.server_tick] is on the stack, and the net ids released during it.
+## Server only: whether [method GSNetManager.server_tick] is on the stack, and the net ids released during it.
 ## An entity released mid-tick would leak a lag-compensation track, because `server_tick` still holds the identity list it took earlier.
 ## The ids are forgotten again here once the manager lets go of that list.
 var _in_server_tick := false
@@ -150,16 +150,16 @@ func _exit_tree() -> void:
 		profile_link = null
 
 
-## [param p_game] and [param p_net], in the shape [DotGameNetcode] calls it.
-func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
+## [param p_game] and [param p_net], in the shape [GSGameNetcode] calls it.
+func attach(p_game: Object, p_net: GSNetManager) -> GSResult:
 	var world := p_game as PhGame
 
 	if world == null or p_net == null:
-		return DotResult.fail(DotError.CODE_INVALID, "A bridge needs a world and a manager.")
+		return GSResult.fail(GSError.CODE_INVALID, "A bridge needs a world and a manager.")
 
 	if world.authoritative != p_net.is_server:
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"The world and the manager disagree about who is authoritative.",
 			"world=%s net.is_server=%s" % [world.authoritative, p_net.is_server]
 		)
@@ -176,7 +176,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 	var event := net.messages.register(
 		PhEvent.NAME, PhEvent,
-		DotNetMessage.Delivery.RELIABLE, DotNetMessage.Direction.TO_CLIENT
+		GSNetMessage.Delivery.RELIABLE, GSNetMessage.Direction.TO_CLIENT
 	)
 
 	if not event.ok:
@@ -184,7 +184,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 
 	var request := net.messages.register(
 		PhRequest.NAME, PhRequest,
-		DotNetMessage.Delivery.RELIABLE, DotNetMessage.Direction.TO_SERVER
+		GSNetMessage.Delivery.RELIABLE, GSNetMessage.Direction.TO_SERVER
 	)
 
 	if not request.ok:
@@ -194,7 +194,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 	net.messages.on(PhRequest.NAME, _on_request)
 
 	# Edited profiles reach every client, so a remote admin's panel shows what the server holds; edits themselves go through the remote workbench.
-	profile_link = DotNetProfileLink.attach(net, world.ensure_runtime())
+	profile_link = GSNetProfileLink.attach(net, world.ensure_runtime())
 
 	# Both ends. The server's tick is `server_tick` and the client's is `client_tick`, which
 	# simulates what it predicts and leaves the rest to interpolation. A world still running
@@ -256,7 +256,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		# blindfold.
 		if game.projectiles != null:
 			game.projectiles.launched.connect(func(f: RefCounted) -> void:
-				var spawn: DotWeaponSpawn = f.get(&"spawn")
+				var spawn: GSWeaponSpawn = f.get(&"spawn")
 				var thrower := session_of(game.entities.key_for_id(spawn.owner_entity))
 				_broadcast(PhEvents.Kind.LAUNCH, PhEvents.write_launch(int(f.get(&"id")), spawn, thrower)))
 
@@ -266,7 +266,7 @@ func attach(p_game: Object, p_net: DotNetManager) -> DotResult:
 		_wire_lag_compensation()
 		weapon_net.watch(game.weapon_layer)
 
-	return DotResult.success(true)
+	return GSResult.success(true)
 
 
 ## Hands dot-combat the rewind and restore callables that make lag compensation real.
@@ -287,7 +287,7 @@ func _wire_lag_compensation() -> void:
 	game.combat.restore_fn = func() -> int:
 		return net.history.restore()
 
-	DotLog.debug(CHANNEL, "lag compensation is wired to the netcode's history", {
+	GSLog.debug(CHANNEL, "lag compensation is wired to the netcode's history", {
 		"max_rewind_ms": game.combat.config.max_rewind_ms if game.combat.config != null else 0.0,
 	})
 
@@ -302,7 +302,7 @@ func open_link(parent: Node) -> void:
 	# Not parent.add_child: the link has to sit under `Server` (RPCs route by path) but must
 	# die with this bridge. A bare add_child left a second link after every module reload, and
 	# Godot renamed the live one `@Node@n`, so RPCs to real clients were silently lost.
-	DotGameLink.attach(link, parent, self, PhNetLink.NODE_NAME)
+	GSGameLink.attach(link, parent, self, PhNetLink.NODE_NAME)
 
 
 static func player_key(session_id: int) -> StringName:
@@ -322,10 +322,10 @@ func player_for_peer(peer_id: int) -> int:
 
 
 
-## Puts a connected peer into the game. What [DotGameRoster] calls.
-func add_player(peer_id: int, session_id: int, display_name: String) -> DotResult:
+## Puts a connected peer into the game. What [GSGameRoster] calls.
+func add_player(peer_id: int, session_id: int, display_name: String) -> GSResult:
 	if net == null or not net.is_server:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only the server adds players.")
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "Only the server adds players.")
 
 	if peer_id > 0:
 		# FIRST, because `game.add_player` emits `player_added` and the handler has to be
@@ -338,13 +338,13 @@ func add_player(peer_id: int, session_id: int, display_name: String) -> DotResul
 	if player == null:
 		_player_of_peer.erase(peer_id)
 		_peer_of_player.erase(session_id)
-		return DotResult.fail(DotError.CODE_STATE, "The game refused the player.")
+		return GSResult.fail(GSError.CODE_STATE, "The game refused the player.")
 
 	if _ready_unseated.has(peer_id):
 		_ready_unseated.erase(peer_id)
 		_admit(peer_id)
 
-	return DotResult.success(player)
+	return GSResult.success(player)
 
 
 ## Somebody the world drives itself: a stand-in, or a test's player.
@@ -413,7 +413,7 @@ func _on_player_added(id: StringName) -> void:
 	# Every id on the wire is `u<session>` and anything else parses back to zero, which is also dot-net's broadcast address.
 	# A second player called `bot` would silently replace the first in this table, so it is refused with a line.
 	if player_key(session_id) != id:
-		DotLog.warn(CHANNEL, "a player whose id is not a session key is not replicated", {
+		GSLog.warn(CHANNEL, "a player whose id is not a session key is not replicated", {
 			"id": String(id), "hint": "use add_bot() or PhNetBridge.player_key()",
 		})
 		return
@@ -427,13 +427,13 @@ func _on_player_added(id: StringName) -> void:
 	var registered := net.registry.register(identity, 0, net.clock.tick, net.config)
 
 	if not registered.ok:
-		DotLog.warn(CHANNEL, "could not replicate a player", {"error": str(registered.error)})
+		GSLog.warn(CHANNEL, "could not replicate a player", {"error": str(registered.error)})
 		return
 
 	# Before the JOIN, so the first thing anybody hears about this person is their face.
 	if player.avatar == null and avatar_fn.is_valid():
 		var avatar: Variant = avatar_fn.call(session_id)
-		player.avatar = avatar as DotAvatar if avatar is DotAvatar else null
+		player.avatar = avatar as GSAvatar if avatar is GSAvatar else null
 
 	_broadcast(PhEvents.Kind.JOIN, _join_body(session_id))
 	roster_changed.emit(session_id)
@@ -449,8 +449,8 @@ func _on_player_removed(id: StringName) -> void:
 		roster_changed.emit(session_id)
 
 
-func _build_entity(player: PhPlayer, peer_id: int) -> DotNetIdentity:
-	# The behaviour is added BEFORE the identity: [DotNetIdentity] collects behaviours in
+func _build_entity(player: PhPlayer, peer_id: int) -> GSNetIdentity:
+	# The behaviour is added BEFORE the identity: [GSNetIdentity] collects behaviours in
 	# `_ready` by walking the subtree, and one added afterwards would never be found.
 	var behaviour := PhPlayerNet.new()
 	behaviour.name = "Net"
@@ -458,13 +458,13 @@ func _build_entity(player: PhPlayer, peer_id: int) -> DotNetIdentity:
 	behaviour.bridge = self
 	player.add_child(behaviour)
 
-	var identity := DotNetIdentity.new()
+	var identity := GSNetIdentity.new()
 	identity.name = "Identity"
 	identity.owner_peer_id = peer_id
 	# SHARED: the server corrects, the owner predicts. SERVER would put a player's own
 	# movement a round trip behind their keys, and a prop dashing for a cupboard would arrive a
 	# round trip after the hunter turned the corner.
-	identity.authority = DotNetIdentity.Authority.SHARED
+	identity.authority = GSNetIdentity.Authority.SHARED
 	# [b]Relevant to everybody, except a prop to a hunter while the props hide[/b] — see
 	# [PhInterest]. Not `always_relevant`, which bypasses the rule; and nothing lingers, or the
 	# first second of the hide would still be sent.
@@ -513,7 +513,7 @@ func _on_world_rebuilt() -> void:
 	_map_messages = PhEvents.write_map_parts(encoded, PhMapDoc.PART_BYTES)
 
 	if _map_messages.size() > 1:
-		DotLog.info(CHANNEL, "a large map goes in pieces", {
+		GSLog.info(CHANNEL, "a large map goes in pieces", {
 			"map": String(game.map.id()), "bytes": encoded.size(), "pieces": _map_messages.size(),
 		})
 
@@ -675,7 +675,7 @@ func ensure_game_ticked(tick: int) -> void:
 		behaviour.pull()
 
 
-func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, aim: bool = false) -> void:
+func client_tick(tick: int, command: GSFpsCommand, slot: int = 0, aim: bool = false) -> void:
 	if net == null or net.is_server or game == null:
 		return
 
@@ -684,7 +684,7 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, aim: bool = f
 	var packet := PhNetCommand.new()
 	packet.tick = tick
 	packet.delta = net.clock.tick_duration()
-	packet.move = command if command != null else DotFpsCommand.new()
+	packet.move = command if command != null else GSFpsCommand.new()
 	packet.slot = slot
 	packet.aim = aim
 
@@ -707,8 +707,8 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, aim: bool = f
 
 	if link != null:
 		var payload := net.encode_ack()
-		var writer := DotNetWriter.new()
-		DotNetInput.write_batch(writer, _input_copies(packet))
+		var writer := GSNetWriter.new()
+		GSNetInput.write_batch(writer, _input_copies(packet))
 		payload.append_array(writer.to_bytes())
 		link.send_input(payload)
 
@@ -735,37 +735,37 @@ func client_tick(tick: int, command: DotFpsCommand, slot: int = 0, aim: bool = f
 
 ## [param packet] and the commands before it from the local replay history, oldest first,
 ## for one input packet. See [constant INPUT_COPIES].
-func _input_copies(packet: DotNetInput) -> Array:
+func _input_copies(packet: GSNetInput) -> Array:
 	var batch: Array = Array(net.local_inputs().recent(INPUT_COPIES, packet.tick - 1))
 	batch = batch.slice(maxi(0, batch.size() - (INPUT_COPIES - 1)))
 	batch.append(packet)
 	return batch
 
 
-func receive_input(peer_id: int, payload: PackedByteArray) -> DotResult:
+func receive_input(peer_id: int, payload: PackedByteArray) -> GSResult:
 	if net == null or not net.is_server:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "Only the server takes input.")
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "Only the server takes input.")
 
 	if not _player_of_peer.has(peer_id):
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "That peer has no player.")
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "That peer has no player.")
 
 	if payload.size() <= ACK_BYTES:
-		return DotResult.fail(DotError.CODE_PARSE, "Input packet is too short.")
+		return GSResult.fail(GSError.CODE_PARSE, "Input packet is too short.")
 
 	net.receive_ack_payload(peer_id, payload.slice(0, ACK_BYTES))
 
 	# A batch: this tick's command and the ones before it (see [constant INPUT_COPIES]).
 	# Copies of ticks already simulated are skipped rather than pushed, or each would count
 	# as a late input; the packet's own tick is always pushed, so a late one still counts.
-	var batch := DotNetInput.read_batch(
-		DotNetReader.new(payload.slice(ACK_BYTES)),
-		func() -> DotNetInput: return PhNetCommand.new()
+	var batch := GSNetInput.read_batch(
+		GSNetReader.new(payload.slice(ACK_BYTES)),
+		func() -> GSNetInput: return PhNetCommand.new()
 	)
 	if batch.is_empty():
-		return DotResult.fail(DotError.CODE_PARSE, "Input packet carries no command.")
+		return GSResult.fail(GSError.CODE_PARSE, "Input packet carries no command.")
 	var buffer := net.input_buffer_for(peer_id)
 	var newest := batch[batch.size() - 1]
-	var pushed := DotResult.success(false)
+	var pushed := GSResult.success(false)
 	for input in batch:
 		if input != newest and input.tick <= buffer.last_consumed_tick():
 			continue
@@ -779,28 +779,28 @@ func notice(peer_id: int, text: String) -> void:
 	_tell(peer_id, PhEvents.Kind.NOTICE, PhEvents.write_notice(text))
 
 
-## One routed line to one peer. What [DotGameServices] sends through, via the link.
+## One routed line to one peer. What [GSGameServices] sends through, via the link.
 func send_chat(peer_id: int, wire: Dictionary) -> void:
 	_tell(peer_id, PhEvents.Kind.CHAT, PhEvents.write_chat(wire))
 
 
 ## A voice frame, in whichever direction. Not a [PhEvent].
 ## Voice is fifty packets a second and every event is reliable, so a talk spurt would queue ahead of a taunt.
-## It also bypasses [DotNetManager], whose sealed message set gains nothing from an opaque blob; [DotVoicePacket] has its own header.
-func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
+## It also bypasses [GSNetManager], whose sealed message set gains nothing from an opaque blob; [GSVoicePacket] has its own header.
+func receive_voice(peer_id: int, payload: PackedByteArray) -> GSResult:
 	if payload.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "An empty voice frame.")
+		return GSResult.fail(GSError.CODE_INVALID, "An empty voice frame.")
 
 	if net != null and net.is_server:
 		if peer_id <= 0 or player_for_peer(peer_id) == 0:
 			# A peer with nobody in the world. Refused rather than relayed: the router
 			# stamps the speaker from this id, so relaying one that belongs to nobody puts
 			# a voice in the game with no name on it.
-			return DotResult.fail(
-				DotError.CODE_FORBIDDEN, "That peer has nobody in the world."
+			return GSResult.fail(
+				GSError.CODE_FORBIDDEN, "That peer has nobody in the world."
 			)
 
-		# One path or the other, never both: [DotGameModule] assigns `voice_relay_fn` to the services layer's `relay_voice`.
+		# One path or the other, never both: [GSGameModule] assigns `voice_relay_fn` to the services layer's `relay_voice`.
 		# Also connecting `voice_requested` to the same router would relay every frame twice, doubling the rate limit and
 		# sending the jitter buffer's sequence number backwards.
 		if voice_relay_fn.is_valid():
@@ -808,13 +808,13 @@ func receive_voice(peer_id: int, payload: PackedByteArray) -> DotResult:
 		else:
 			voice_requested.emit(peer_id, payload)
 
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	voice_arrived.emit(payload)
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
-func _on_request(message: DotNetMessage) -> void:
+func _on_request(message: GSNetMessage) -> void:
 	var ask := message as PhRequest
 
 	if ask == null or net == null or not net.is_server:
@@ -833,7 +833,7 @@ func _on_request(message: DotNetMessage) -> void:
 
 			if bool(said["ok"]):
 				# Emitted rather than acted on: everything about what a line means is
-				# [DotChatRouter]'s, and the router is the module's.
+				# [GSChatRouter]'s, and the router is the module's.
 				say_requested.emit(
 					peer_id, StringName(str(said["channel"])), str(said["text"])
 				)
@@ -868,7 +868,7 @@ func _spectate_step(peer_id: int, direction: int, roam: bool = false) -> void:
 	if session_id == 0 or game.spectate == null:
 		return
 
-	var moved: DotResult = game.spectate.toggle_roam(player_key(session_id)) if roam \
+	var moved: GSResult = game.spectate.toggle_roam(player_key(session_id)) if roam \
 		else game.spectate.step(player_key(session_id), direction)
 
 	if not moved.ok:
@@ -950,7 +950,7 @@ func _join_body(session_id: int) -> PackedByteArray:
 ## Tells everybody who somebody is now: a late profile, a wardrobe change, an operator's rename. Server only.
 ## Through JOIN, which a client applies idempotently to a player it has, so no second "changed" message is needed.
 ## An empty [param display_name] keeps the current one.
-func refresh_player(session_id: int, display_name: String, avatar: DotAvatar) -> bool:
+func refresh_player(session_id: int, display_name: String, avatar: GSAvatar) -> bool:
 	if net == null or not net.is_server or game == null:
 		return false
 
@@ -1053,7 +1053,7 @@ func _ask(kind: int, body: PackedByteArray) -> void:
 	net.send(PhRequest.new(kind, body), 1)
 
 
-func _on_event(message: DotNetMessage) -> void:
+func _on_event(message: GSNetMessage) -> void:
 	var event := message as PhEvent
 
 	if event == null or game == null or net == null or net.is_server:
@@ -1172,7 +1172,7 @@ func _on_event(message: DotNetMessage) -> void:
 				game.apply_disguise_wire(id, worn["wire"])
 				if wearer != null:
 					# What the HUD reads to say "press Q to hide again".
-					wearer.set_aside = DotPropDisguise.new() if bool(worn["revealed"]) else null
+					wearer.set_aside = GSPropDisguise.new() if bool(worn["revealed"]) else null
 				disguise_received.emit(int(worn["player_id"]), bool(worn["revealed"]))
 		PhEvents.Kind.TAUNT:
 			var heard := PhEvents.read_taunt(reader)
@@ -1192,7 +1192,7 @@ func _on_event(message: DotNetMessage) -> void:
 
 
 ## A round began or ended: the number, the clocks and (on a start) every broken piece.
-func _apply_round(reader: DotNetReader) -> void:
+func _apply_round(reader: GSNetReader) -> void:
 	var round_info := PhEvents.read_round(reader)
 
 	if not bool(round_info["ok"]):
@@ -1215,7 +1215,7 @@ func _apply_round(reader: DotNetReader) -> void:
 	)
 
 
-func _apply_hello(reader: DotNetReader) -> void:
+func _apply_hello(reader: GSNetReader) -> void:
 	var hello := PhEvents.read_hello(reader)
 
 	if not bool(hello["ok"]):
@@ -1258,16 +1258,16 @@ func _adopt_tick_rate(rate: int) -> void:
 	# The LIVE one, which is built from the config back at `setup()` and is therefore not
 	# updated by writing the config alone.
 	net.clock.tick_rate = game.tick_rate
-	# dot-net API 7 has DotNetClock.adopt_tick_rate(), which also raises the engine's step cap to
+	# dot-net API 7 has GSNetClock.adopt_tick_rate(), which also raises the engine's step cap to
 	# a quarter second of ticks, so a slow-frame client keeps up with the server. A shell built
 	# before it gets the same rule here; remove this branch when the oldest shell is API 7.
-	if DotAddonApi.build_level("dot_net") >= 7:
-		DotNetClock.adopt_tick_rate(game.tick_rate)
+	if GSAddonApi.build_level("dot_net") >= 7:
+		GSNetClock.adopt_tick_rate(game.tick_rate)
 	else:
 		Engine.max_physics_steps_per_frame = maxi(Engine.max_physics_steps_per_frame, ceili(0.25 * float(game.tick_rate)))
 		Engine.physics_ticks_per_second = game.tick_rate
 
-	DotLog.info(CHANNEL, "adopted the server's tick rate", {
+	GSLog.info(CHANNEL, "adopted the server's tick rate", {
 		"was": before, "now": game.tick_rate, "engine": Engine.physics_ticks_per_second,
 	})
 
@@ -1305,7 +1305,7 @@ func _register_toys() -> void:
 ## A toy's behaviour and identity under [param parent], registered under [param net_id] (0
 ## allocates: the server); null when the registry refused it. The behaviour before the
 ## identity, which collects behaviours in its `_ready`.
-func _toy_entity(toy: DotPropBody, parent: Node, net_id: int) -> PhToyNet:
+func _toy_entity(toy: GSPropBody, parent: Node, net_id: int) -> PhToyNet:
 	var behaviour := PhToyNet.new()
 	behaviour.name = "Net"
 	behaviour.toy = toy
@@ -1317,17 +1317,17 @@ func _toy_entity(toy: DotPropBody, parent: Node, net_id: int) -> PhToyNet:
 	at.add_child(behaviour)
 	if net.is_server:
 		behaviour.pull()
-	var identity := DotNetIdentity.new()
+	var identity := GSNetIdentity.new()
 	identity.name = "Identity"
 	identity.owner_peer_id = 0
-	identity.authority = DotNetIdentity.Authority.SERVER
+	identity.authority = GSNetIdentity.Authority.SERVER
 	# Under [PhInterest]: no toy to a hunter while the props hide.
 	identity.always_relevant = false
 	identity.interest_linger_sec = 0.0
 	at.add_child(identity)
 	var registered := net.registry.register(identity, net_id, net.clock.tick, net.config)
 	if not registered.ok:
-		DotLog.warn(CHANNEL, "could not replicate a toy", {"toy": _toy_nets.size(), "error": str(registered.error)})
+		GSLog.warn(CHANNEL, "could not replicate a toy", {"toy": _toy_nets.size(), "error": str(registered.error)})
 		at.remove_child(behaviour)
 		at.remove_child(identity)
 		behaviour.queue_free()
@@ -1387,7 +1387,7 @@ func _pair_pending_toys() -> void:
 		return
 	var box := game.map.toys if game.map != null and game.map.toys != null and game.map.id() == _toys_map else null
 	if box != null and box.count() != _toy_nets.size():
-		DotLog.warn(CHANNEL, "the server's map has a different number of toys", {"server": _toy_nets.size(), "here": box.count()})
+		GSLog.warn(CHANNEL, "the server's map has a different number of toys", {"server": _toy_nets.size(), "here": box.count()})
 	for i in range(_toy_nets.size()):
 		var behaviour: PhToyNet = _toy_nets[i]
 		behaviour.toy = box.toy(i) if box != null else null
@@ -1411,7 +1411,7 @@ func toy_count() -> int:
 
 ## The map, which on a client is a document it builds exactly as the server did: whole, or
 ## from its pieces once all of them are in ([code]ph_map_join.gd[/code]).
-func _apply_map(reader: DotNetReader, in_parts: bool) -> void:
+func _apply_map(reader: GSNetReader, in_parts: bool) -> void:
 	var told := PhEvents.read_map_part(reader) if in_parts else PhEvents.read_map(reader)
 
 	if not bool(told["ok"]) or game == null:
@@ -1423,7 +1423,7 @@ func _apply_map(reader: DotNetReader, in_parts: bool) -> void:
 		map_received.emit(game.map.id())
 
 
-func _apply_join(reader: DotNetReader) -> void:
+func _apply_join(reader: GSNetReader) -> void:
 	var join := PhEvents.read_join(reader)
 
 	if not bool(join["ok"]):
@@ -1453,7 +1453,7 @@ func _apply_join(reader: DotNetReader) -> void:
 		)
 
 		if not registered.ok:
-			DotLog.warn(CHANNEL, "could not mirror a player", {"error": str(registered.error)})
+			GSLog.warn(CHANNEL, "could not mirror a player", {"error": str(registered.error)})
 			return
 	else:
 		player.display_name = str(join["name"])
@@ -1493,13 +1493,13 @@ func _claim_local_player() -> void:
 	if claimed == 0 or mine.identity.owner_peer_id == claimed:
 		return
 
-	DotLog.debug(CHANNEL, "claimed the local player after HELLO", {
+	GSLog.debug(CHANNEL, "claimed the local player after HELLO", {
 		"session": local_player_id, "net_id": mine.identity.net_id,
 	})
 	var _changed := net.registry.change_owner(mine.identity.net_id, claimed)
 
 
-func _apply_clock(reader: DotNetReader) -> void:
+func _apply_clock(reader: GSNetReader) -> void:
 	var clock := PhEvents.read_clock(reader)
 
 	if not bool(clock["ok"]):

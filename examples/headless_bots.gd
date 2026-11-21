@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
@@ -102,7 +102,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	Engine.physics_ticks_per_second = 1920
 	Engine.max_physics_steps_per_frame = 64
 	_run.call_deferred()
@@ -118,8 +118,8 @@ func _run() -> void:
 	print("")
 	var args := OS.get_cmdline_user_args()
 	var ci := OS.get_environment("CI") == "true"
-	var shard := DotGameShardArgs.shard()
-	var merge_logs := DotGameShardArgs.merge_logs()
+	var shard := GSGameShardArgs.shard()
+	var merge_logs := GSGameShardArgs.merge_logs()
 	var rounds := maxi(1, int(_arg(args, "--rounds", str(CI_ROUNDS if ci else 96))))
 	if shard != "":
 		# The map's share of the whole run: the rounds the one run plays on it.
@@ -135,7 +135,7 @@ func _run() -> void:
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var results: Array[Dictionary] = []
 
-	if DotGameShardArgs.is_merge():
+	if GSGameShardArgs.is_merge():
 		results = _load_rounds(merge_logs)
 		rounds = 0
 		_section("%d rounds of stand-ins at %s, merged from %d logs" % [results.size(), difficulty, merge_logs.size()])
@@ -357,7 +357,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 	game.register_service = false
 	add_child(game)
 	game.set_physics_process(false)
-	var _set := DotBotSettings.of(game).set_difficulty(difficulty)
+	var _set := GSBotSettings.of(game).set_difficulty(difficulty)
 	await get_tree().physics_frame
 
 	for i in range(BOTS):
@@ -511,7 +511,7 @@ func _round(map_id: String, index: int, difficulty: String) -> Dictionary:
 ## hunter that thinks like the annotator would sweep first. Empty with no mesh.
 static func _top_places(game: PhGame) -> PackedVector3Array:
 	var out := PackedVector3Array()
-	var annotations: DotNpcAiNavAnnotations = game.bots.annotations
+	var annotations: GSNpcAiNavAnnotations = game.bots.annotations
 	if annotations == null:
 		return out
 	var ranked: Array[Dictionary] = []
@@ -615,8 +615,8 @@ func _watchers(game: PhGame) -> PackedVector3Array:
 	if not _watch_cache.has(key):
 		_watch_cache.clear()
 		var out := PackedVector3Array()
-		var stream := DotRandomStream.new(4242, &"bots_suite")
-		var nav: DotBotNav = game.bots.nav
+		var stream := GSRandomStream.new(4242, &"bots_suite")
+		var nav: GSBotNav = game.bots.nav
 		if nav.is_ready():
 			for _i in range(WATCHERS):
 				out.append(nav.random_point(stream) + Vector3(0.0, 1.6, 0.0))

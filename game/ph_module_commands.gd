@@ -1,4 +1,4 @@
-extends DotGameModule
+extends GSGameModule
 
 ## The console commands of PhModule that read the world and change nothing else; ph_module.gd adds the load, the wiring and the rest.
 
@@ -7,7 +7,7 @@ const PhServices := preload("ph_services.gd")
 const PhGame := preload("ph_game.gd")
 
 
-func _cmd_wish(ctx: DotCmdContext, side: int) -> void:
+func _cmd_wish(ctx: GSCmdContext, side: int) -> void:
 	var world := game as PhGame
 	if world == null or ctx.session == null:
 		ctx.reply("Only a player can choose a side.")
@@ -22,7 +22,7 @@ func _cmd_wish(ctx: DotCmdContext, side: int) -> void:
 	)
 
 
-func _cmd_say(ctx: DotCmdContext) -> void:
+func _cmd_say(ctx: GSCmdContext) -> void:
 	var text := ctx.rest()
 
 	if text.strip_edges() == "":
@@ -35,14 +35,14 @@ func _cmd_say(ctx: DotCmdContext) -> void:
 
 	var announced: Variant = services.get("chat").call("announce", text, PhServices.CH_ALL)
 
-	if announced is DotResult and not (announced as DotResult).ok:
+	if announced is GSResult and not (announced as GSResult).ok:
 		ctx.reply_error(announced)
 		return
 
 	ctx.reply("Said: %s" % text)
 
 
-func _cmd_status(ctx: DotCmdContext) -> void:
+func _cmd_status(ctx: GSCmdContext) -> void:
 	var world := game as PhGame
 
 	if world == null:
@@ -52,7 +52,7 @@ func _cmd_status(ctx: DotCmdContext) -> void:
 	ctx.reply_lines(world.describe_lines())
 
 
-func _cmd_net(ctx: DotCmdContext) -> void:
+func _cmd_net(ctx: GSCmdContext) -> void:
 	if bridge == null:
 		ctx.reply("No bridge; this server is not replicating anything.")
 		return
@@ -63,7 +63,7 @@ func _cmd_net(ctx: DotCmdContext) -> void:
 		ctx.reply_lines(services.call("describe_lines"))
 
 
-func _cmd_maps(ctx: DotCmdContext) -> void:
+func _cmd_maps(ctx: GSCmdContext) -> void:
 	var world := game as PhGame
 
 	if world == null or world.catalogue == null:
@@ -74,7 +74,7 @@ func _cmd_maps(ctx: DotCmdContext) -> void:
 	ctx.reply("playing: %s" % str(world.map_doc.get("id", "-")))
 
 
-func _cmd_map(ctx: DotCmdContext) -> void:
+func _cmd_map(ctx: GSCmdContext) -> void:
 	var world := game as PhGame
 	var id := StringName(ctx.arg(0)) if ctx.argc() > 0 else &""
 
@@ -90,7 +90,7 @@ func _cmd_map(ctx: DotCmdContext) -> void:
 	ctx.reply("%s is next, from the end of this round." % String(id))
 
 
-func _cmd_taunts(ctx: DotCmdContext) -> void:
+func _cmd_taunts(ctx: GSCmdContext) -> void:
 	var world := game as PhGame
 
 	if world == null or world.taunts == null:

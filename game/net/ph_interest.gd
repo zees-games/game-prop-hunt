@@ -1,4 +1,4 @@
-extends DotNetInterest
+extends GSNetInterest
 
 const PhGame := preload("../ph_game.gd")
 const PhPlayer := preload("../ph_player.gd")
@@ -16,7 +16,7 @@ func _init() -> void:
 	evaluation_interval_sec = 0.0
 
 
-func _is_relevant(observer: DotNetIdentity, entity: DotNetIdentity, _context: Dictionary) -> bool:
+func _is_relevant(observer: GSNetIdentity, entity: GSNetIdentity, _context: Dictionary) -> bool:
 	if game == null or observer == null or entity == null:
 		return true
 
@@ -30,7 +30,7 @@ func _is_relevant(observer: DotNetIdentity, entity: DotNetIdentity, _context: Di
 
 	# A toy: not to a hunter while the props hide, or a ball rolling away from where a prop just
 	# walked would be that prop on the wire. Sent as it stands when the seek starts.
-	if entity.get_parent() is DotPropBody:
+	if entity.get_parent() is GSPropBody:
 		return game.team_of(watcher.player_id) != PhGame.HUNTERS
 
 	var seen := entity.get_parent() as PhPlayer

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## Section counting and the exit probe for dedicated.gd: a second copy of the suite whose exit nothing in-process can read.
 

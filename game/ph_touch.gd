@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## The phone's controls: dot-mobile's stick, drag-look and buttons over the HUD, driving the client's own [DotFpsTouchSampler].
+## The phone's controls: dot-mobile's stick, drag-look and buttons over the HUD, driving the client's own [GSFpsTouchSampler].
 ## The buttons are the side's: a hunter's fire, reload and aim, a prop's swap, lock and taunt, and jump for both
 ## ([method touch_layout]). Which set shows follows the side ([method show_for]); the client turns a press into what the
 ## key would have done. Auto-fire is the server's (`sv_autofire`, off here): a hunter pays in health for every piece of
@@ -13,8 +13,8 @@ signal released(id: StringName)
 
 const MAX_RANGE := 60.0
 
-var controls: DotMobileControls = null
-## The DotGameClient that fits the buttons each time the set changes.
+var controls: GSMobileControls = null
+## The GSGameClient that fits the buttons each time the set changes.
 var client: Object = null
 ## The PhClient: its player, game and camera, read by the crosshair and the live test.
 var owner_client: Node = null
@@ -22,18 +22,18 @@ var _hunter: bool = false
 var _loadout: bool = false
 
 ## dot-ui's buttons inside the overlay.
-var buttons: DotTouchButtons:
+var buttons: GSTouchButtons:
 	get:
 		return controls.buttons if controls != null else null
 
 
 ## Whether this device wants them.
 static func wanted() -> bool:
-	return DotPlatform.has_touch()
+	return GSPlatform.has_touch()
 
 
 ## dot-game's fps preset, cut to what the side uses. A hunter keeps fire and reload and adds aim (and gear on a host with a loadout menu); a prop swaps fire for swap, lock and taunt. Jump keeps its home for both.
-static func touch_layout(hunter: bool, loadout: bool = false) -> DotGameTouchLayout:
+static func touch_layout(hunter: bool, loadout: bool = false) -> GSGameTouchLayout:
 	var cut := {&"alt": null, &"crouch": null, &"use": null, &"next": null, &"prev": null, &"board": null, &"chat": null}
 	if hunter:
 		cut[&"aim"] = {"slot": &"secondary", "label": "AIM"}
@@ -45,10 +45,10 @@ static func touch_layout(hunter: bool, loadout: bool = false) -> DotGameTouchLay
 		cut[&"disguise"] = {"slot": &"primary", "label": "SWAP"}
 		cut[&"lock"] = {"slot": &"secondary", "label": "LOCK"}
 		cut[&"taunt"] = {"slot": &"inner", "label": "TAUNT"}
-	var res := DotGameTouchLayout.build(DotGameTouchLayout.FPS, cut)
+	var res := GSGameTouchLayout.build(GSGameTouchLayout.FPS, cut)
 	if not res.ok:
 		push_error("mg-prop-hunt touch layout refused: %s" % str(res.error))
-		return DotGameTouchLayout.custom()
+		return GSGameTouchLayout.custom()
 	return res.value
 
 
@@ -57,7 +57,7 @@ static func rows(hunter: bool, loadout: bool = false) -> Array[Dictionary]:
 	var out := touch_layout(hunter, loadout).buttons()
 	for row in out:
 		if row["id"] == &"jump":
-			row["hold"] = DotFpsCommand.BUTTON_JUMP
+			row["hold"] = GSFpsCommand.BUTTON_JUMP
 	return out
 
 
@@ -67,7 +67,7 @@ func _init() -> void:
 
 
 ## Wires the overlay into [param host] on [param sampler]: its buttons go to [param on_button] (id, down).
-func attach(host: Node, platform: Object, sampler: DotFpsSampler, rules: DotMobileRules, on_button: Callable) -> void:
+func attach(host: Node, platform: Object, sampler: GSFpsSampler, rules: GSMobileRules, on_button: Callable) -> void:
 	client = platform
 	owner_client = host
 	build(sampler, rules)
@@ -77,8 +77,8 @@ func attach(host: Node, platform: Object, sampler: DotFpsSampler, rules: DotMobi
 
 
 ## Builds the overlay on [param sampler], following [param rules] (the server's; null keeps dot-mobile's defaults).
-func build(sampler: DotFpsSampler, rules: DotMobileRules = null) -> void:
-	controls = DotMobileControls.new()
+func build(sampler: GSFpsSampler, rules: GSMobileRules = null) -> void:
+	controls = GSMobileControls.new()
 	controls.name = "TouchControls"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	if rules != null:
@@ -96,8 +96,8 @@ func build(sampler: DotFpsSampler, rules: DotMobileRules = null) -> void:
 
 ## Another sampler (offline play keeps one on the player): the overlay drives it from now on.
 ## A thumb on FIRE sets the client's `_firing`; auto-fire (`sv_autofire`, off by default) is read through [method is_held].
-func bind_sampler(sampler: DotFpsSampler) -> void:
-	if controls != null and sampler is DotFpsTouchSampler and sampler != controls.sampler:
+func bind_sampler(sampler: GSFpsSampler) -> void:
+	if controls != null and sampler is GSFpsTouchSampler and sampler != controls.sampler:
 		controls.setup(sampler, rows(_hunter, _loadout))
 		_fit()
 
@@ -166,12 +166,12 @@ func _fit() -> void:
 func _crosshair() -> int:
 	var host := owner_client
 	if not is_instance_valid(host) or not host.is_inside_tree():
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	var cam := host.get_viewport().get_camera_3d()
 	var game: Object = host.get(&"game")
 	var me: Object = host.get(&"player")
 	if cam == null or game == null or me == null:
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	var hulls: Array[Dictionary] = []
 	for p: Object in game.players.values():
 		if p == me or not is_instance_valid(p) or not p.is_alive():
@@ -199,16 +199,16 @@ static func crosshair_kind(eye: Vector3, forward: Vector3, hulls: Array, space: 
 			best_t = t
 			best = h
 	if best.is_empty():
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	if bool(best["friend"]):
-		return DotMobileAutoFire.TARGET_FRIEND
+		return GSMobileAutoFire.TARGET_FRIEND
 	if best_t > MAX_RANGE:
-		return DotMobileAutoFire.TARGET_NONE
+		return GSMobileAutoFire.TARGET_NONE
 	if space != null and mask != 0:
 		var at: Vector3 = (best["feet"] as Vector3) + Vector3(0.0, float(best["height"]) * 0.5, 0.0)
 		if not space.intersect_ray(PhysicsRayQueryParameters3D.create(eye, at, mask)).is_empty():
-			return DotMobileAutoFire.TARGET_NONE
-	return DotMobileAutoFire.TARGET_ENEMY
+			return GSMobileAutoFire.TARGET_NONE
+	return GSMobileAutoFire.TARGET_ENEMY
 
 
 ## Distance along [param dir] (unit) to the closest approach of the vertical segment feet..feet+height when it passes

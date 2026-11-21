@@ -33,9 +33,9 @@ func _set_vote_hooks(world: PhGame) -> void:
 				out.append([id, str((world.catalogue.maps.get(id, {}) as Dictionary).get("name", id))])
 
 		return out
-	vote.apply_fn = func(id: StringName) -> DotResult:
+	vote.apply_fn = func(id: StringName) -> GSResult:
 		world.next_map_id = id
-		return DotResult.success(id)
+		return GSResult.success(id)
 	vote.due_fn = func() -> bool:
 		return world.rounds_left_on_map() <= 1
 	vote.voters_fn = func() -> Array:
@@ -62,7 +62,7 @@ func _set_vote_hooks(world: PhGame) -> void:
 			server.broadcast_message(line)
 	vote.is_admin_fn = func(voter: StringName) -> bool:
 		var session := server.session_by_userid(String(voter).to_int()) if server != null else null
-		return session != null and session.has_permission(DotAdminFlags.CHANGEMAP)
+		return session != null and session.has_permission(GSAdminFlags.CHANGEMAP)
 	vote.ballot_fn = func(state: Dictionary) -> void:
 		if server == null:
 			return
@@ -70,7 +70,7 @@ func _set_vote_hooks(world: PhGame) -> void:
 		for session in server.playing_sessions():
 			var data := state.duplicate()
 			data["you"] = str(session.userid)
-			server.send_notice(session, DotNotice.make(
+			server.send_notice(session, GSNotice.make(
 				&"", "", float(state.get("seconds", -1.0)), MAP_BALLOT_TOPIC, data
 			))
 	vote.people_fn = func(voter: StringName) -> Dictionary:
@@ -104,13 +104,13 @@ func _build_vote(world: PhGame) -> void:
 	var ready := vote.setup()
 
 	if not ready.ok:
-		DotLog.result(CHANNEL, "the map vote; the rotation alone chooses", ready)
+		GSLog.result(CHANNEL, "the map vote; the rotation alone chooses", ready)
 		vote.queue_free()
 		vote = null
 		return
 
 	var commanded := vote.install_commands(self)
-	DotLog.result(CHANNEL, "the map vote's commands", commanded)
+	GSLog.result(CHANNEL, "the map vote's commands", commanded)
 
 	# The map menu (M), dot-vote's: a player holding the owner's `sv_map_menu_flag` changes the
 	# map now, not after its rounds, and sees the same rows a solo player does. Read by name,
@@ -141,7 +141,7 @@ func _build_vote(world: PhGame) -> void:
 	)
 
 	if server != null:
-		server.client_disconnected.connect(func(session: DotClientSession, _reason: String) -> void:
+		server.client_disconnected.connect(func(session: GSClientSession, _reason: String) -> void:
 			if vote != null:
 				vote.forget_voter(StringName(str(session.userid)))
 		)

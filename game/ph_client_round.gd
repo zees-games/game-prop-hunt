@@ -15,19 +15,19 @@ const CHANNEL := "ph.client"
 var game: PhGame = null
 var player: PhPlayer = null
 var hud: PhHud = null
-var board: DotMenuScoreboard = null
-var chat: DotGameChatClient = null
+var board: GSMenuScoreboard = null
+var chat: GSGameChatClient = null
 var settings: PhSettings = null
 var view_model: ZeeViewModel = null
-var net: DotNetManager = null
+var net: GSNetManager = null
 ## Records every frame and replays the round's last moment ([PhKillcam]); then the reveal.
 var killcam: PhKillcam = null
-var winner_reveal: DotWinnerReveal = null
+var winner_reveal: GSWinnerReveal = null
 ## The server's `mp_killcam_time`; -1 until it has said, so the config's number stands.
 var _killcam_sec: float = -1.0
 
-## The server's `mp_killview_camera` ([enum DotKillViewRules.Camera]); the eye until it has said.
-var _killcam_camera: int = DotKillViewRules.Camera.EYE
+## The server's `mp_killview_camera` ([enum GSKillViewRules.Camera]); the eye until it has said.
+var _killcam_camera: int = GSKillViewRules.Camera.EYE
 var _round_ending: bool = false
 var _round_end_number: int = 0
 var _round_end_winner: int = 0
@@ -36,8 +36,8 @@ var _round_board_open: bool = false
 var _hud_was_visible: bool = true
 var _started_msec: int = Time.get_ticks_msec()
 ## dot-game's client platform: the cover, settings and menu, console, HUD theme, Tab, M, the
-## pointer and the input block. See [DotGameClient].
-var platform: DotGameClient = null
+## pointer and the input block. See [GSGameClient].
+var platform: GSGameClient = null
 
 
 func _dress_board() -> void:
@@ -46,11 +46,11 @@ func _dress_board() -> void:
 
 	board.title_text = "Prop Hunt"
 	board.columns = [
-		{"key": &"avatar", "kind": DotMenuScoreboard.KIND_AVATAR, "width": 0.0},
+		{"key": &"avatar", "kind": GSMenuScoreboard.KIND_AVATAR, "width": 0.0},
 		{"key": &"name", "title": "Player", "width": 3.0},
-		{"key": &"points", "title": "Points", "kind": DotMenuScoreboard.KIND_NUMBER},
-		{"key": &"seconds", "title": "Time", "kind": DotMenuScoreboard.KIND_DURATION},
-		{"key": &"ping", "title": "Ping", "kind": DotMenuScoreboard.KIND_PING},
+		{"key": &"points", "title": "Points", "kind": GSMenuScoreboard.KIND_NUMBER},
+		{"key": &"seconds", "title": "Time", "kind": GSMenuScoreboard.KIND_DURATION},
+		{"key": &"ping", "title": "Ping", "kind": GSMenuScoreboard.KIND_PING},
 	]
 	board.sort_by = &"points"
 	board.decorate = _decorate_row
@@ -155,7 +155,7 @@ func _on_killcam_cvar(cvar_name: String, value: String) -> void:
 	if cvar_name == "mp_killcam_time" and value.strip_edges().is_valid_float():
 		_killcam_sec = maxf(value.to_float(), 0.0)
 	elif cvar_name == "mp_killview_camera" and value.strip_edges().is_valid_float():
-		_killcam_camera = DotKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else DotKillViewRules.Camera.EYE
+		_killcam_camera = GSKillViewRules.Camera.BEHIND if value.to_float() >= 0.5 else GSKillViewRules.Camera.EYE
 
 
 func _begin_round_end(number: int, winner: int, why: String) -> void:
@@ -174,7 +174,7 @@ func _begin_round_end(number: int, winner: int, why: String) -> void:
 				break
 	killcam.hide_while_playing = [hud, chat.window if chat != null else null, view_model, platform.hud if platform != null else null]
 	if killcam.round_ended():
-		DotLog.debug(CHANNEL, "the winner waits for the killcam")
+		GSLog.debug(CHANNEL, "the winner waits for the killcam")
 
 
 ## The winning side and its best three, after the killcam and before the board.
@@ -195,7 +195,7 @@ func _reveal_round() -> void:
 	var title := "%s WIN" % game.side_name(_round_end_winner).to_upper() if _round_end_winner != 0 else "DRAW"
 	var shown := winner_reveal.present(entries, {"title": title,
 		"subtitle": _round_end_why.substr(0, 1).to_upper() + _round_end_why.substr(1) if _round_end_why != "" else "Round %d" % _round_end_number,
-		"hint": "Jump to skip"}) if not entries.is_empty() else DotResult.fail(DotError.CODE_INVALID, "nobody to show")
+		"hint": "Jump to skip"}) if not entries.is_empty() else GSResult.fail(GSError.CODE_INVALID, "nobody to show")
 	if not shown.ok:
 		_open_round_board()
 		return

@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhTouch := preload("../game/ph_touch.gd")
 
@@ -9,7 +9,7 @@ const CHECKS := 46
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -23,7 +23,7 @@ func _run() -> void:
 			ids.append(b["id"])
 		_check(ids.size() >= 4, "%s: the layout has its buttons" % label)
 		for size: Vector2 in [Vector2(844, 390), Vector2(667, 375), Vector2(932, 430)]:
-			var buttons := DotTouchButtons.new()
+			var buttons := GSTouchButtons.new()
 			buttons.size = size
 			buttons.set_buttons(layout)
 			add_child(buttons)
@@ -41,12 +41,12 @@ func _run() -> void:
 	_check(hunter.validate().ok and prop.validate().ok, "both sets validate (no alias id, no button too small or touching)")
 	_check(hunter.row(&"fire")["offset"] == Vector2(80, 84) and hunter.row(&"jump")["offset"] == prop.row(&"jump")["offset"], "fire and jump sit in the family's homes, jump unmoved between sides")
 	_check(not prop.has(&"fire") and prop.has(&"disguise") and hunter.has(&"loadout") and not hunter.has(&"crouch"), "a prop swaps fire for swap; a hunter has gear and no duck")
-	DotPlatform.touch_override = 0
-	var off := DotTouchButtons.new()
+	GSPlatform.touch_override = 0
+	var off := GSTouchButtons.new()
 	add_child(off)
 	_check(not off.visible, "no touch: the buttons are hidden")
 	off.free()
-	DotPlatform.touch_override = -1
+	GSPlatform.touch_override = -1
 	_overlay()
 	_crosshair()
 	_report(CHECKS)
@@ -64,7 +64,7 @@ class FakeClient extends Node:
 		return live
 
 
-func _tap(controls: DotMobileControls, at: Vector2, down: bool, index: int = 0) -> void:
+func _tap(controls: GSMobileControls, at: Vector2, down: bool, index: int = 0) -> void:
 	var e := InputEventScreenTouch.new()
 	e.index = index
 	e.position = at
@@ -76,8 +76,8 @@ func _tap(controls: DotMobileControls, at: Vector2, down: bool, index: int = 0) 
 
 
 func _overlay() -> void:
-	var rules := DotMobileRules.new()
-	var prefs := DotMobilePrefs.new()
+	var rules := GSMobileRules.new()
+	var prefs := GSMobilePrefs.new()
 	_check(prefs.autofire and not rules.resolve(prefs, true).autofire, "auto-fire is off for a touch player by default, even when they ask (shooting furniture costs health)")
 	_check(not rules.resolve(prefs, true).aim_assist, "and aim assist is off")
 	var bound := {}
@@ -86,14 +86,14 @@ func _overlay() -> void:
 		return null
 	rules.bind_cvars(record, 0)
 	_check(bound.has("sv_autofire") and bound.has("sv_mobile_touch"), "the server binds dot-mobile's cvars", str(bound.keys()))
-	_check(FileAccess.get_file_as_string("res://game/ph_game.gd").contains("mobile_rules: DotMobileRules"), "PhGame carries the rules the module binds")
-	DotPlatform.touch_override = 1
+	_check(FileAccess.get_file_as_string("res://game/ph_game.gd").contains("mobile_rules: GSMobileRules"), "PhGame carries the rules the module binds")
+	GSPlatform.touch_override = 1
 	var host := Control.new()
 	host.size = Vector2(844, 390)
 	add_child(host)
 	var owner_client := FakeClient.new()
 	host.add_child(owner_client)
-	var sampler := DotFpsTouchSampler.new(DotFpsTunables.new())
+	var sampler := GSFpsTouchSampler.new(GSFpsTunables.new())
 	var touch := PhTouch.new()
 	touch.owner_client = owner_client
 	touch.build(sampler, rules)
@@ -121,7 +121,7 @@ func _overlay() -> void:
 	_tap(controls, controls.buttons.centre_of(&"fire"), false)
 	_check(not touch.is_held(&"fire"), "and lifting it lets go")
 	_tap(controls, controls.buttons.centre_of(&"jump"), true, 1)
-	_check(touch.is_held(&"jump") and (sampler.sample(1.0 / 60.0).buttons & DotFpsCommand.BUTTON_JUMP) != 0, "JUMP is held on the sampler's jump bit")
+	_check(touch.is_held(&"jump") and (sampler.sample(1.0 / 60.0).buttons & GSFpsCommand.BUTTON_JUMP) != 0, "JUMP is held on the sampler's jump bit")
 	_tap(controls, controls.buttons.centre_of(&"jump"), false, 1)
 	var look := InputEventScreenTouch.new()
 	look.index = 2
@@ -143,7 +143,7 @@ func _overlay() -> void:
 	_check(touch.active(), "and closing the menu brings it back")
 	_check(owner_client.touch_ignores(Vector2(780, 20)) and not owner_client.touch_ignores(Vector2(400, 200)), "the Menu button's corner is left to the menu")
 	host.free()
-	DotPlatform.touch_override = -1
+	GSPlatform.touch_override = -1
 
 
 func _hull(feet: Vector3, friend: bool, height: float = 1.0, radius: float = 0.3) -> Dictionary:
@@ -153,9 +153,9 @@ func _hull(feet: Vector3, friend: bool, height: float = 1.0, radius: float = 0.3
 func _crosshair() -> void:
 	var eye := Vector3(0, 0.6, 0)
 	var ahead := Vector3(0, 0, -1)
-	var none := DotMobileAutoFire.TARGET_NONE
-	var foe := DotMobileAutoFire.TARGET_ENEMY
-	var friend := DotMobileAutoFire.TARGET_FRIEND
+	var none := GSMobileAutoFire.TARGET_NONE
+	var foe := GSMobileAutoFire.TARGET_ENEMY
+	var friend := GSMobileAutoFire.TARGET_FRIEND
 	var prop := _hull(Vector3(0, 0, -10), false)
 	_check(PhTouch.crosshair_kind(eye, ahead, [prop], null, 0) == foe, "the crosshair on a living prop is an enemy")
 	_check(PhTouch.crosshair_kind(eye, Vector3(1, 0, 0), [prop], null, 0) == none, "looking away is nothing")

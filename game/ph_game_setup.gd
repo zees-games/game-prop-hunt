@@ -11,14 +11,14 @@ signal player_armed(player_id: StringName, weapon_id: StringName)
 var ads_rules: ZeeAdsRules = ZeeAdsRules.load_config()
 ## The burst drawn where a grenade went off (dot-fx).
 const BLAST_FX := &"blast"
-var effects: DotFxManager = null
-## Who has had the hunters' role, for [DotTeamRotation].
+var effects: GSFxManager = null
+## Who has had the hunters' role, for [GSTeamRotation].
 var hunter_history: Dictionary = {}
 const HUNTERS := 2
 var map: PhMap = null
 ## The map this round is played on.
 var map_doc: Dictionary = {}
-var match_node: DotMatch = null
+var match_node: GSMatch = null
 const PhMap := preload("ph_map.gd")
 const PhPaths := preload("ph_paths.gd")
 const PhPlayer := preload("ph_player.gd")
@@ -83,19 +83,19 @@ func _build_effects() -> void:
 	if authoritative and not draw_world:
 		return
 
-	var fx := DotFxCatalogue.new()
+	var fx := GSFxCatalogue.new()
 
-	var go := DotFxDef.new()
+	var go := GSFxDef.new()
 	go.id = &"go"
-	go.kind = DotFxDef.Kind.SCREEN
+	go.kind = GSFxDef.Kind.SCREEN
 	go.flash_peak = 0.18
 	go.flash_colour = Color(0.98, 0.86, 0.35, 1.0)
 	go.flash_decay_ms = 380
 	fx.add(go)
 
-	var hurt := DotFxDef.new()
+	var hurt := GSFxDef.new()
 	hurt.id = &"hurt"
-	hurt.kind = DotFxDef.Kind.SCREEN
+	hurt.kind = GSFxDef.Kind.SCREEN
 	hurt.flash_peak = 0.3
 	hurt.flash_colour = Color(0.9, 0.1, 0.1, 1.0)
 	hurt.flash_decay_ms = 260
@@ -103,7 +103,7 @@ func _build_effects() -> void:
 
 	# A grenade going off: a fireball, smoke, sparks and a light (game-fatal-contact's scene, copied). At
 	# every quality: where something went off is information, not decoration.
-	var blast := DotFxDef.new()
+	var blast := GSFxDef.new()
 	blast.id = BLAST_FX
 	blast.scene_path = PhPaths.rebase("res://scenes/fx/explosion.tscn")
 	blast.lifetime_ms = 1400
@@ -112,13 +112,13 @@ func _build_effects() -> void:
 	blast.max_distance = 140.0
 	fx.add(blast)
 
-	effects = DotFxManager.new()
+	effects = GSFxManager.new()
 	effects.name = "Effects"
 	effects.catalogue = fx
-	effects.config = DotFxConfig.new()
+	effects.config = GSFxConfig.new()
 	effects.register_as_service = false
 	add_child(effects)
-	DotLog.result(CHANNEL, "the effects layer", effects.setup())
+	GSLog.result(CHANNEL, "the effects layer", effects.setup())
 
 
 func _build_spectate() -> void:
@@ -134,7 +134,7 @@ func _build_spectate() -> void:
 	var ready_now := spectate.setup()
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "spectating is off", {"why": ready_now.error.message})
 		remove_child(spectate)
 		spectate.queue_free()
 		spectate = null
@@ -153,7 +153,7 @@ func _build_progress() -> void:
 	var ready_now := progress.setup(config.progress_directory, config.report_progress)
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "progress is off", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "progress is off", {"why": ready_now.error.message})
 		remove_child(progress)
 		progress.queue_free()
 		progress = null
@@ -164,7 +164,7 @@ func _build_progress() -> void:
 	)
 
 
-## Who hunts this round: [DotTeamRotation], with the server's mode and the players' wishes.
+## Who hunts this round: [GSTeamRotation], with the server's mode and the players' wishes.
 func _draw_sides() -> void:
 	var keys: Array[StringName] = []
 
@@ -186,16 +186,16 @@ func _draw_sides() -> void:
 	# A map may ask for its own share of hunters: a big school with a hiding place every few
 	# metres wants more of them than a cottage (`ph-bots-map-spread-1`).
 	var want := config.hunters_for(keys.size(), float(map_doc.get("players_per_hunter", 0.0)))
-	var picked: Dictionary = DotTeamRotation.pick(
-		keys, want, config.hunter_pick as DotTeamRotation.Mode, hunter_history, _round_seed, wishes
+	var picked: Dictionary = GSTeamRotation.pick(
+		keys, want, config.hunter_pick as GSTeamRotation.Mode, hunter_history, _round_seed, wishes
 	)
-	DotTeamRotation.note(hunter_history, keys, picked["picked"], round_number)
+	GSTeamRotation.note(hunter_history, keys, picked["picked"], round_number)
 
 	for id in keys:
 		_set_side(id, HUNTERS if (picked["picked"] as Array).has(id) else PROPS)
 
 	if not keys.is_empty():
-		DotLog.debug(CHANNEL, "hunters drawn", {"why": str(picked["why"])})
+		GSLog.debug(CHANNEL, "hunters drawn", {"why": str(picked["why"])})
 
 
 func _set_side(id: StringName, side: int) -> void:
@@ -235,17 +235,17 @@ func map_rows() -> Array:
 	return out
 
 
-func weapon_command_for(player: PhPlayer) -> DotWeaponCommand:
-	var command := DotWeaponCommand.new()
+func weapon_command_for(player: PhPlayer) -> GSWeaponCommand:
+	var command := GSWeaponCommand.new()
 	var pending := player.controller.current_command
 
 	if pending == null:
 		return command
 
-	command.set_button(DotWeaponCommand.BUTTON_ATTACK, pending.is_pressed(DotFpsCommand.BUTTON_USER_0))
-	command.set_button(DotWeaponCommand.BUTTON_ALT, pending.is_pressed(DotFpsCommand.BUTTON_USER_1))
-	command.set_button(DotWeaponCommand.BUTTON_RELOAD, pending.is_pressed(DotFpsCommand.BUTTON_USER_2))
-	command.set_button(DotWeaponCommand.BUTTON_AIM, player.aiming)
+	command.set_button(GSWeaponCommand.BUTTON_ATTACK, pending.is_pressed(GSFpsCommand.BUTTON_USER_0))
+	command.set_button(GSWeaponCommand.BUTTON_ALT, pending.is_pressed(GSFpsCommand.BUTTON_USER_1))
+	command.set_button(GSWeaponCommand.BUTTON_RELOAD, pending.is_pressed(GSFpsCommand.BUTTON_USER_2))
+	command.set_button(GSWeaponCommand.BUTTON_AIM, player.aiming)
 	command.yaw = pending.yaw
 	command.pitch = pending.pitch
 	command.slot = player.wanted_slot

@@ -51,7 +51,7 @@ func _ready() -> void:
 		elif arg.begins_with("--lean="):
 			_lean = arg.trim_prefix("--lean=").to_int()
 		elif arg == "--touch":
-			DotPlatform.touch_override = 1
+			GSPlatform.touch_override = 1
 		elif arg == "--board":
 			_board = true
 		elif arg.begins_with("--seconds="):
@@ -84,11 +84,11 @@ func _ready() -> void:
 	_client.set("remember_loadout", false)
 	_client.set("third_person", _view == "action")
 	add_child(_client)
-	# --view=cover: the loading cover dot-game's DotGameClient puts up first, before it lifts.
+	# --view=cover: the loading cover dot-game's GSGameClient puts up first, before it lifts.
 	if _view == "cover":
 		for _i in 2:
 			await RenderingServer.frame_post_draw
-		var platform: DotGameClient = _client.get("platform")
+		var platform: GSGameClient = _client.get("platform")
 		print("cover %s" % ("lifted" if platform.is_shown() else "up"))
 		var cover_path := ProjectSettings.globalize_path(_out)
 		DirAccess.make_dir_recursive_absolute(cover_path.get_base_dir())
@@ -98,7 +98,7 @@ func _ready() -> void:
 	_run.call_deferred()
 
 
-## --view=maps: a fixture map pack in the shared [DotContentIndex], as the solo shell leaves
+## --view=maps: a fixture map pack in the shared [GSContentIndex], as the solo shell leaves
 ## one after a subscribed pack mounts, so the M menu shows what a player would see. The pack's
 ## map is the practice house under another name, written to user://.
 func _subscribe_fixture() -> void:
@@ -111,11 +111,11 @@ func _subscribe_fixture() -> void:
 	var file := FileAccess.open(dir + "barn.json", FileAccess.WRITE)
 	file.store_string(JSON.stringify(doc))
 	file.close()
-	var index := DotContentIndex.shared()
-	index.set_session(DotContentIndex.SESSION_SOLO)
+	var index := GSContentIndex.shared()
+	index.set_session(GSContentIndex.SESSION_SOLO)
 	var _added := index.add_pack({
 		"content_id": "fixture/barns", "version": "1.0.0", "prefix": dir,
-		"session": DotContentIndex.SESSION_SOLO, "source": &"subscription",
+		"session": GSContentIndex.SESSION_SOLO, "source": &"subscription",
 		"provides": {"schema": 1, "title": "Hilltop Pack", "kinds": ["map"], "entries": [
 			{"kind": "map", "id": "fixture_barn", "name": "Fixture Barn", "scene": "barn.json", "map_kind": "prophunt"},
 			{"kind": "map", "id": "fixture_run", "name": "Fixture Run", "scene": "barn.json", "map_kind": "surf"},
@@ -145,7 +145,7 @@ func _run() -> void:
 	var game: PhGame = _client.get("game")
 	await _until_a_round(game)
 	# Waits past the load cover (slow on a cold GPU box) before any view's timing starts; capped, so a stuck cover cannot hang the shot.
-	if not await DotShotGate.wait_lifted(get_tree(), _client.get("platform")):
+	if not await GSShotGate.wait_lifted(get_tree(), _client.get("platform")):
 		printerr("shot: load cover still up after the wait; shooting anyway")
 	var local = _client.get("player")
 	var hunter := _view in ["hunter", "blind", "round", "loadout", "grenade", "killcam"]
@@ -318,7 +318,7 @@ func _finish() -> void:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var saved := image.save_png(path)
 	print("saved %s (%s): %s" % [_out, _view, error_string(saved)])
-	await DotShotSeq.new().record(get_tree(), path)
+	await GSShotSeq.new().record(get_tree(), path)
 	get_tree().quit(0 if saved == OK else 1)
 
 
@@ -342,7 +342,7 @@ func _view_spots(game: PhGame) -> void:
 	if game.bots.annotations == null:
 		print("the bots made no annotations (ph_bot_nav 0, or no stand-in to drive)")
 	else:
-		var debug := DotNpcAiNavDebug.new()
+		var debug := GSNpcAiNavDebug.new()
 		game.map.add_child(debug)
 		debug.show_annotations(game.bots.annotations)
 	await _frames(6)
@@ -364,7 +364,7 @@ func _view_killcam(game: PhGame, local: PhPlayer) -> void:
 	prey.place_at(ahead, 180.0)
 	var _dressed := game.disguise_as(prey.player_id, _as)
 	await _seconds_of(4.0)
-	var found := DotDamage.make(local.entity_id, prey.entity_id, prey.health.max_health * 10.0, null)
+	var found := GSDamage.make(local.entity_id, prey.entity_id, prey.health.max_health * 10.0, null)
 	found.weapon_id = &"pistol"
 	found.tick = game._tick
 	var _hit: Variant = game.combat.apply_damage(found)
@@ -399,15 +399,15 @@ func _view_dead(game: PhGame, local: PhPlayer) -> bool:
 	feet = victim.controller.state.position
 	var camera := _free_camera()
 	camera.look_at_from_position(feet + Vector3(1.9, 1.3, 1.7), feet + Vector3(0.0, 0.4, 0.0))
-	var slay := DotDamage.make(0, victim.entity_id, victim.health.max_health * 10.0, null)
+	var slay := GSDamage.make(0, victim.entity_id, victim.health.max_health * 10.0, null)
 	slay.tick = game._tick
 	slay.direction = (feet - camera.global_position) * Vector3(1, 0, 1)
 	var _applied: Variant = game.combat.apply_damage(slay)
 	print("killed %s (%s) at %s: %s" % [victim.display_name, _victim, feet.snapped(Vector3.ONE * 0.1),
 		victim.death.describe() if victim.death != null else "no fall"])
 	await _seconds_of(_seconds)
-	var yard: DotPlayerRagdolls = _client.get("ragdolls")
-	for body: DotPlayerRagdoll in yard.live():
+	var yard: GSPlayerRagdolls = _client.get("ragdolls")
+	for body: GSPlayerRagdoll in yard.live():
 		print("body: %s, centre %s" % [body.describe(), body.centre().snapped(Vector3.ONE * 0.01)])
 	return true
 
@@ -439,7 +439,7 @@ func _view_person(game: PhGame, local: PhPlayer) -> void:
 		drawn.clear()
 		drawn.append(ShotOutline.hull(self, other.controller.state.position,
 			other.controller.tunables.radius, other.hull_height()))
-		for box: DotHitbox in other.hitboxes.get_children():
+		for box: GSHitbox in other.hitboxes.get_children():
 			if box.enabled:
 				drawn.append(ShotOutline.hitbox(self, box))
 	follow.call()
@@ -461,9 +461,9 @@ func _view_grenade(game: PhGame, local: PhPlayer) -> void:
 	_client.set("_slot", ZeeWeaponIds.SLOT_THROWN)
 	await _seconds_of(1.0)
 	Engine.time_scale = 0.2
-	var tuning := ZeeWeaponPack.catalogue().get_def(&"frag").tuning as DotWeaponBallistics
+	var tuning := ZeeWeaponPack.catalogue().get_def(&"frag").tuning as GSWeaponBallistics
 	var forward: Vector3 = local.aim_direction()
-	var spawn := DotWeaponSpawn.make(&"frag", local.eye_position() + forward * 0.6,
+	var spawn := GSWeaponSpawn.make(&"frag", local.eye_position() + forward * 0.6,
 		forward * tuning.speed * 0.55 + Vector3.UP * 2.5, local.entity_id)
 	spawn.gravity_scale = tuning.gravity_scale
 	spawn.radius = tuning.radius
@@ -557,8 +557,8 @@ func _stage_action(game: PhGame, me: PhPlayer) -> void:
 	await _seconds_of(1.5)
 	var figure: Object = _client.call("_avatar_figure", 0)
 	print("action %s/%s: figure=%s disguised=%s third_person=%s" % [_action[0], _action[1], figure != null, me.is_disguised(), _client.get("third_person")])
-	var entry := DotAvatarActions.defaults().find(_action[0], _action[1])
-	var input: Object = (_client.get("platform") as DotGameClient).avatar_actions.input
+	var entry := GSAvatarActions.defaults().find(_action[0], _action[1])
+	var input: Object = (_client.get("platform") as GSGameClient).avatar_actions.input
 	input.emit_signal(&"action_requested", entry)
 	var yaw := deg_to_rad(float(me.controller.state.yaw))
 	var ahead := Vector3(-sin(yaw), 0.0, -cos(yaw))

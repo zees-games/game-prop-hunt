@@ -1,8 +1,8 @@
-extends DotMenuGameSettings
+extends GSMenuGameSettings
 
 const PhBindings := preload("ph_bindings.gd")
 
-## A player's own settings and the menu that changes them: dot-menu's `DotMenuGameSettings` with this game's spec (names, field of view, keys, help).
+## A player's own settings and the menu that changes them: dot-menu's `GSMenuGameSettings` with this game's spec (names, field of view, keys, help).
 ## Scopes are the family's: `sensitivity` is ACCOUNT (`tmc_account`), `field_of_view` SERVER_CLAMPED (a server may cap a wide view but cannot READ it), volumes this machine's.
 ## Use: `add_child(s); s.setup(); s.bind_look(...); s.bind_camera(...); s.bind_audio(...); s.open()`.
 
@@ -29,8 +29,8 @@ func _init() -> void:
 
 
 ## The game's settings as data: names, field of view, extra settings, keys and the help screen's goal and rules.
-static func spec_for() -> DotMenuGameSpec:
-	var s := DotMenuGameSpec.new()
+static func spec_for() -> GSMenuGameSpec:
+	var s := GSMenuGameSpec.new()
 	s.schema_version = SCHEMA_VERSION
 	s.brand_name = "Prop Hunt"
 	s.settings_dir = SETTINGS_DIR
@@ -40,7 +40,7 @@ static func spec_for() -> DotMenuGameSpec:
 	s.comfort_row_text = "The end-of-round announcement appears at once."
 	s.ambient_text = "Quiet sounds under the map."
 	s.not_applied = NOT_APPLIED
-	s.bindings_maker = func() -> DotMenuBindings: return PhBindings.make()
+	s.bindings_maker = func() -> GSMenuBindings: return PhBindings.make()
 	s.help_about = "Most players are props: look at something on the map, press E to become it, and keep still. The rest are hunters, blindfolded while the props hide, then given a few minutes to find them. Props win if anybody is left when the clock runs out."
 	s.help_cards = [
 		["Props", "Your health is the size of what you became. Taunt for points, lock your rotation so you stop turning with the view, and tilt to sit the way the real ones do. A prop that keeps quiet too long taunts on its own."],

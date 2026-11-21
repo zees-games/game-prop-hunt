@@ -1,6 +1,6 @@
 extends Node
 
-## Splinters, shards and chips where furniture breaks, drawn by dot-fx's DotFxBreak and following fx_quality.
+## Splinters, shards and chips where furniture breaks, drawn by dot-fx's GSFxBreak and following fx_quality.
 
 ## Catalogue ids containing one of these break as that material; anything else is wood.
 const MATERIAL_WORDS := {
@@ -10,12 +10,12 @@ const MATERIAL_WORDS := {
 	"plastic": ["bear", "toy", "keyboard", "computer", "ball", "football", "bin"],
 }
 
-var break_fx: DotFxBreak = null
+var break_fx: GSFxBreak = null
 
 
 func _init() -> void:
 	name = "BreakFx"
-	break_fx = DotFxBreak.new()
+	break_fx = GSFxBreak.new()
 	break_fx.name = "Break"
 	add_child(break_fx)
 

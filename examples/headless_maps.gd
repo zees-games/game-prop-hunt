@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
@@ -38,14 +38,14 @@ var _sections_finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
 func _merge(logs: Array) -> void:
-	var absent := DotGameShardArgs.missing(PackedStringArray(logs))
+	var absent := GSGameShardArgs.missing(PackedStringArray(logs))
 	_check(logs.size() == SHARDS and absent.is_empty(), "every shard's log is there (%d logs)" % logs.size(), "missing %s" % [absent])
-	var entered := DotGameShardArgs.sections_entered(PackedStringArray(logs))
+	var entered := GSGameShardArgs.sections_entered(PackedStringArray(logs))
 	var linked := DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://maps"))
 	var want := SHARDS + (MAPS.size() if linked else 1)
 	_check(entered == want, "the shards entered every map once and the catalogue once each (%d of %d sections)" % [entered, want])
@@ -55,16 +55,16 @@ func _merge(logs: Array) -> void:
 func _run() -> void:
 	print("prophunt maps")
 	print("")
-	if DotGameShardArgs.is_merge():
+	if GSGameShardArgs.is_merge():
 		_section("merged from the shards' logs")
-		_merge(DotGameShardArgs.merge_logs())
+		_merge(GSGameShardArgs.merge_logs())
 		_finished()
 		_report_sections(_sections_entered, _sections_finished, 1, 2)
 		return
 
-	_shard = DotGameShardArgs.shard()
+	_shard = GSGameShardArgs.shard()
 	await _test_the_catalogue()
-	var play: Array = DotGameShardArgs.slice(_maps, _shard, SHARDS)
+	var play: Array = GSGameShardArgs.slice(_maps, _shard, SHARDS)
 
 	for id: String in play:
 		await _test_map(StringName(id))
@@ -313,15 +313,15 @@ func _world(id: StringName, drawn := false) -> PhGame:
 	return game
 
 
-## dot-core's [DotCollisionAudit] over the map as a client draws it. The map keeps its drawing in `Drawn` and its shapes in `Solid` and `Furniture`,
+## dot-core's [GSCollisionAudit] over the map as a client draws it. The map keeps its drawing in `Drawn` and its shapes in `Solid` and `Furniture`,
 ## so the audit is the lenient one (a touching mesh passes); [method _partly_covered] is the stricter half for furniture a hunter or disguised prop walks into.
 func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	var drawn := await _world(id, true)
-	var res := DotCollisionAudit.audit(drawn.map, true)
-	var found: PackedStringArray = (res.value as DotCollisionAudit).paths() if res.ok else PackedStringArray()
+	var res := GSCollisionAudit.audit(drawn.map, true)
+	var found: PackedStringArray = (res.value as GSCollisionAudit).paths() if res.ok else PackedStringArray()
 
 	if res.ok:
-		var report: DotCollisionAudit = res.value
+		var report: GSCollisionAudit = res.value
 		print("  collision audit: %d findings of %d examined, %d opted out" % [report.count(), report.examined, report.opted_out])
 
 		for line in report.describe_lines().slice(1, 12):
@@ -333,7 +333,7 @@ func _report_colliderless(id: StringName, doc: Dictionary) -> void:
 	for line in partial.slice(0, 20):
 		print("    %s" % line)
 
-	_check(res.ok and (res.value as DotCollisionAudit).examined > 0 and found.is_empty(),
+	_check(res.ok and (res.value as GSCollisionAudit).examined > 0 and found.is_empty(),
 		"everything drawn has collision, or says it is decoration (dot_no_collision)",
 		"; ".join(found.slice(0, 6)) if res.ok else res.error.message)
 	await _dispose(drawn)

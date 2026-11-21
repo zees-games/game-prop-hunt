@@ -10,7 +10,7 @@ const CHECKS := 104
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -103,7 +103,7 @@ func _build() -> bool:
 	_client_net = _make_manager(false, &"client", CLIENT_PEER, client_side, CLIENT_ENGINE_TICK_RATE)
 		# This harness stamps every command itself (`_tick + INPUT_LEAD`), so the client must not ask for dot-net's input-lead report:
 		# steered by reports about commands it never stamped, the clock runs away. By the constant map, so this parses against a dot-net from before the report.
-	var lead_bit := int((DotNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
+	var lead_bit := int((GSNetMessageRegistry as Script).get_script_constant_map().get("FEATURE_INPUT_LEAD", 0))
 	_client_net.messages.features &= ~lead_bit
 
 	_server_bridge = PhNetBridge.new()
@@ -221,7 +221,7 @@ func _test_the_local_player_is_predicted() -> void:
 	server_me.place_at(Vector3(-2.0, 0.05, 0.0), 0.0)
 	await _steps(20)
 	var before := mine.controller.state.position
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = Vector2(0.0, 1.0)
 	await _step(forward)
 	_check(mine.controller.state.position.distance_to(before) > 0.01,
@@ -260,7 +260,7 @@ func _test_a_disguise_is_a_hull_on_both_ends() -> void:
 	_check(absf(mine.health.max_health - server_me.health.max_health) < 0.1, "and the chair's health",
 		"%.1f / %.1f" % [mine.health.max_health, server_me.health.max_health])
 
-	var back := DotFpsCommand.new()
+	var back := GSFpsCommand.new()
 	back.move = Vector2(-1.0, 0.0)
 	back.yaw = aim.yaw
 	await _steps(20, back)
@@ -344,7 +344,7 @@ func _test_a_decoy_is_charged() -> void:
 	await _steps(6, aim)
 	var health := server_me.health.health
 	var fire := _aim_at(_mine(), CHAIR_AT + Vector3(0.0, 0.35, 0.0))
-	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
+	fire.set_button(GSFpsCommand.BUTTON_USER_0, true)
 	await _steps(SERVER_TICK_RATE * 2, fire)
 	await _steps(6, aim)
 	_check(server_me.health.health < health, "the server charged them for shooting a chair",
@@ -360,7 +360,7 @@ func _test_a_decoy_is_charged() -> void:
 			index = i
 			break
 	var piece: Dictionary = _server_game.map.props[index]
-	var shot := DotShot.new()
+	var shot := GSShot.new()
 	shot.damage = 10000.0
 	shot.direction = Vector3(0.0, 0.0, -1.0)
 	shot.impacts.append((piece["transform"] as Transform3D).origin + Vector3(0.0, (piece["size"] as Vector3).y * 0.5, 0.0))
@@ -405,7 +405,7 @@ func _test_the_drawn_gun_takes_the_server_count() -> void:
 	client.call(&"_arm_locally", server_def.id)
 	var drawn: ZeeWeaponRig = client.get(&"weapons")
 	# Drawn as `_net_physics` would: the slot the arming picked, until the switch is over.
-	var command := DotWeaponCommand.new()
+	var command := GSWeaponCommand.new()
 	command.slot = int(client.get(&"_slot"))
 	for i in range(SERVER_TICK_RATE):
 		if drawn == null or (drawn.arsenal.current_slot() == command.slot and not drawn.arsenal.is_switching()):
@@ -458,7 +458,7 @@ func _test_the_aim_bit_crosses() -> void:
 
 	# How far the body gets in a second of walking from the same spot: the best of four directions (the practice room has walls), hip then aimed.
 	var run := func(direction: Vector2, aim: bool) -> float:
-		var walk := DotFpsCommand.new()
+		var walk := GSFpsCommand.new()
 		walk.move = direction
 		server_me.place_at(LOOK_FROM, 0.0)
 		await _steps(INPUT_LEAD + 8)
@@ -475,7 +475,7 @@ func _test_the_aim_bit_crosses() -> void:
 	_check(not server_me.aiming and rig.ads_move_scale() == 1.0, "unaimed, the server's body is not aiming and not slowed")
 
 	var aimed_run: float = await run.call(best, true)
-	var forward := DotFpsCommand.new()
+	var forward := GSFpsCommand.new()
 	forward.move = best
 	_check(server_me.aiming and _mine().aiming and absf(rig.ads_move_scale() - paced) < 0.001,
 		"aimed, the server's body and the client's both are, and the rig is at the rules' pace",
@@ -516,7 +516,7 @@ func _test_a_hit_is_the_shooters() -> void:
 	_listening = true
 
 	var fire := _aim_at(_mine(), _stand_in.global_position + Vector3(0.0, 0.4, 0.0))
-	fire.set_button(DotFpsCommand.BUTTON_USER_0, true)
+	fire.set_button(GSFpsCommand.BUTTON_USER_0, true)
 	await _steps(4, fire)
 	await _steps(INPUT_LEAD + 6, aim)
 
@@ -533,9 +533,9 @@ func _test_a_hit_is_the_shooters() -> void:
 	# Hit back: the hunter the victim, and a victim is told nothing.
 	hits.clear()
 	_sent_events.clear()
-	var shot_back := DotShot.new()
+	var shot_back := GSShot.new()
 	shot_back.attacker = _stand_in.entity_id
-	var wound := DotDamage.make(_stand_in.entity_id, server_me.entity_id, 1.0, null)
+	var wound := GSDamage.make(_stand_in.entity_id, server_me.entity_id, 1.0, null)
 	wound.health_lost = 1.0
 	wound.point = server_me.global_position + Vector3.UP
 	shot_back.damages.append(wound)
@@ -562,13 +562,13 @@ func _test_a_grenade_reaches_the_client() -> void:
 	var heard := func(at: Vector3, _weapon: StringName) -> void: drawn.append(at)
 	_client_game.blast_drawn.connect(heard)
 	var server_blasts: Array = []
-	var went := func(at: Vector3, _spawn: DotWeaponSpawn) -> void: server_blasts.append(at)
+	var went := func(at: Vector3, _spawn: GSWeaponSpawn) -> void: server_blasts.append(at)
 	_server_game.projectiles.detonated.connect(went)
 	_sent_events.clear()
 	_listening = true
 
 	# Lobbed across the open garden, well clear of everybody, a second's fuse and a small blast.
-	var spawn := DotWeaponSpawn.make(&"frag", Vector3(13.0, 1.5, -1.0), Vector3(3.0, 3.0, 0.5), server_me.entity_id)
+	var spawn := GSWeaponSpawn.make(&"frag", Vector3(13.0, 1.5, -1.0), Vector3(3.0, 3.0, 0.5), server_me.entity_id)
 	spawn.gravity_scale = 1.0
 	spawn.radius = 0.12
 	spawn.fuse_ticks = SERVER_TICK_RATE
@@ -579,7 +579,7 @@ func _test_a_grenade_reaches_the_client() -> void:
 	await _steps(12)
 	var copies: Array = _client_game.projectiles.flying()
 	var copy: RefCounted = copies[0] if not copies.is_empty() else null
-	var owned := copy != null and (copy.get(&"spawn") as DotWeaponSpawn).owner_entity == _mine().entity_id
+	var owned := copy != null and (copy.get(&"spawn") as GSWeaponSpawn).owner_entity == _mine().entity_id
 	_check(_events_of(PhEvents.Kind.LAUNCH, CLIENT_PEER) == 1 and copy != null and int(copy.get(&"id")) == int(flying.get(&"id")) and owned,
 		"one LAUNCH to every ready player, and the client flies a copy of that grenade, owned by its own number for the thrower",
 		"%d sent, %d copies" % [_events_of(PhEvents.Kind.LAUNCH, CLIENT_PEER), copies.size()])
@@ -610,7 +610,7 @@ func _events_of(kind: int, peer_id: int) -> int:
 
 func _test_the_round_ends() -> void:
 	_section("the round ends, and the client is told who won and why")
-	var damage := DotDamage.make(_server_me().entity_id, _stand_in.entity_id, 10000.0, null)
+	var damage := GSDamage.make(_server_me().entity_id, _stand_in.entity_id, 10000.0, null)
 	damage.tick = _tick
 	var _applied := _server_game.combat.apply_damage(damage)
 	await _steps(6)
@@ -681,26 +681,26 @@ func _workbench_up(flags: Dictionary, state: Dictionary) -> Dictionary:
 	var cbinder := PhConfig.make_binder(cconfig)
 	var _l1 := sbinder.load_layers()
 	var _l2 := cbinder.load_layers()
-	var set: DotProfileSet = null
-	for candidate: DotProfileSet in sbinder.profile_sets():
+	var set: GSProfileSet = null
+	for candidate: GSProfileSet in sbinder.profile_sets():
 		if candidate.rel_path.ends_with("round"):
 			set = candidate
-	var cset: DotProfileSet = null
-	for candidate: DotProfileSet in cbinder.profile_sets():
+	var cset: GSProfileSet = null
+	for candidate: GSProfileSet in cbinder.profile_sets():
 		if candidate.rel_path.ends_with("round"):
 			cset = candidate
-	var swb := DotGameWorkbench.new()
+	var swb := GSGameWorkbench.new()
 	swb.dedicated = true
 	swb.config = {"enabled": false}
 	swb.add_set(set, "Game settings")
 	add_child(swb)
 	var started := swb.start()
 	sbinder.attach(swb.api.runtime)
-	var made := DotGameWorkbenchRemote.serve(snet)
-	var slink := DotNetProfileLink.attach(snet, swb.api.runtime as DotProfileRuntime)
-	var cremote := DotGameWorkbenchRemoteClient.attach(cnet)
-	var crt := DotProfileRuntime.new()
-	var clink := DotNetProfileLink.attach(cnet, crt)
+	var made := GSGameWorkbenchRemote.serve(snet)
+	var slink := GSNetProfileLink.attach(snet, swb.api.runtime as GSProfileRuntime)
+	var cremote := GSGameWorkbenchRemoteClient.attach(cnet)
+	var crt := GSProfileRuntime.new()
+	var clink := GSNetProfileLink.attach(cnet, crt)
 	snet.messages.seal()
 	cnet.messages.seal()
 	var remote := swb.serve_remote(snet)
@@ -716,8 +716,8 @@ func _workbench_up(flags: Dictionary, state: Dictionary) -> Dictionary:
 	remote.connected_fn = func(_p: int) -> bool: return true
 	remote.permit_uid_fn = func(uid: String, flag: String) -> bool: return (flags.get(uid, []) as Array).has(flag)
 	remote.now_fn = func() -> int: return state["now"]
-	remote.limiter = DotRateLimiter.new(1000.0, 1000.0)
-	var cwb := DotGameWorkbench.new()
+	remote.limiter = GSRateLimiter.new(1000.0, 1000.0)
+	var cwb := GSGameWorkbench.new()
 	cwb.panel_mode = 2
 	cwb.config = {"enabled": false}
 	cwb.remote_client = cremote
@@ -728,7 +728,7 @@ func _workbench_up(flags: Dictionary, state: Dictionary) -> Dictionary:
 	_check(cstarted.ok and cwb.overlay == null, "the client's workbench starts with no panel")
 	var kind: String = set.rel_path
 	var edit := {"op": "set", "kind": kind, "id": sbinder.profile_id, "key": "hide_seconds", "value": 45.0}
-	var srt := swb.api.runtime as DotProfileRuntime
+	var srt := swb.api.runtime as GSProfileRuntime
 	return {"snet": snet, "cnet": cnet, "sconfig": sconfig, "sbinder": sbinder, "swb": swb, "cwb": cwb,
 		"slink": slink, "clink": clink, "cremote": cremote, "crt": crt, "remote": remote, "edit": edit,
 		"kind": kind, "srt": srt}
@@ -738,10 +738,10 @@ func _workbench_up(flags: Dictionary, state: Dictionary) -> Dictionary:
 func _workbench_asks(w: Dictionary, flags: Dictionary, state: Dictionary) -> void:
 	var sconfig: PhConfig = w["sconfig"]
 	var sbinder: Variant = w["sbinder"]
-	var cremote: DotGameWorkbenchRemoteClient = w["cremote"]
-	var cwb: DotGameWorkbench = w["cwb"]
-	var crt: DotProfileRuntime = w["crt"]
-	var srt: DotProfileRuntime = w["srt"]
+	var cremote: GSGameWorkbenchRemoteClient = w["cremote"]
+	var cwb: GSGameWorkbench = w["cwb"]
+	var crt: GSProfileRuntime = w["crt"]
+	var srt: GSProfileRuntime = w["srt"]
 	var remote: Variant = w["remote"]
 	var edit: Dictionary = w["edit"]
 	var kind: String = w["kind"]
@@ -756,7 +756,7 @@ func _workbench_asks(w: Dictionary, flags: Dictionary, state: Dictionary) -> voi
 	cremote.ask()
 	_check(cremote.allowed and cremote.flags.has("cvar"), "with the cvar on an admin is told the flags it holds")
 	_check(cwb.overlay != null, "and gets the panel")
-	var applied: DotResult = cwb.api.handle(DotGameWorkbenchRemoteClient.ACTOR, edit)
+	var applied: GSResult = cwb.api.handle(GSGameWorkbenchRemoteClient.ACTOR, edit)
 	_check(applied.ok and sconfig.hide_seconds == 45.0, "an edit from the panel reaches the server's live config", "" if applied.ok else applied.error.message)
 	_check(crt.revision(kind, sbinder.profile_id) > 0 and crt.revision(kind, sbinder.profile_id) == srt.revision(kind, sbinder.profile_id), "and its row replicated to the client")
 
@@ -794,7 +794,7 @@ func _workbench_asks(w: Dictionary, flags: Dictionary, state: Dictionary) -> voi
 ## panel and an edit that applies and replicates; a guest, a non-admin, a revoked admin and the cvar off are refused.
 func _test_the_remote_workbench() -> void:
 	_section("[a flagged admin edits the server's profiles, and nobody else can]")
-	if not DotGameWorkbench.available():
+	if not GSGameWorkbench.available():
 		print("  dot-workbench is not linked: skipped")
 		_passed += 16
 		_finished()

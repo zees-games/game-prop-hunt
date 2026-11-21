@@ -7,7 +7,7 @@ const PhNavAnnotator := preload("ph_nav_annotator.gd")
 
 ## The stand-ins: props that hide as something that belongs where they stand, and hunters that search
 ## the rooms and test what looks wrong, on dot-bot's settings and hiding helpers. The map is surveyed
-## once when built; pure state per bot, every draw the bot's own DotRandomStream, the clock the game's tick.
+## once when built; pure state per bot, every draw the bot's own GSRandomStream, the clock the game's tick.
 
 const CHANNEL := "ph.bots"
 
@@ -46,7 +46,7 @@ const FURNITURE_TARGET := -7
 
 var game: Node = null
 
-var nav: DotBotNav = DotBotNav.new()
+var nav: GSBotNav = GSBotNav.new()
 
 ## `[{at, exposure, prop, kind, yaw, kin}]` for the map built, or empty.
 var spots: Array[Dictionary] = []
@@ -60,7 +60,7 @@ var _first_survey: String = ""
 
 ## The map's annotations (dot-npc-ai), made after the first survey on every map so a suite can
 ## measure against them; the bots use them only with `bot_nav`. Stepped a few slices a tick.
-var annotations: DotNpcAiNavAnnotations = null
+var annotations: GSNpcAiNavAnnotations = null
 var _job: PhNavAnnotator = null
 ## True once the annotations replaced the first survey's places.
 var _nav_places: bool = false
@@ -95,8 +95,8 @@ func _init(p_game: Node = null) -> void:
 	game = p_game
 
 
-func settings() -> DotBotSettings:
-	return DotBotSettings.of(game)
+func settings() -> GSBotSettings:
+	return GSBotSettings.of(game)
 
 
 func config_of() -> Object:
@@ -180,10 +180,10 @@ func _bake(map: Node3D, doc: Dictionary, key: String) -> void:
 	_survey_at = -1
 
 
-func _bake_failed(res: DotResult, key: String, map_id: String) -> void:
+func _bake_failed(res: GSResult, key: String, map_id: String) -> void:
 	if not res.ok and _baked == key and _surveyed != key:
 		_surveyed = key
-		DotLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": map_id, "why": res.error.message})
+		GSLog.warn(CHANNEL, "no walkable mesh for the bots; they walk straight", {"map": map_id, "why": res.error.message})
 
 
 ## Drops a bake still in flight, so it cannot land on a map that has been freed.
@@ -198,7 +198,7 @@ func _set_survey_tick() -> void:
 
 ## Bakes and surveys the map now built, once per map. Only where bots run.
 ## Indices of the floor furniture a prop may become.
-func _usable_furniture(props: Array, catalogue: Object, rules: DotPropDisguiseRules) -> Array[int]:
+func _usable_furniture(props: Array, catalogue: Object, rules: GSPropDisguiseRules) -> Array[int]:
 	var usable: Array[int] = []
 	var floor_y := _ground_floor(game.get("map_doc"))
 	for i in range(props.size()):
@@ -206,7 +206,7 @@ func _usable_furniture(props: Array, catalogue: Object, rules: DotPropDisguiseRu
 		var frame: Transform3D = prop["transform"]
 		if frame.origin.y > floor_y + 0.3:
 			continue
-		if not bool(catalogue.call("may_disguise", prop["id"])) or not DotPropDisguise.may_take(prop["size"], rules).ok:
+		if not bool(catalogue.call("may_disguise", prop["id"])) or not GSPropDisguise.may_take(prop["size"], rules).ok:
 			continue
 		usable.append(i)
 	return usable
@@ -268,7 +268,7 @@ func _sides_beside(props: Array, usable: Array[int]) -> Array:
 
 
 ## A place beside the furniture, on the nav mesh, per surveyed piece: `[positions, owner indices]`.
-func _places_beside(sides: Array, stream: DotRandomStream) -> Array:
+func _places_beside(sides: Array, stream: GSRandomStream) -> Array:
 	var candidates := PackedVector3Array()
 	var owners: Array[int] = []
 	for piece: Dictionary in sides:
@@ -313,10 +313,10 @@ func _prepare() -> void:
 
 	_first_survey = key
 	var started := Time.get_ticks_usec()
-	var random: DotRandomManager = game.get("random")
+	var random: GSRandomManager = game.get("random")
 	var stream := random.stream_for(&"bot_survey", hash(str(doc.get("id", ""))) % 65536)
 	var catalogue: Object = game.get("props_catalogue")
-	var rules: DotPropDisguiseRules = game.get("rules")
+	var rules: GSPropDisguiseRules = game.get("rules")
 	var props: Array = map.get("props")
 
 	var usable := _ahead_usable
@@ -330,7 +330,7 @@ func _prepare() -> void:
 
 	_kin_near = _ahead_near
 
-	var surveyed := DotBotHiding.survey(candidates, watchers, _los, DotBotHiding.REACH, 0.5)
+	var surveyed := GSBotHiding.survey(candidates, watchers, _los, GSBotHiding.REACH, 0.5)
 	for n in range(surveyed.size()):
 		var prop: Dictionary = props[owners[n]]
 		var frame: Transform3D = prop["transform"]
@@ -344,7 +344,7 @@ func _prepare() -> void:
 		_places.append({"at": spot["at"], "exposure": spot["exposure"]})
 
 	survey_ms = (Time.get_ticks_usec() - started) / 1000.0 + nav.bake_ms
-	DotLog.debug(CHANNEL, "surveyed the map for the bots", {
+	GSLog.debug(CHANNEL, "surveyed the map for the bots", {
 		"map": str(doc.get("id", "")), "spots": spots.size(), "nav_ms": snappedf(nav.bake_ms, 0.1), "ms": snappedf(survey_ms, 0.1),
 	})
 	_start_annotator(map, props, usable, catalogue)
@@ -409,10 +409,10 @@ func _step_annotator(key: String) -> void:
 	_job = null
 	_surveyed = key
 	if job.result == null or not job.result.ok:
-		DotLog.warn(CHANNEL, "the map's annotations failed; the bots use the first survey", {"why": job.result.error.message if job.result != null else "no result"})
+		GSLog.warn(CHANNEL, "the map's annotations failed; the bots use the first survey", {"why": job.result.error.message if job.result != null else "no result"})
 		return
 	annotations = job.result.value
-	DotLog.debug(CHANNEL, "annotated the map for the bots", {"ms": snappedf(_annotate_ms, 0.1), "spots": annotations.spots.size(), "hiding": annotations.hiding.size(), "chokepoints": annotations.chokepoints.size()})
+	GSLog.debug(CHANNEL, "annotated the map for the bots", {"ms": snappedf(_annotate_ms, 0.1), "spots": annotations.spots.size(), "hiding": annotations.hiding.size(), "chokepoints": annotations.chokepoints.size()})
 	if bool(config_of().get("bot_nav")):
 		_adopt_annotations(job)
 
@@ -441,7 +441,7 @@ func _adopt_annotations(job: PhNavAnnotator) -> void:
 			break
 	if chosen.size() < 8:
 		# A map with almost no furniture beside its walls: the first survey still stands.
-		DotLog.debug(CHANNEL, "too few annotated places; the bots use the first survey", {"places": chosen.size()})
+		GSLog.debug(CHANNEL, "too few annotated places; the bots use the first survey", {"places": chosen.size()})
 		return
 	spots = chosen
 	_nav_places = true

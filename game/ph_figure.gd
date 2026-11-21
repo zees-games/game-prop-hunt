@@ -2,9 +2,9 @@ extends Node3D
 
 const PhPaths := preload("ph_paths.gd")
 
-## What somebody ELSE looks like: a Kenney blocky character (dot-player-char's `DotHumanoidFigure`) scaled to the hull, in their side's [constant TEAM_TINT] on the torso. Client side only.
+## What somebody ELSE looks like: a Kenney blocky character (dot-player-char's `GSHumanoidFigure`) scaled to the hull, in their side's [constant TEAM_TINT] on the torso. Client side only.
 ## Top level and placed by its caller every frame (`PhClient.present_frame`): a node moving once a TICK would step while the camera is blended between ticks. See `PhPlayer.present_body`.
-## The atlas letter is a look (`DotHumanoidLook.from_letter`), so old avatar documents dress the same person everywhere; the weapon is in the figure's own hand and legs keep walking under an upper-body swing.
+## The atlas letter is a look (`GSHumanoidLook.from_letter`), so old avatar documents dress the same person everywhere; the weapon is in the figure's own hand and legs keep walking under an upper-body swing.
 
 const CHANNEL := "ph.figure"
 
@@ -39,7 +39,7 @@ var holding: StringName = &""
 var held: ZeeWorldModel = null
 
 ## The person, under this node.
-var person: DotHumanoidFigure = null
+var person: GSHumanoidFigure = null
 
 
 func _init() -> void:
@@ -56,21 +56,21 @@ func build(height: float, atlas_path: String, colour: Color) -> void:
 	# The gun hung off the old person's hand and goes with it; [method hold] builds it again on
 	# the next frame, from [member holding], which outlives a rebuild.
 	held = null
-	var look := DotHumanoidLook.from_letter(atlas_path)
+	var look := GSHumanoidLook.from_letter(atlas_path)
 	if look == null:
-		look = DotHumanoidLook.stock(hash(atlas_path))
+		look = GSHumanoidLook.stock(hash(atlas_path))
 	if colour != Color.WHITE:
 		look = look.with_side(colour, TEAM_TINT)
 	if person != null:
 		remove_child(person)
 		person.queue_free()
-	person = DotHumanoidFigure.new()
+	person = GSHumanoidFigure.new()
 	person.name = "Person"
 	add_child(person)
 	person.build(look, height)
 	from_art = person.from_art
 	if not from_art:
-		DotLog.warn(CHANNEL, "the person's art did not load; a capsule stands in", {"atlas": atlas.get_file()})
+		GSLog.warn(CHANNEL, "the person's art did not load; a capsule stands in", {"atlas": atlas.get_file()})
 
 
 ## The drawn model, for a death that breaks it apart or falls. Null before [method build].
@@ -79,7 +79,7 @@ func body_node() -> Node3D:
 
 
 ## How the player moves besides its ground speed: `on_floor`, `vertical`, `crouched`, `downed`
-## and the rest [method DotHumanoidFigure.set_motion] reads.
+## and the rest [method GSHumanoidFigure.set_motion] reads.
 func set_motion(motion: Dictionary) -> void:
 	if person != null:
 		person.set_motion(motion)
@@ -94,7 +94,7 @@ func pose(at: Vector3, yaw_radians: float, speed: float) -> void:
 		return
 	# Game time, as the body moves: a wall-clock step skated the feet. frame_delta is dot_player_char level 11; called by name so an older host still parses.
 	var delta := get_process_delta_time()
-	if DotAddonApi.build_level("dot_player_char") >= 11:
+	if GSAddonApi.build_level("dot_player_char") >= 11:
 		delta = float(person.call(&"frame_delta"))
 	person.animate(speed, delta)
 	clip = person.clip
@@ -143,16 +143,16 @@ func _set_hold_kind() -> void:
 	if person == null:
 		return
 	if holding == &"" or held == null or not held.visible:
-		person.set_hold(DotHumanoidFigure.Hold.NONE)
+		person.set_hold(GSHumanoidFigure.Hold.NONE)
 		return
 	var art: Variant = ZeeWeaponArtTable.table().get(holding)
 	var pose: StringName = (art as ZeeWeaponArt).pose if art is ZeeWeaponArt else ZeeWeaponArtTable.POSE_RIFLE
 	if pose == ZeeWeaponArtTable.POSE_MELEE:
-		person.set_hold(DotHumanoidFigure.Hold.MELEE)
+		person.set_hold(GSHumanoidFigure.Hold.MELEE)
 	elif pose == ZeeWeaponArtTable.POSE_THROWN:
-		person.set_hold(DotHumanoidFigure.Hold.NONE)
+		person.set_hold(GSHumanoidFigure.Hold.NONE)
 	else:
-		person.set_hold(DotHumanoidFigure.Hold.GUN)
+		person.set_hold(GSHumanoidFigure.Hold.GUN)
 
 
 ## The weapon in this figure's hand was used [param times] times, as a [ZeeWeaponNet] kind.
@@ -166,7 +166,7 @@ func fired(times: int, kind: int) -> void:
 
 	# [b]A swing is the arm, not a kick[/b]: the person's slash, over whatever the legs do.
 	if kind == ZeeWeaponNet.KIND_SWING and person != null:
-		person.swing(DotHumanoidClips.SLASH)
+		person.swing(GSHumanoidClips.SLASH)
 
 
 ## The node a held weapon hangs from, by the name [ZeeWorldModel] asks for: the person's hand.

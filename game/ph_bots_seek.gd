@@ -1,7 +1,7 @@
 extends "ph_bots_doubt.gd"
 
-## The hunters' senses for a tick, all of them in one call into dot-sim ([code]DotSimHunterSeek[/code]):
-## who each can see is a prop ([method _prey]), the places each crosses off ([method DotBotSearch.observe])
+## The hunters' senses for a tick, all of them in one call into dot-sim ([code]GSSimHunterSeek[/code]):
+## who each can see is a prop ([method _prey]), the places each crosses off ([method GSBotSearch.observe])
 ## and the doubt rows each weighs ([method _doubt_rows]), the same answers in the same order as the
 ## script, rays and all. What a hunter does with them (chase, test, walk, look) stays in script.
 ## [code]headless_native_seek[/code] holds the two to the bit.
@@ -55,10 +55,10 @@ func _seek_native() -> RefCounted:
 	if seek_mode != "native":
 		return null
 	if _seek_table == null:
-		if not DotSim.has(&"seek") or not DotSim.has(&"sight"):
+		if not GSSim.has(&"seek") or not GSSim.has(&"sight"):
 			return null
-		_seek_table = ClassDB.instantiate(DotSim.MODULES[&"seek"])
-		_seek_ray = ClassDB.instantiate(DotSim.MODULES[&"sight"])
+		_seek_table = ClassDB.instantiate(GSSim.MODULES[&"seek"])
+		_seek_ray = ClassDB.instantiate(GSSim.MODULES[&"sight"])
 		_seek_table.call(&"set_sight", _seek_ray)
 	return _seek_table
 
@@ -124,7 +124,7 @@ func _sense_hunters(hunters: Array[PhPlayer]) -> void:
 		profile.memory, profile.map_knowledge, profile.aggression, float(int(game.get("round_number")))])
 	var out: Array = table.call(&"sense", rules, taunt_at, taunt_t, rows[0], rows[1], rows[2], flags, rows[4], rows[5], rows[6])
 	if out.size() != 2:
-		push_error("DotSimHunterSeek.sense refused the batch: the hunters ask in script this tick")
+		push_error("GSSimHunterSeek.sense refused the batch: the hunters ask in script this tick")
 		return
 	_seek_take_answers(hunters, flags, out)
 
@@ -165,7 +165,7 @@ func _seek_send_props(table: Object) -> Dictionary:
 
 ## Each hunter's row for [code]sense[/code] (its native mind refreshed first where the script's
 ## search moved): [ids, eye, forward, flags, found, found_at, clearing].
-func _seek_hunter_rows(table: Object, hunters: Array[PhPlayer], index_of: Dictionary, profile: DotBotProfile, t: float) -> Array:
+func _seek_hunter_rows(table: Object, hunters: Array[PhPlayer], index_of: Dictionary, profile: GSBotProfile, t: float) -> Array:
 	var doubt_tick := int(game.get("_tick")) % 4 == 0
 	var m := hunters.size()
 	var ids := PackedStringArray()
@@ -188,7 +188,7 @@ func _seek_hunter_rows(table: Object, hunters: Array[PhPlayer], index_of: Dictio
 		var state: Dictionary = call(&"_state_of", player)
 		if state["search"] == null:
 			state["search"] = call(&"_new_search", profile)
-		var search: DotBotSearch = state["search"]
+		var search: GSBotSearch = state["search"]
 		if not state.has("seek_sync"):
 			# A new state (a new round, or this hunter forgotten): its native mind starts again.
 			table.call(&"forget", id)
@@ -273,7 +273,7 @@ func _seek_prey(player: PhPlayer, state: Dictionary, sensed: Array) -> PhPlayer:
 
 ## Observe and doubt for [param player] this doubt tick: the native answer when there is one,
 ## else (or for the look after an unheard taunt) the script's.
-func _seek_sense(player: PhPlayer, state: Dictionary, careful: bool, search: DotBotSearch, t: float, sensed: Array) -> void:
+func _seek_sense(player: PhPlayer, state: Dictionary, careful: bool, search: GSBotSearch, t: float, sensed: Array) -> void:
 	var profile := settings().profile
 	if not sensed.is_empty() and not bool(sensed[1]):
 		_seek_differs(player, "the native senses did not run where the script's do")

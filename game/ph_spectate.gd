@@ -1,8 +1,8 @@
-extends DotSpectatorHost
+extends GSSpectatorHost
 
 const PhPlayer := preload("ph_player.gd")
 
-## Where somebody who is out looks, and what the server lets them see: [DotSpectatorHost] with this game's numbers.
+## Where somebody who is out looks, and what the server lets them see: [GSSpectatorHost] with this game's numbers.
 ## No delay: every client already receives every player's live position, so one would hide nothing. No `class_name`; reached by preload from [PhGame], which hands it two dictionaries so there is no cycle.
 
 const CHANNEL := "ph.spectate"
@@ -37,7 +37,7 @@ func _channel() -> String:
 	return CHANNEL
 
 
-func _tune_rules(r: DotSpectatorRules) -> DotSpectatorRules:
+func _tune_rules(r: GSSpectatorRules) -> GSSpectatorRules:
 	r.force_camera = clampi(force_camera, 0, 2)
 	# Dead players stay dead until the next round, so a list including them would be bodies at the kill height.
 	r.cycle_includes_dead = false
@@ -70,17 +70,17 @@ func line_for(key: String) -> String:
 	var roam_hint := ("   %s: free camera" % roam_key) if roam_key != "" and can_roam(key) else ""
 
 	match view.mode:
-		DotSpectatorView.Mode.ROAMING:
+		GSSpectatorView.Mode.ROAMING:
 			return "free camera   WASD move   Space / Ctrl up and down   Shift fast   Alt slow   %s: back to the players" % (
 				roam_key if roam_key != "" else "click"
 			)
-		DotSpectatorView.Mode.DEATH_CAM:
+		GSSpectatorView.Mode.DEATH_CAM:
 			return "you are out"
-		DotSpectatorView.Mode.FREEZE_CAM:
+		GSSpectatorView.Mode.FREEZE_CAM:
 			return "shot by %s" % _name_of(view.target)
-		DotSpectatorView.Mode.FIXED:
+		GSSpectatorView.Mode.FIXED:
 			return "nobody left to watch"
-		DotSpectatorView.Mode.CHASE:
+		GSSpectatorView.Mode.CHASE:
 			return "watching %s  (behind)   click: next   F5: their eyes%s" % [_name_of(view.target), roam_hint]
 		_:
 			return "watching %s   click: next   F5: behind them%s" % [_name_of(view.target), roam_hint]

@@ -1,10 +1,10 @@
-extends DotNetBehaviour
+extends GSNetBehaviour
 
 const PhNetCommand := preload("ph_net_command.gd")
 const PhPlayer := preload("../ph_player.gd")
 
 ## What a networked player replicates: the movement state, health, weapons, and the numbers a hiding prop needs about itself.
-## The movement half is dot-player-controller's [DotFpsNetSync.state_specs], not copied here; its type names are strings so the addon can describe a layout without naming dot-net.
+## The movement half is dot-player-controller's [GSFpsNetSync.state_specs], not copied here; its type names are strings so the addon can describe a layout without naming dot-net.
 ## Disguise and side are NOT per-tick fields: they change a few times a round and travel as reliable `DISGUISE`, JOIN and TEAM events (a lost snapshot would leave a client sweeping the old capsule).
 
 ## Somebody this client is watching used their weapon, [param times] times since the last
@@ -85,7 +85,7 @@ var _seen_fire_seq: int = 0
 
 ## Retained, not cleared: a player whose packet was lost keeps moving in a straight line
 ## rather than stopping dead. The controller says the same of its own command.
-var last_move: DotFpsCommand = DotFpsCommand.new()
+var last_move: GSFpsCommand = GSFpsCommand.new()
 
 ## And the slot they last asked for, which is simulation state for a hunter: the arsenal is
 ## edge-triggered against it.
@@ -98,8 +98,8 @@ var last_state_tick: int = -1
 
 
 func _register_net_vars() -> void:
-	for spec in DotFpsNetSync.state_specs():
-		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
+	for spec in GSFpsNetSync.state_specs():
+		var declaration := replicate(spec["property"], GSNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
 			declaration.bits(int(spec["bits"]))
@@ -111,23 +111,23 @@ func _register_net_vars() -> void:
 			declaration.range_of(0.0, 1.0)
 
 	# Owner-only jump timers, appended after the movement specs (declaration order is wire order).
-	# Guarded: a shell without API 10 has no DotFpsNetSync.rewind_specs().
-	if DotAddonApi.build_level("dot_player_controller") >= 10:
-		for spec in DotFpsNetSync.rewind_specs():
-			var _timers := replicate(spec["property"], DotNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
+	# Guarded: a shell without API 10 has no GSFpsNetSync.rewind_specs().
+	if GSAddonApi.build_level("dot_player_controller") >= 10:
+		for spec in GSFpsNetSync.rewind_specs():
+			var _timers := replicate(spec["property"], GSNetVar.Type[spec["type"]]).bits(int(spec["bits"])).to_owner_only()
 
-	replicate(&"net_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(12)
+	replicate(&"net_health", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(12)
 	# 14 bits, not 12: a disguise's health is a fraction, and at 12 the client drew a chair's
 	# 98 as 97.9 (headless_net, "and the chair's health").
-	replicate(&"net_max_health", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(14)
-	replicate(&"net_points", DotNetVar.Type.UINT).bits(16)
-	replicate(&"net_ping", DotNetVar.Type.UINT).bits(10).server_driven()
-	replicate(&"net_watching", DotNetVar.Type.BOOL)
-	var _meter := replicate(&"net_taunt_meter", DotNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).to_owner_only()
-	var _wait := replicate(&"net_reveal_wait", DotNetVar.Type.UINT).bits(10).to_owner_only()
+	replicate(&"net_max_health", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 1000.0).bits(14)
+	replicate(&"net_points", GSNetVar.Type.UINT).bits(16)
+	replicate(&"net_ping", GSNetVar.Type.UINT).bits(10).server_driven()
+	replicate(&"net_watching", GSNetVar.Type.BOOL)
+	var _meter := replicate(&"net_taunt_meter", GSNetVar.Type.FLOAT_RANGE).range_of(0.0, 1.0).bits(7).to_owner_only()
+	var _wait := replicate(&"net_reveal_wait", GSNetVar.Type.UINT).bits(10).to_owner_only()
 
 	for spec in ZeeWeaponNet.all_specs():
-		var declaration := replicate(spec["property"], DotNetVar.Type[spec["type"]])
+		var declaration := replicate(spec["property"], GSNetVar.Type[spec["type"]])
 
 		if int(spec["bits"]) > 0:
 			declaration.bits(int(spec["bits"]))
@@ -141,14 +141,14 @@ func _register_net_vars() -> void:
 		# Per-player state rather than an event, so a late joiner, a lost snapshot or a re-laid field is corrected by the next snapshot where an event is missed.
 		# The blind goes to its owner alone: an opponent who received it would know the moment somebody could not see.
 		# No relevance change for a beacon: every player is already always relevant (`PhNetBridge`), and turning `always_relevant` off would drop the player from snapshots.
-	var _blind := replicate(&"net_blind", DotNetVar.Type.BOOL).to_owner_only()
-	replicate(&"net_beacon", DotNetVar.Type.BOOL)
-	replicate(&"net_marked", DotNetVar.Type.BOOL)
-	replicate(&"net_flashlight", DotNetVar.Type.BOOL)
-	replicate(&"net_warp", DotNetVar.Type.UINT).bits(4)
+	var _blind := replicate(&"net_blind", GSNetVar.Type.BOOL).to_owner_only()
+	replicate(&"net_beacon", GSNetVar.Type.BOOL)
+	replicate(&"net_marked", GSNetVar.Type.BOOL)
+	replicate(&"net_flashlight", GSNetVar.Type.BOOL)
+	replicate(&"net_warp", GSNetVar.Type.UINT).bits(4)
 
 
-func _net_apply_input(input: DotNetInput, _tick: int) -> void:
+func _net_apply_input(input: GSNetInput, _tick: int) -> void:
 	var command := input as PhNetCommand
 
 	if command != null:
@@ -185,7 +185,7 @@ func pull() -> void:
 	if player == null:
 		return
 
-	DotFpsNetSync.pull(player.controller.state, self)
+	GSFpsNetSync.pull(player.controller.state, self)
 
 	if player.health != null:
 		net_health = player.health.health
@@ -219,7 +219,7 @@ func _net_state_applied(tick: int) -> void:
 
 	last_state_tick = tick
 	_forget_the_path()
-	DotFpsNetSync.push(self, player.controller.state)
+	GSFpsNetSync.push(self, player.controller.state)
 	_adopt()
 
 		# NOT the node, on a predicted entity: `receive_snapshot` runs BEFORE the predictor reconciles, which reads the node as "what the client is showing".
@@ -238,8 +238,8 @@ func _forget_the_path() -> void:
 
 	if _seen_warp >= 0 and net_warp != _seen_warp and bridge != null:
 		var manager: Variant = bridge.get(&"net")
-		if manager is DotNetManager and (manager as DotNetManager).interpolator != null:
-			(manager as DotNetManager).interpolator.forget(identity.net_id)
+		if manager is GSNetManager and (manager as GSNetManager).interpolator != null:
+			(manager as GSNetManager).interpolator.forget(identity.net_id)
 
 	_seen_warp = net_warp
 
@@ -250,7 +250,7 @@ func _net_interpolated(_tick: int) -> void:
 	if player == null:
 		return
 
-	DotFpsNetSync.push(self, player.controller.state)
+	GSFpsNetSync.push(self, player.controller.state)
 	player.global_position = player.controller.state.position
 
 

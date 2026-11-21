@@ -4,7 +4,7 @@ const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 
-## Bot soak on the real game: N stand-ins play rounds back to back on one map for M simulated minutes through dot-bot's DotBotSoak.
+## Bot soak on the real game: N stand-ins play rounds back to back on one map for M simulated minutes through dot-bot's GSBotSoak.
 ## Run: ./game.sh soak [map] [minutes]; the harness's own flags work too. Writes .godot/test-logs/soak-<map>.json and exits 1 on failure.
 ## Only a live hunter in the seek counts as a mover with a goal: props stand still by design and hunters are held in the hide.
 
@@ -19,7 +19,7 @@ var _seek_ticks := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -33,7 +33,7 @@ func _arg(name: String, fallback: String) -> String:
 
 func _run() -> void:
 	var map_id := _arg("map", String(DEFAULT_MAP))
-	var cfg := DotBotSoakConfig.new()
+	var cfg := GSBotSoakConfig.new()
 	cfg.minutes = DEFAULT_MINUTES
 	cfg.bots = DEFAULT_BOTS
 	cfg.apply_cli()
@@ -70,11 +70,11 @@ func _run() -> void:
 		_fail("no map %s (playing %s)" % [map_id, _game.map_doc.get("id", "none")])
 		return
 
-	var watch := DotSpawnWatch.new()
+	var watch := GSSpawnWatch.new()
 	watch.rules.enabled = true
 	watch.rules.kill_y = -5000.0
 
-	var soak := DotBotSoak.new(cfg)
+	var soak := GSBotSoak.new(cfg)
 	soak.watch = watch
 	soak.movers_fn = _movers
 	soak.object_count_fn = func() -> int: return int(Performance.get_monitor(Performance.OBJECT_COUNT))
@@ -92,8 +92,8 @@ func _run() -> void:
 	report["rounds"] = _game.round_number
 	report["rounds_over"] = _rounds_over
 	report["seek_sec"] = snappedf(float(_seek_ticks) / float(TICK_RATE), 0.1)
-	print(DotBotSoak.summary(report))
-	print(DotBotSoak.report_line(report))
+	print(GSBotSoak.summary(report))
+	print(GSBotSoak.report_line(report))
 	var path := ProjectSettings.globalize_path("res://.godot/test-logs/soak-%s.json" % map_id)
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	if soak.write_report(report, path) != OK:

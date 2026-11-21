@@ -1,8 +1,8 @@
-extends DotConfig
+extends GSConfig
 
-## Every number this game has, layered like every [DotConfig]: [code]exported defaults < JSON file < environment < command line[/code].
+## Every number this game has, layered like every [GSConfig]: [code]exported defaults < JSON file < environment < command line[/code].
 ## Metres and seconds, the units the maps use (see [PhMapDoc]); every field is a `ph_<field>` cvar, `PH_*` variable, `--ph-*` flag and workbench setting.
-## All of that is [DotGameConfigBinder], and an unknown key stops a dedicated boot.
+## All of that is [GSGameConfigBinder], and an unknown key stops a dedicated boot.
 
 
 @export_group("The round")
@@ -42,7 +42,7 @@ extends DotConfig
 
 ## How hunters are chosen each round: 0 a random draw that skips last round's hunters, 1 a queue
 ## so everybody gets an equal share of turns, 2 the sides swap over every round. See
-## [DotTeamRotation].
+## [GSTeamRotation].
 @export_enum("random", "queue", "swap") var hunter_pick: int = 0
 
 ## Whether a player's own wish (`!hunter`, `!prop`, `!any`) counts: those who asked are picked
@@ -56,7 +56,7 @@ extends DotConfig
 @export_range(0.5, 10.0, 0.1) var disguise_reach: float = 3.0
 
 ## A disguise's health at one cubic metre, and how fast it rises with size. See
-## [DotPropDisguiseRules]: a cabinet is about nine bottles, not a hundred and fifty.
+## [GSPropDisguiseRules]: a cabinet is about nine bottles, not a hundred and fifty.
 @export_range(1.0, 1000.0, 1.0) var prop_health_scale: float = 190.0
 @export_range(0.0, 1.0, 0.01) var prop_health_exponent: float = 0.45
 @export_range(1.0, 1000.0, 1.0) var prop_min_health: float = 10.0
@@ -144,7 +144,7 @@ extends DotConfig
 @export_range(0.0, 50.0, 0.5) var decoy_penalty_min: float = 1.0
 
 ## What happens to a hunter who dies to the furniture: 0 nothing drawn, 1 they fall apart, 2
-## they burst. See [DotPlayerBreakRules].
+## they burst. See [GSPlayerBreakRules].
 @export_enum("none", "limbs", "explode") var hunter_break: int = 2
 
 ## What a disguised prop does when it is found: 0 bursts into its own pieces, as shot furniture
@@ -198,7 +198,7 @@ extends DotConfig
 ## Where map documents are read from, relative to this game's root.
 @export var map_directory: String = "maps"
 
-## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (dot-map's `DotMapRotationFile`).
+## The file that says which maps a server ROTATES: `cfg/maps.yml`, layered over the shipped `res://maps.yml` (dot-map's `GSMapRotationFile`).
 ## Empty, or no such file, rotates every map; one the rotation leaves out stays installed (`ph_map <id>` queues it) but is never drawn or balloted. `sv_map_rotation_file`.
 @export var map_rotation_file: String = "cfg/maps.yml"
 
@@ -290,8 +290,8 @@ const CFG_FILES := {
 
 
 ## The binder every entry point uses: [param config] layered, one cfg file per [constant CFG_FILES] entry.
-static func make_binder(config: DotConfig, json_path := "") -> DotGameConfigBinder:
-	var b := DotGameConfigBinder.create(config, "mg-prop-hunt", "ph", json_path)
+static func make_binder(config: GSConfig, json_path := "") -> GSGameConfigBinder:
+	var b := GSGameConfigBinder.create(config, "mg-prop-hunt", "ph", json_path)
 	b.grouped = true
 	b.group_files = CFG_FILES
 	return b
@@ -308,18 +308,18 @@ func cli_prefix() -> String:
 ## How many hunters a round with [param players] in it has. [param per] is a map's own
 ## players per hunter (0: the server's); the server's least and most hunters hold either way.
 func hunters_for(players: int, per: float = 0.0) -> int:
-	return DotTeamRotation.count_for(players, per if per > 0.0 else players_per_hunter, min_hunters, max_hunters)
+	return GSTeamRotation.count_for(players, per if per > 0.0 else players_per_hunter, min_hunters, max_hunters)
 
 
 ## The disguise rules, from this configuration.
-func disguise_rules() -> DotPropDisguiseRules:
-	var r := DotPropDisguiseRules.new()
+func disguise_rules() -> GSPropDisguiseRules:
+	var r := GSPropDisguiseRules.new()
 	apply_disguise_rules(r)
 	return r
 
 
 ## Writes the disguise numbers onto live rules (a workbench or cvar edit).
-func apply_disguise_rules(r: DotPropDisguiseRules) -> void:
+func apply_disguise_rules(r: GSPropDisguiseRules) -> void:
 	r.health_scale = prop_health_scale
 	r.health_exponent = prop_health_exponent
 	r.min_health = prop_min_health
@@ -334,29 +334,29 @@ func apply_disguise_rules(r: DotPropDisguiseRules) -> void:
 	r.reveal_paid_seconds = reveal_paid_seconds
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if round_seconds <= 0.0:
-		return DotResult.fail(DotError.CODE_INVALID, "A round has to last some time.")
+		return GSResult.fail(GSError.CODE_INVALID, "A round has to last some time.")
 
 	if players_per_hunter < 1.0:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"players_per_hunter is %.2f; it is 1 or more." % players_per_hunter)
 
 	if min_hunters < 1:
-		return DotResult.fail(DotError.CODE_INVALID, "min_hunters is %d; a round has at least one hunter." % min_hunters)
+		return GSResult.fail(GSError.CODE_INVALID, "min_hunters is %d; a round has at least one hunter." % min_hunters)
 
 	if max_hunters < 0:
-		return DotResult.fail(DotError.CODE_INVALID, "max_hunters is %d; it is 0 (no limit) or more." % max_hunters)
+		return GSResult.fail(GSError.CODE_INVALID, "max_hunters is %d; it is 0 (no limit) or more." % max_hunters)
 
 	if max_hunters > 0 and min_hunters > max_hunters:
-		return DotResult.fail(DotError.CODE_INVALID, "min_hunters is over max_hunters.")
+		return GSResult.fail(GSError.CODE_INVALID, "min_hunters is over max_hunters.")
 
 	if timeout_winner < 0 or timeout_winner > 2:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"timeout_winner is %d; it is 0 (draw), 1 (props) or 2 (hunters)." % timeout_winner)
 
 	if hunter_pick < 0 or hunter_pick > 2:
-		return DotResult.fail(DotError.CODE_INVALID,
+		return GSResult.fail(GSError.CODE_INVALID,
 			"hunter_pick is %d; it is 0 (random), 1 (queue) or 2 (swap)." % hunter_pick)
 
 	var rules := disguise_rules().validate()
@@ -364,7 +364,7 @@ func validate() -> DotResult:
 	if not rules.ok:
 		return rules
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func describe() -> Dictionary:

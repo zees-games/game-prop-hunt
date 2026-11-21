@@ -5,7 +5,7 @@ extends "dedicated_rotation.gd"
 ## The players' vote decides the next map: a ballot over the server's maps, one vote, and the round's end puts the winner on the next round.
 ## Driven by hand because stand-ins are not voters; hibernation: the director follows the server's and the ballot's timer waits with it.
 func _vote_sleeps_with_the_server(vote: Node) -> void:
-	var sleeper: DotVoteDirector = vote.get("director")
+	var sleeper: GSVoteDirector = vote.get("director")
 	_check(server.hibernation_changed.is_connected(sleeper.set_hibernating),
 		"the vote follows the server's hibernation without a line of this game's")
 	vote.set("_opened_this_map", true)
@@ -41,7 +41,7 @@ func _test_the_map_vote() -> void:
 	vote.call("refresh_maps")
 	var ids: Array = []
 
-	for choice: DotVoteChoice in (vote.get("source") as DotVoteListSource).entries:
+	for choice: GSVoteChoice in (vote.get("source") as GSVoteListSource).entries:
 		ids.append(String(choice.id))
 
 	_check(ids.has("ph_school") and ids.has("ph_house"), "it offers the delivered maps", str(ids))
@@ -53,11 +53,11 @@ func _test_the_map_vote() -> void:
 		and server.console.find_cvar("sv_map_menu_flag").get_string() == "generic"
 		and (menu_half.get("change_fn") as Callable).is_valid(),
 		"the map menu is there, staff-only by default, changing the map now")
-	var staff := DotCmdContext.new()
-	staff.source = DotCmdContext.Source.CHAT
+	var staff := GSCmdContext.new()
+	staff.source = GSCmdContext.Source.CHAT
 	staff.permissions = PackedStringArray(["generic"])
-	var player := DotCmdContext.new()
-	player.source = DotCmdContext.Source.CHAT
+	var player := GSCmdContext.new()
+	player.source = GSCmdContext.Source.CHAT
 	var offered: Dictionary = menu_half.call("offer", player)
 	_check((offered["maps"] as Array).size() > 1 and not bool(offered["allowed"]) and bool(offered["vote"]),
 		"a player is offered every map, as a vote")
@@ -71,8 +71,8 @@ func _test_the_map_vote() -> void:
 		"%s: %s" % [target, menu_changed.get("text", "")])
 
 	vote.set("voters_fn", func() -> Array: return [&"7"])
-	var director: DotVoteDirector = vote.get("director")
-	var opened := director.open_vote(DotVoteClock.REASON_MANUAL)
+	var director: GSVoteDirector = vote.get("director")
+	var opened := director.open_vote(GSVoteClock.REASON_MANUAL)
 	_check(opened.ok and director.is_voting(), "a ballot opens", opened.error.message if not opened.ok else "")
 
 	# The ballot is a sample of the maps, so the vote goes to one that is on it: a fixed id fell off
@@ -102,7 +102,7 @@ func _test_the_map_vote() -> void:
 
 
 ## Rock the vote, typed at the console, on the director the map vote built.
-func _test_rock_the_vote(vote: Node, director: DotVoteDirector) -> void:
+func _test_rock_the_vote(vote: Node, director: GSVoteDirector) -> void:
 		# Rock the vote, typed at the console as a player's !rtv reaches it. Under MANUAL a passed rtv answered "Rocked. 1 of 1." and no ballot came.
 		# Past dot-vote's cooldown, on the director alone so the map's own ballot timer does not open one first.
 	var laid := StringName(str(game.map_doc.get("id", "")))

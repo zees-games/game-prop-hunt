@@ -9,25 +9,25 @@ const PhPlayer := preload("ph_player.gd")
 ## the player and the tick. A hunter's gun is a weapon def (a shotgun may launch); the
 ## furniture's cost and a fall carry no direction, and push nothing.
 static func decide_death(
-	player: PhPlayer, damage: DotDamage, shooter: PhPlayer, rules: DotPlayerRagdollRules, tick: int
-) -> DotPlayerDeath:
+	player: PhPlayer, damage: GSDamage, shooter: PhPlayer, rules: GSPlayerRagdollRules, tick: int
+) -> GSPlayerDeath:
 	var weapon: Object = null
 	if shooter != null and shooter.weapons != null and shooter.weapons.arsenal != null and damage.weapon_id != &"":
 		weapon = shooter.weapons.arsenal.catalogue.get_def(damage.weapon_id)
 	var direction := damage.direction
 	if direction.length_squared() < 0.0001 and shooter != null and shooter != player:
 		direction = (player.controller.state.position - shooter.controller.state.position) * Vector3(1, 0, 1)
-	return DotPlayerDeath.decide(
+	return GSPlayerDeath.decide(
 		rules.reactions(), damage.is_headshot(), damage.amount, direction,
-		DotPlayerDeath.seed_of(player.entity_id, tick), weapon
+		GSPlayerDeath.seed_of(player.entity_id, tick), weapon
 	)
 
 
 ## The damages of a shot that took health from somebody else, as the shooter's hit confirmations.
 ## A refused hit, a dead body or the shooter's own splash is no confirmation anybody wants a marker for.
-static func confirmed_hits(shooter: PhPlayer, shot: DotShot) -> Array[DotDamage]:
-	var out: Array[DotDamage] = []
-	for damage: DotDamage in shot.damages:
+static func confirmed_hits(shooter: PhPlayer, shot: GSShot) -> Array[GSDamage]:
+	var out: Array[GSDamage] = []
+	for damage: GSDamage in shot.damages:
 		if damage == null or damage.refused or damage.health_lost <= 0.0 or damage.victim == shooter.entity_id:
 			continue
 		out.append(damage)

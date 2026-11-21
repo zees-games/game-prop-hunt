@@ -11,7 +11,7 @@ const PhPaths := preload("ph_paths.gd")
 const PhProjectileView := preload("ph_projectile_view.gd")
 
 ## One local player, a camera and a HUD over a [PhGame], offline or against a server. The offline half is not a demo mode:
-## the same world class with `authoritative` true, and all the difference is [PhNetBridge]. A [DotClientLink] in the registry
+## the same world class with `authoritative` true, and all the difference is [PhNetBridge]. A [GSClientLink] in the registry
 ## under `dot_client_link` means connected; `--offline` forces solo. A prop sees itself in third person (F5 swaps), a hunter down a gun.
 
 
@@ -31,22 +31,22 @@ var camera: Camera3D = null
 var projectile_view: PhProjectileView = null
 
 ## Asks a server whether this player may edit it (sv_workbench_remote); null offline.
-var workbench_remote: DotGameWorkbenchRemoteClient = null
+var workbench_remote: GSGameWorkbenchRemoteClient = null
 
 ## Whether the camera hangs behind the player. Follows the side; F5 swaps it.
 var third_person: bool = false
 
 ## The flashlight on the eye and the others' beams (dot-flashlight); the server owns on/off.
-var flash: DotFlashlight = null
-var flash_crowd: DotFlashlightCrowd = null
+var flash: GSFlashlight = null
+var flash_crowd: GSFlashlightCrowd = null
 var _flash_msec := -100000
 var _flash_retain := 0.0
 
 ## Whether the player chose the view with F5 this round, which the side then leaves alone.
 var _view_chosen: bool = false
 
-var _arm: DotCameraBoom = null
-var _fade: DotCameraFade = null
+var _arm: GSCameraBoom = null
+var _fade: GSCameraFade = null
 var _rig_height: float = 0.0
 
 var _firing: bool = false
@@ -57,20 +57,20 @@ var _alt: bool = false
 var base_fov: float = 90.0
 var _reloading: bool = false
 var _slot: int = 0
-var _wheel: DotWeaponWheel
+var _wheel: GSWeaponWheel
 
 ## The last whole second of the hide a beep was played for.
 var _beeped: int = -1
 
 ## Covers the screen, and keeps the local body and the input still, until the level is built,
-## the local player exists and its camera is current. It is [member DotGameClient.gate].
-var gate: DotLoadGate = null
+## the local player exists and its camera is current. It is [member GSGameClient.gate].
+var gate: GSLoadGate = null
 
 
 func _ready() -> void:
 	# First, before anything can be drawn: the platform puts the loading cover up, held until the
 	# player exists and the camera is current, and finds the link.
-	platform = DotGameClient.new()
+	platform = GSGameClient.new()
 	platform.name = "Platform"
 	platform.force_offline = force_offline
 	platform.spawned_fn = func() -> bool: return player != null
@@ -84,7 +84,7 @@ func _ready() -> void:
 	var loaded := binder.load_layers()
 
 	if not loaded.ok:
-		DotGameConfigBinder.fail_boot(get_tree(), loaded)
+		GSGameConfigBinder.fail_boot(get_tree(), loaded)
 		return
 
 	link = platform.link as Node
@@ -120,12 +120,12 @@ func _ready() -> void:
 		_start_offline()
 	else:
 		var netted := _build_netcode()
-		DotLog.result(CHANNEL, "the netcode", netted)
+		GSLog.result(CHANNEL, "the netcode", netted)
 		if netted.ok and link != null:
 			_start_remote_workbench()
 
 
-## The load gate is [member DotGameClient.gate]. Without it the first frames showed a half-built world: the body fell while shaders
+## The load gate is [member GSGameClient.gate]. Without it the first frames showed a half-built world: the body fell while shaders
 ## compiled, a HUD had no player until JOIN, and a map change tore the level down in front of a falling body. A frozen player is also
 ## skipped by [method PhPlayer.simulate]. Held while the old map goes, released once the new one stands ([signal PhGame.world_clearing], [signal PhGame.world_rebuilt]).
 func _hold_for_maps() -> void:
@@ -176,7 +176,7 @@ func _start_offline() -> void:
 		if id == &"local":
 			_on_hit(point, killed, headshot))
 	game.start()
-	DotLog.result(CHANNEL, "chat, offline", chat.attach(null))
+	GSLog.result(CHANNEL, "chat, offline", chat.attach(null))
 
 
 ## A solo stand-in's name: the server's list, through dot-bot's pick, so solo and a server
@@ -184,20 +184,20 @@ func _start_offline() -> void:
 static func _bot_name(index: int) -> String:
 	var taken: Array = []
 	for i in range(index):
-		taken.append(DotBotNames.pick(taken, i, PhGame.BOT_NAMES))
-	return DotBotNames.pick(taken, index, PhGame.BOT_NAMES)
+		taken.append(GSBotNames.pick(taken, i, PhGame.BOT_NAMES))
+	return GSBotNames.pick(taken, index, PhGame.BOT_NAMES)
 
 
 ## The client's network manager, configured and added; `net.setup()` follows.
 func _make_net() -> void:
-	net = DotNetManager.new()
+	net = GSNetManager.new()
 	net.name = "Net"
 	net.is_server = false
 	net.local_peer_id = multiplayer.get_unique_id() if multiplayer != null else 2
 	net.auto_tick = false
 	net.config_file = ""
 
-	var net_config := DotNetConfig.new()
+	var net_config := GSNetConfig.new()
 	net_config.tick_rate = game.tick_rate
 	net_config.snapshot_rate = PhGame.NET_SNAPSHOT_RATE
 	net_config.enable_prediction = true
@@ -235,7 +235,7 @@ func _connect_bridge() -> void:
 			var _heard := audio.on_weapon(who.global_position, kind))
 
 
-func _build_netcode() -> DotResult:
+func _build_netcode() -> GSResult:
 	# The server's `mp_teammate_passthrough` and every change to it, through the link: this end traces its own shots,
 	# and against a server on 0 or 2 they ended in (or went through) a team-mate where the server's did not.
 	# An older shell's link cannot say, and the manager keeps its default.
@@ -261,9 +261,9 @@ func _build_netcode() -> DotResult:
 	bridge.open_link(link)
 	_follow_server_cvars()
 	# Before the seal and in the server's order (after the bridge), or the actions stay local.
-	DotLog.result(CHANNEL, "avatar action message", DotGameAvatarActionMessage.register(net))
+	GSLog.result(CHANNEL, "avatar action message", GSGameAvatarActionMessage.register(net))
 	# The server's order again (after the avatar frame): the remote workbench's frame.
-	workbench_remote = DotGameWorkbenchRemoteClient.attach(net)
+	workbench_remote = GSGameWorkbenchRemoteClient.attach(net)
 	net.messages.seal()
 
 	_connect_bridge()
@@ -272,7 +272,7 @@ func _build_netcode() -> DotResult:
 		bridge.rtt_source = func() -> float:
 			return float(maxi(0, int(link.call("ping_ms"))))
 
-	DotLog.result(CHANNEL, "chat and voice", chat.attach(bridge))
+	GSLog.result(CHANNEL, "chat and voice", chat.attach(bridge))
 
 	if link != null and link.has_method("is_playing") and bool(link.call("is_playing")):
 		_say_ready()
@@ -422,7 +422,7 @@ func _hear_rig(armed: PhPlayer) -> void:
 	armed.weapons.used.connect(_on_rig_used.bind(armed))
 
 
-func _on_rig_used(outcome: DotWeaponOutcome, armed: PhPlayer) -> void:
+func _on_rig_used(outcome: GSWeaponOutcome, armed: PhPlayer) -> void:
 	if audio != null and is_instance_valid(armed):
 		var _heard := audio.on_weapon(armed.global_position, ZeeWeaponNet.kind_number(outcome.kind))
 
@@ -461,7 +461,7 @@ func is_hunter() -> bool:
 
 func _on_map(map_id: StringName) -> void:
 	if flash != null:
-		flash.allowed = DotFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
+		flash.allowed = GSFlashlightRules.allowed_on(game.flashlight_conf(), str(map_id))
 
 	# The new map's toys are heard: a ball's bounce, a barrel's knock.
 	if game.map != null and game.map.toys != null and audio != null and not game.map.toys.sound.is_connected(_toy_sound):
@@ -590,15 +590,15 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 	weapons.tick_rate = game.tick_rate
 	# The held weapon lowers at every brush that stops the player, fences and clip included.
 	weapons.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-	weapons.view_model_ref = DotNodeRef.of_path(view_model.get_path())
-	weapons.player_ref = DotNodeRef.of_path(player.get_path())
+	weapons.view_model_ref = GSNodeRef.of_path(view_model.get_path())
+	weapons.player_ref = GSNodeRef.of_path(player.get_path())
 	weapons.ads_rules = game.ads_rules
 	player.add_child(weapons)
 
 	var ready_now := weapons.setup()
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "the view model would not set up", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "the view model would not set up", {"why": ready_now.error.message})
 		_disarm_locally()
 		return
 
@@ -607,7 +607,7 @@ func _arm_locally(weapon_id: StringName = &"") -> void:
 	# headless_run's "the drawn gun is the armed one" holds it.
 	_give_locally(weapon_id)
 
-	weapons.used.connect(func(outcome: DotWeaponOutcome) -> void:
+	weapons.used.connect(func(outcome: GSWeaponOutcome) -> void:
 		if audio != null and camera != null:
 			var _heard := audio.on_weapon(camera.global_position, ZeeWeaponNet.kind_number(outcome.kind)))
 
@@ -619,7 +619,7 @@ func _give_locally(weapon_id: StringName) -> void:
 		return
 	var given := weapons.give(weapon_id)
 	if not given.ok:
-		DotLog.warn(CHANNEL, "the drawn rig refused a weapon", {"weapon": String(weapon_id), "why": given.error.message})
+		GSLog.warn(CHANNEL, "the drawn rig refused a weapon", {"weapon": String(weapon_id), "why": given.error.message})
 
 
 func _select_locally(weapon_id: StringName) -> void:
@@ -657,7 +657,7 @@ func _build_camera() -> void:
 
 	# Other players, handed over: hidden at the lens, faded in third person between the
 	# camera and you. It rides the camera wherever the camera goes.
-	_fade = DotCameraFade.new()
+	_fade = GSCameraFade.new()
 	_fade.name = "Fade"
 	_fade.bodies_fn = _other_players
 	camera.add_child(_fade)
@@ -700,7 +700,7 @@ func _place_camera() -> void:
 	# dot-core's boom (it was a spring arm, which cast a ray and snapped to its hit), swept
 	# from the eye or the prop's middle, the height above it added in the world's up.
 	var size := player.disguise.standing_size() if player.is_disguised() else Vector3(0.7, 1.8, 0.7)
-	_arm = DotCameraBoom.new()
+	_arm = GSCameraBoom.new()
 	_arm.name = "Chase"
 	_arm.spring_length = CHASE_BACK + maxf(size.x, size.z)
 	# Against the building and the furniture, never the player's own prop.
@@ -847,7 +847,7 @@ func _build_killcam() -> void:
 	killcam.over.connect(func(_skipped: bool) -> void: _reveal_round())
 	add_child(killcam)
 	var _mounted := KillPovView.mount(self, killcam)
-	winner_reveal = DotWinnerReveal.new()
+	winner_reveal = GSWinnerReveal.new()
 	winner_reveal.name = "WinnerReveal"
 	winner_reveal.skip_actions = PhKillcam.SKIP_ACTIONS
 	winner_reveal.hold_seconds = 4.0
@@ -857,7 +857,7 @@ func _build_killcam() -> void:
 
 ## dot-game's chat box and microphone, with this game's channels and voice format.
 func _build_chat() -> void:
-	chat = DotGameChatClient.new()
+	chat = GSGameChatClient.new()
 	chat.name = "Chat"
 	chat.channels = [
 		{"id": PhServices.CH_ALL, "label": "All", "colour": Color(0.93, 0.94, 0.96)},
@@ -867,7 +867,7 @@ func _build_chat() -> void:
 	chat.max_length = PhServices.chat_rules().max_length
 	chat.voice_config = PhServices.voice_format()
 	# A phone: three narrow rows in the corner, so a log line is not drawn across the thumbstick and the buttons.
-	if DotPlatform.has_touch():
+	if GSPlatform.has_touch():
 		chat.window_settings = {"max_lines": 3, "width": 200.0, "margin_left": 12.0, "margin_bottom": 8.0}
 	add_child(chat)
 
@@ -880,7 +880,7 @@ func _build_audio() -> void:
 	var ready_now := audio.setup()
 
 	if not ready_now.ok:
-		DotLog.warn(CHANNEL, "no sound", {"why": ready_now.error.message})
+		GSLog.warn(CHANNEL, "no sound", {"why": ready_now.error.message})
 		remove_child(audio)
 		audio.queue_free()
 		audio = null
@@ -890,21 +890,21 @@ func _build_audio() -> void:
 func _start_remote_workbench() -> void:
 	if workbench_remote == null:
 		return
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.name = "Workbench"
 	wb.remote_client = workbench_remote
 	wb.remote_fn = func() -> bool: return true
 	wb.config = {"enabled": false}
 	if game.config_binder != null:
-		for set: DotProfileSet in game.config_binder.profile_sets():
+		for set: GSProfileSet in game.config_binder.profile_sets():
 			wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	var _fl := game.flashlight_conf()
 	if game.flashlight_binder != null:
-		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+		for set: GSProfileSet in game.flashlight_binder.profile_sets():
 			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start(game.ensure_runtime())
-	DotLog.result(CHANNEL, "the remote workbench", started)
+	GSLog.result(CHANNEL, "the remote workbench", started)
 	if not started.ok:
 		wb.queue_free()
 		return
@@ -914,7 +914,7 @@ func _start_remote_workbench() -> void:
 
 
 func _build_ragdolls() -> void:
-	ragdolls = DotPlayerRagdolls.new()
+	ragdolls = GSPlayerRagdolls.new()
 	ragdolls.name = "Ragdolls"
 	ragdolls.rules = game.ragdoll_rules
 	ragdolls.sound_fn = _ragdoll_sound
@@ -946,9 +946,9 @@ func _build_break_rules() -> void:
 	if game.config.hunter_break == 0:
 		return
 
-	_break_rules = DotPlayerBreakRules.new()
-	_break_rules.mode = DotPlayerBreakRules.Mode.EXPLODE if game.config.hunter_break == 2 \
-		else DotPlayerBreakRules.Mode.LIMBS
+	_break_rules = GSPlayerBreakRules.new()
+	_break_rules.mode = GSPlayerBreakRules.Mode.EXPLODE if game.config.hunter_break == 2 \
+		else GSPlayerBreakRules.Mode.LIMBS
 	_break_rules.limbs = 3
 	_break_rules.criticals_only = false
 	_break_rules.force = 7.0
@@ -1014,7 +1014,7 @@ func _physics_process(delta: float) -> void:
 
 	# The clock still advances; only the sampling waits, so the mouse does not pile up a turn
 	# behind the cover and the server sees an idle body until it lifts.
-	var move := _sampler.sample(delta) if _sampler != null and not _covered() else DotFpsCommand.new()
+	var move := _sampler.sample(delta) if _sampler != null and not _covered() else GSFpsCommand.new()
 	_stamp(move)
 
 	# Snapshots read since the last frame are reconciled before the clock moves: the replay runs to the clock's
@@ -1046,7 +1046,7 @@ func _drive_offline() -> void:
 	_drive_view_model(pending)
 
 
-func _stamp(command: DotFpsCommand) -> void:
+func _stamp(command: GSFpsCommand) -> void:
 	if command == null:
 		return
 
@@ -1055,25 +1055,25 @@ func _stamp(command: DotFpsCommand) -> void:
 	command.set_button(PhNetCommand.BUTTON_RELOAD, _reloading)
 
 
-func _drive_view_model(command: DotFpsCommand) -> void:
+func _drive_view_model(command: GSFpsCommand) -> void:
 	if weapons == null or player == null:
 		return
 
-	var weapon_command := DotWeaponCommand.new()
-	weapon_command.set_button(DotWeaponCommand.BUTTON_AIM, _aim_sent())
+	var weapon_command := GSWeaponCommand.new()
+	weapon_command.set_button(GSWeaponCommand.BUTTON_AIM, _aim_sent())
 
 	if command != null:
-		weapon_command.set_button(DotWeaponCommand.BUTTON_ATTACK, command.is_pressed(PhNetCommand.BUTTON_FIRE))
-		weapon_command.set_button(DotWeaponCommand.BUTTON_ALT, command.is_pressed(PhNetCommand.BUTTON_ALT))
-		weapon_command.set_button(DotWeaponCommand.BUTTON_RELOAD, command.is_pressed(PhNetCommand.BUTTON_RELOAD))
+		weapon_command.set_button(GSWeaponCommand.BUTTON_ATTACK, command.is_pressed(PhNetCommand.BUTTON_FIRE))
+		weapon_command.set_button(GSWeaponCommand.BUTTON_ALT, command.is_pressed(PhNetCommand.BUTTON_ALT))
+		weapon_command.set_button(GSWeaponCommand.BUTTON_RELOAD, command.is_pressed(PhNetCommand.BUTTON_RELOAD))
 		weapon_command.yaw = command.yaw
 		weapon_command.pitch = command.pitch
 
 	weapon_command.slot = _slot
 	var _outcome := weapons.simulate_tick(weapon_command, game.round_number * 100000 + Engine.get_physics_frames())
 
-	var busy := weapon_command.is_pressed(DotWeaponCommand.BUTTON_ATTACK) \
-		or weapon_command.is_pressed(DotWeaponCommand.BUTTON_RELOAD) \
+	var busy := weapon_command.is_pressed(GSWeaponCommand.BUTTON_ATTACK) \
+		or weapon_command.is_pressed(GSWeaponCommand.BUTTON_RELOAD) \
 		or weapons.arsenal.is_reloading() or weapons.arsenal.is_switching()
 	_drawn_quiet = 0.0 if busy else _drawn_quiet + 1.0 / float(maxi(game.tick_rate, 1))
 	var _corrected := correct_drawn()
@@ -1195,7 +1195,7 @@ func _process(delta: float) -> void:
 
 	if weapons != null:
 		var speed := Vector2(state.velocity.x, state.velocity.z).length()
-		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != DotFpsState.Mode.AIR, state.crouch_fraction > 0.5)
+		weapons.drive_view(Vector2(state.yaw, state.pitch), speed, state.mode != GSFpsState.Mode.AIR, state.crouch_fraction > 0.5)
 
 	_present_effects(delta)
 
@@ -1252,7 +1252,7 @@ func _present_effects(delta: float) -> void:
 
 ## The pose the free camera holds between frames, seeded from the camera as it was the frame
 ## the roam began, so the spectator starts where they were looking.
-var _free_cam: DotSpectatorFreeCam = null
+var _free_cam: GSSpectatorFreeCam = null
 var _roam_seeded := false
 var _roam_look := Vector2.ZERO
 
@@ -1268,7 +1268,7 @@ func _watched_through_eyes() -> PhPlayer:
 
 	var mode := game.spectate.mode_of(player.player_id)
 
-	if mode != DotSpectatorView.Mode.FIRST_PERSON and mode != DotSpectatorView.Mode.FREEZE_CAM:
+	if mode != GSSpectatorView.Mode.FIRST_PERSON and mode != GSSpectatorView.Mode.FREEZE_CAM:
 		return null
 
 	return game.players.get(game.spectate.watching(player.player_id))
@@ -1307,7 +1307,7 @@ func _drive_spectator_camera() -> bool:
 	_roam_seeded = false
 
 	# Chase and death cameras pulled out of the house by dot-spectate, given the level.
-	var manager: DotSpectatorManager = game.spectate.manager
+	var manager: GSSpectatorManager = game.spectate.manager
 	if manager != null and manager.camera_world == null and game.physics != null:
 		manager.camera_world = camera.get_world_3d()
 		manager.camera_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
@@ -1338,7 +1338,7 @@ func _refresh_watching_line() -> void:
 ## The speed is the server's (`mp_freeroam_speed`), so a client cannot fly faster than it was told; the server holds only the mode.
 func _drive_free_camera() -> void:
 	if _free_cam == null:
-		_free_cam = DotSpectatorFreeCam.new()
+		_free_cam = GSSpectatorFreeCam.new()
 
 	_free_cam.rules = game.spectate.manager.rules
 
@@ -1365,7 +1365,7 @@ func _drive_free_camera() -> void:
 		move, shift, alt and not shift, get_process_delta_time())
 
 
-## Mouse motion while roaming, as radians for [method DotSpectatorFreeCam.look]: positive x
+## Mouse motion while roaming, as radians for [method GSSpectatorFreeCam.look]: positive x
 ## turns left (mouse right is negative), positive y looks up (mouse down is negative).
 func _roam_mouse(motion: InputEventMouseMotion) -> void:
 	var sampler := _sampler if _sampler != null else player.sampler
@@ -1428,7 +1428,7 @@ func spectate_step(direction: int) -> void:
 ## Returns how many are shown. Static so the net suite drives exactly this and not a copy.
 ## [param first_person] hides [param own]'s body; a prop is always drawn to its own player in third person.
 static func present_frame(
-	p_net: DotNetManager,
+	p_net: GSNetManager,
 	p_game: PhGame,
 	own: PhPlayer,
 	first_person: bool,
@@ -1483,7 +1483,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _covered():
 		return
 
-	# Tab, M and a click taking the pointer back are the platform's (DotGameClient).
+	# Tab, M and a click taking the pointer back are the platform's (GSGameClient).
 	if event.is_action_pressed("ui_cancel"):
 		# The button's release goes to the menu, so the aim is let go here or it sticks up.
 		_aiming = false
@@ -1553,7 +1553,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## carry nothing and have no item switching, so for them it does nothing.
 func _wheel_pressed(event: InputEvent) -> bool:
 	if _wheel == null:
-		_wheel = DotWeaponWheel.new()
+		_wheel = GSWeaponWheel.new()
 		_wheel.ring_provider = func() -> Array:
 			return weapons.arsenal.slots() if weapons != null and weapons.arsenal != null else []
 		_wheel.current_provider = func() -> Variant:
@@ -1636,10 +1636,10 @@ func _key_pressed(event: InputEvent) -> bool:
 
 
 ## The sound manager the flashlight clicks play through, or null before audio is up.
-func _flash_audio_ref() -> DotNodeRef:
+func _flash_audio_ref() -> GSNodeRef:
 	if audio == null or audio.manager == null or not audio.manager.is_inside_tree():
 		return null
-	return DotNodeRef.of_path(audio.manager.get_path())
+	return GSNodeRef.of_path(audio.manager.get_path())
 
 
 ## The light on the eye follows the server's state (but not for 0.4 s after our own switch); everybody else's beam, and ours when the camera is not our eye, comes from the crowd.
@@ -1650,10 +1650,10 @@ func _present_flashlights(delta: float) -> void:
 	if flash == null or not is_instance_valid(flash):
 		_make_flash(cfg)
 
-	flash.allowed = DotFlashlightRules.allowed_on(cfg, map_id)
+	flash.allowed = GSFlashlightRules.allowed_on(cfg, map_id)
 
 	if flash_crowd == null:
-		flash_crowd = DotFlashlightCrowd.new()
+		flash_crowd = GSFlashlightCrowd.new()
 		flash_crowd.name = "Flashlights"
 		flash_crowd.config = cfg
 		flash_crowd.audio = _flash_audio_ref()
@@ -1682,8 +1682,8 @@ func _present_flashlights(delta: float) -> void:
 		flash_crowd.retain(game.players.keys())
 
 
-func _make_flash(cfg: DotFlashlightConfig) -> void:
-	flash = DotFlashlight.new()
+func _make_flash(cfg: GSFlashlightConfig) -> void:
+	flash = GSFlashlight.new()
 	flash.name = "Flashlight"
 	flash.config = cfg
 	flash.handle_input = false

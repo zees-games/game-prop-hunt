@@ -1,6 +1,6 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
-## PhConfig through DotGameConfigBinder: fields, cvars, strict refusal, the diff, a shipped yml, the workbench round trip and HELLO.
+## PhConfig through GSGameConfigBinder: fields, cvars, strict refusal, the diff, a shipped yml, the workbench round trip and HELLO.
 ## Run: godot --headless --path . res://examples/headless_config.tscn
 
 const PhConfig := preload("../game/ph_config.gd")
@@ -21,7 +21,7 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.FATAL)
+	GSLog.set_level(GSLog.Level.FATAL)
 	_run.call_deferred()
 
 
@@ -50,9 +50,9 @@ func _run() -> void:
 			"friendly_fire", "min_players_to_start", "accelerate", "friction", "gravity", "map_rotation_file", "hunter_weapons"]:
 		_check(keys.has(k), "%s is exposed" % k)
 
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
-	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	binder.bind_cvars(console.cvar, GSConVar.FLAG_ARCHIVE, console.has_name)
 	console.set_cvar("ph_rounds_per_map", "7")
 	var fall := _fall_rules(console)
 	console.set_cvar("sv_falldamage", "0")
@@ -75,17 +75,17 @@ func _run() -> void:
 	_killcam_icon()
 	_finished += 1
 
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.panel_mode = 1
 	wb.config = {"enabled": false}
-	for set: DotProfileSet in binder.profile_sets():
+	for set: GSProfileSet in binder.profile_sets():
 		wb.add_set(set, set.rel_path)
 	add_child(wb)
 	_check(wb.start().ok, "the workbench starts")
 	binder.attach(wb.api.runtime)
 	var listed := PackedStringArray()
 	for kind: String in wb.api.kinds():
-		var got: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
+		var got: GSResult = wb.api.handle(GSGameWorkbench.LOCAL_ACTOR, {"op": "get", "kind": kind, "id": binder.profile_id})
 		if got.ok:
 			listed.append_array(PackedStringArray((got.value as Dictionary).get("values", {}).keys()))
 	var missing := PackedStringArray()
@@ -93,7 +93,7 @@ func _run() -> void:
 		if not listed.has(k):
 			missing.append(k)
 	_check(missing.is_empty() and binder.profile_sets().size() == 4, "the workbench lists all %d keys over %d files" % [keys.size(), binder.profile_sets().size()], ",".join(missing))
-	var res: DotResult = wb.api.handle(DotGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "hide_seconds", "value": 90.0})
+	var res: GSResult = wb.api.handle(GSGameWorkbench.LOCAL_ACTOR, {"op": "set", "kind": "config_round", "id": binder.profile_id, "key": "hide_seconds", "value": 90.0})
 	_check(res.ok and config.hide_seconds == 90.0, "a workbench edit reaches the live config")
 	var files: Dictionary = wb.exporter.call("collect")
 	var text: String = files.get("cfg/game/mg-prop-hunt/config_round/game.yml", "")
@@ -110,7 +110,7 @@ func _run() -> void:
 
 func _hello_carries_movement(config: PhConfig) -> void:
 	var move := config.movement_floats()
-	var hello := PhEvents.read_hello(DotNetReader.new(PhEvents.write_hello(3, 64, 10, 30.0, 300.0, 2.0, 60.0, move, true)))
+	var hello := PhEvents.read_hello(GSNetReader.new(PhEvents.write_hello(3, 64, 10, 30.0, 300.0, 2.0, 60.0, move, true)))
 	_check(bool(hello["ok"]) and hello["move"] == move and bool(hello["auto_hop"]), "the HELLO carries the movement numbers")
 
 
@@ -177,9 +177,9 @@ func _strict_refuses_an_unknown_key() -> void:
 
 
 ## Fall damage as this game binds it: on by default, a hard landing hurts, only a very high speed kills.
-func _fall_rules(console: DotConsole) -> DotFallDamageRules:
+func _fall_rules(console: GSConsole) -> GSFallDamageRules:
 	var fall := PhGame.make_fall_rules()
-	var _made := fall.bind_cvars(console.cvar, DotConVar.FLAG_NOTIFY)
+	var _made := fall.bind_cvars(console.cvar, GSConVar.FLAG_NOTIFY)
 	_check(console.get_int("sv_falldamage") == 1 and fall.enabled, "fall damage is on in this game")
 	_check(fall.damage_for(20.0) > 0.0 and fall.damage_for(5.0) == 0.0, "a hard landing hurts, a small one does not")
 	_check(console.get_int("sv_falldamage_lethal") == 40 and fall.damage_for(45.0) > 1000.0, "only a very high speed kills outright")
@@ -193,9 +193,9 @@ func _probe() -> void:
 	binder.strict = true
 	binder.roots = PackedStringArray([ProjectSettings.globalize_path(ROOT)])
 	var loaded := binder.load_layers()
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
-	binder.bind_cvars(console.cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+	binder.bind_cvars(console.cvar, GSConVar.FLAG_ARCHIVE, console.has_name)
 	print("PROBE ok=%s round=%s round_src=%s cooldown=%s cooldown_src=%s cvar=%s speed=%s speed_src=%s penalty=%s penalty_src=%s" % [
 		loaded.ok, config.round_seconds, binder.source_of("round_seconds"), config.reveal_cooldown, binder.source_of("reveal_cooldown"),
 		console.find_cvar("ph_reveal_cooldown").get_string(), config.run_speed, binder.source_of("run_speed"),
@@ -231,12 +231,12 @@ func _layers() -> void:
 	OS.unset_environment("PH_REVEAL_COOLDOWN")
 	_write("game/%s/config_round/game.yml" % GAME, "reveal_cooldown: 4.5\n")
 	_check(_child().contains("PROBE ok=false"), "strict: a key in the wrong file is refused")
-	var removed := DotPaths.remove_tree(ProjectSettings.globalize_path(ROOT))
+	var removed := GSPaths.remove_tree(ProjectSettings.globalize_path(ROOT))
 	_check(removed.ok and not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(ROOT)), "the per-process cfg fixture directory is removed", ROOT if removed.ok else str(removed.error))
 
 
 ## The shipped cfg files hold every key, in step with PhConfig, and change nothing as they are.
-func _templates(binder: DotGameConfigBinder) -> void:
+func _templates(binder: GSGameConfigBinder) -> void:
 	var files := binder.template_files()
 	_check(files.size() == 4, "four shipped cfg files", str(files.size()))
 	var stale := PackedStringArray()
@@ -248,7 +248,7 @@ func _templates(binder: DotGameConfigBinder) -> void:
 
 ## The killcam banner's weapon icon: DEATH carries the id, the moment keeps it, the banner draws it.
 func _killcam_icon() -> void:
-	var fatal := PhEvents.read_death(DotNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, null, &"pistol")))
+	var fatal := PhEvents.read_death(GSNetReader.new(PhEvents.write_death(5, 6, PhGame.DIED_SHOT, null, &"pistol")))
 	_check(bool(fatal["ok"]) and fatal.get("weapon_id", &"") == &"pistol", "a DEATH carries the weapon id")
 	var kc := PhKillcam.new()
 	add_child(kc)
@@ -271,11 +271,11 @@ func _killcam_icon() -> void:
 	_check(kc.round_ended() and kc.killcam.banner != null, "round_ended starts the killcam from the noted moment")
 	_check(seen == ["pistol"] and kc.killcam.banner.icon_rect.visible and kc.killcam.banner.icon_rect.texture != null, "round_ended hands the moment's weapon id to the banner, which shows its picture", str(seen))
 	subject.free()
-	_check(kc.camera_mode_fn.call() == DotKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
+	_check(kc.camera_mode_fn.call() == GSKillViewRules.Camera.EYE, "the killcam camera is the eye until the server says")
 	var pov := preload("../game/ph_kill_pov.gd")
 	_check(pov.weapon_name(pov.hash_of(&"pistol")) != "" and pov.weapon_name(0.0) == "" and pov.aux_of(null) == [0.0], "the killer's screen names a recorded weapon and nothing for an empty hand")
-	var framing := DotKillcamFraming.new(null, 1)
+	var framing := GSKillcamFraming.new(null, 1)
 	var eye := Transform3D(Basis.IDENTITY, Vector3(0, 1.6, 0))
-	var placed: Dictionary = framing.place(DotKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
+	var placed: Dictionary = framing.place(GSKillViewRules.Camera.BEHIND, eye, 75.0, Vector3(0, 1.2, -20))
 	_check((placed["transform"] as Transform3D).origin.z > 1.0, "the behind camera sits behind the killer's eye")
 	kc.free()

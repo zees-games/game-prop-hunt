@@ -1,4 +1,4 @@
-extends DotFpsController
+extends GSFpsController
 
 ## The first-person controller, with the one modifier this game adds: a hunter held still while the props hide.
 ## A modifier is part of the movement state, so it travels in the snapshot and a predicting client applies it on exactly the ticks the server does;
@@ -9,7 +9,7 @@ const BLINDFOLD := &"ph_blindfold"
 
 
 func _register_extensions() -> void:
-	var held := DotFpsModifier.make(BLINDFOLD)
+	var held := GSFpsModifier.make(BLINDFOLD)
 	held.deny_move = true
 	held.deny_jump = true
 	held.deny_crouch = true

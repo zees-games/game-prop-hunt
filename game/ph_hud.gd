@@ -9,7 +9,7 @@ const ZeeIds := preload("res://addons/zee_weapons/content/zee_weapon_ids.gd")
 
 ## What a player needs on screen: the clock, their side and how much of them is left, what they are hiding as, and a blindfold for hunters while the props hide.
 ## The blindfold is a black rect UNDER every widget; the server also holds a blindfolded hunter still ([PhController]) and fires their gun, so it relies on no honest client.
-## Glance pieces are dot-ui's ([DotScoreStrip], [DotVitals], [DotKeyPrompt]); key hints are read from the bindings table, so a rebound key is never a hint that lies.
+## Glance pieces are dot-ui's ([GSScoreStrip], [GSVitals], [GSKeyPrompt]); key hints are read from the bindings table, so a rebound key is never a hint that lies.
 
 const BLIND_FADE_SEC := 0.25
 const BLIND_COLOUR := Color(0.01, 0.01, 0.015)
@@ -30,7 +30,7 @@ const MAP_COLOUR := Color(0.80, 0.88, 0.98)
 ## so a light or high-contrast theme can change them. Static so a render tool can use it.
 static func piece_theme() -> Theme:
 	var t := Theme.new()
-	var type := DotHudPiece.THEME_TYPE
+	var type := GSHudPiece.THEME_TYPE
 	t.set_color(&"plate_edge", type, Color(MAP_COLOUR, 0.3))
 	t.set_color(&"highlight", type, MAP_COLOUR)
 	return t
@@ -72,22 +72,22 @@ var blindfold: ColorRect = null
 var _root: Control = null
 ## The clock, the props and hunters still up either side of it, and the caption and map
 ## name under it.
-var strip: DotScoreStrip = null
+var strip: GSScoreStrip = null
 ## Health, as a share of this body's or disguise's maximum, in the side's colour.
-var vitals: DotVitals = null
+var vitals: GSVitals = null
 ## "Look at a prop" with the disguise key drawn as a key, while a prop is undisguised.
-var prompt: DotKeyPrompt = null
+var prompt: GSKeyPrompt = null
 ## Bottom right, a hunter's: the weapon in hand and `magazine | reserve`. See [method _draw_ammo].
-var ammo: DotAmmoCounter = null
+var ammo: GSAmmoCounter = null
 ## The held weapon's sprite over [member ammo]; nothing drawn when it has none.
-var weapon_icon: DotWeaponIconPlate = null
+var weapon_icon: GSWeaponIconPlate = null
 ## The rig the counter reads: the gun the client draws (`PhClient.weapons`), which the server's
 ## count corrects (`PhClient._correct_drawn`). Unset, the player's own rig.
 var weapons_fn: Callable = Callable()
 
 ## Four ticks round the crosshair for a hit the server confirmed. See [method confirm_hit].
-var hit_fx: DotHitFeedback = null
-var hit_marker: DotHitMarker = null
+var hit_fx: GSHitFeedback = null
+var hit_marker: GSHitMarker = null
 var _shout: Label = null
 var _hints: Label = null
 var _as: Label = null
@@ -101,8 +101,8 @@ var _crosshair: Control = null
 var scope: ZeeScopeOverlay = null
 ## 0 at the hip to 1 down the sights, from the client's view model ([method set_aim]).
 var aim_fraction: float = 0.0
-## Whether the host's dot-ui has `DotCrosshair.opacity_for_aim` (API 5).
-var _fades: bool = DotAddonApi.build_level("dot_ui") >= 5
+## Whether the host's dot-ui has `GSCrosshair.opacity_for_aim` (API 5).
+var _fades: bool = GSAddonApi.build_level("dot_ui") >= 5
 var _shout_for: float = 0.0
 
 
@@ -142,7 +142,7 @@ func _build() -> void:
 	_blindfold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_blindfold_label.add_theme_color_override("font_color", Color(0.98, 0.78, 0.45))
 
-	# The glance pieces read their colours from the theme on the type DotHudPiece; set on
+	# The glance pieces read their colours from the theme on the type GSHudPiece; set on
 	# the root, every piece under it inherits them. See [method piece_theme].
 	_root.theme = piece_theme()
 	_follow()
@@ -150,7 +150,7 @@ func _build() -> void:
 	_build_top()
 	_build_bottom()
 
-	hit_fx = DotHitFeedback.mount(_root)
+	hit_fx = GSHitFeedback.mount(_root)
 	hit_marker = hit_fx.marker
 
 	_build_status_labels()
@@ -163,7 +163,7 @@ func _build() -> void:
 func _build_top() -> void:
 	# Top centre, full width because the strip centres itself on its own middle. Its plates
 	# span 388 pixels round the middle, clear of the key hints top left at 1280 x 720.
-	strip = DotScoreStrip.new()
+	strip = GSScoreStrip.new()
 	strip.name = "Clock"
 	strip.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
 	strip.offset_top = 14.0
@@ -171,7 +171,7 @@ func _build_top() -> void:
 	_root.add_child(strip)
 
 	# Under the crosshair: what the disguise key does right now.
-	prompt = DotKeyPrompt.new()
+	prompt = GSKeyPrompt.new()
 	prompt.name = "Prompt"
 	prompt.font_size = 19
 	prompt.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
@@ -205,7 +205,7 @@ func _build_bottom() -> void:
 	# Bottom left: health on its plate, and over it what you are, the rotation lock and the
 	# forced-taunt meter. The plate ends 214 pixels off the bottom, above the chat box's full
 	# eight-row log, which reaches 202 (checked in headless_run).
-	vitals = DotVitals.new()
+	vitals = GSVitals.new()
 	vitals.name = "Vitals"
 	vitals.bar_end = 220.0
 	vitals.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
@@ -217,8 +217,8 @@ func _build_bottom() -> void:
 	_root.add_child(vitals)
 
 	# Bottom right, a hunter's: what is in hand and how much is in it. It shares no corner with the chat box, health plate or ballot,
-	# and a ballot that does reach it dims it (DotHudPiece's cover); headless_run checks the corners.
-	ammo = DotAmmoCounter.new()
+	# and a ballot that does reach it dims it (GSHudPiece's cover); headless_run checks the corners.
+	ammo = GSAmmoCounter.new()
 	ammo.name = "Ammo"
 	ammo.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	ammo.offset_left = -420.0
@@ -236,7 +236,7 @@ func _build_bottom() -> void:
 	_root.add_child(ammo)
 
 	# The weapon's picture over the counter (`cl_weapon_icons`); hidden when it has none.
-	weapon_icon = DotWeaponIconPlate.new()
+	weapon_icon = GSWeaponIconPlate.new()
 	weapon_icon.name = "WeaponIcon"
 	weapon_icon.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	weapon_icon.offset_left = -204.0
@@ -364,7 +364,7 @@ func _process(delta: float) -> void:
 	# reads "Props win in · Maple Grove School".
 	var running := game.phase != PhGame.Phase.IDLE
 	strip.show_clock(
-		DotScoreStrip.clock_text(left) if running else "", running and left <= LOW_CLOCK_SEC,
+		GSScoreStrip.clock_text(left) if running else "", running and left <= LOW_CLOCK_SEC,
 		caption, str(game.map_doc.get("name", ""))
 	)
 	if running:
@@ -461,7 +461,7 @@ func _draw_hints(side: int) -> void:
 
 	var lines := PackedStringArray()
 
-	if side == PhGame.PROPS and DotPlatform.has_touch():
+	if side == PhGame.PROPS and GSPlatform.has_touch():
 		pass  # The phone's buttons are labelled; a list of keyboard keys beside them is noise.
 	elif side == PhGame.PROPS:
 		lines.append("%s  Become what you look at" % _key(PhBindings.DISGUISE))
@@ -475,7 +475,7 @@ func _draw_hints(side: int) -> void:
 		lines.append("Shoot the props. Shooting furniture hurts you.")
 		lines.append(_weapon_hint())
 		lines.append("%s  Aim   %s  Quick melee" % [_key(PhBindings.AIM), _key(PhBindings.BASH)])
-		if loadout_offered and not DotPlatform.has_touch():
+		if loadout_offered and not GSPlatform.has_touch():
 			lines.append("%s  Loadout (next round)" % _key(&"dot_menu_loadout"))
 
 	if side == PhGame.PROPS and player.reveal_wait > 0.0 and player.is_disguised():
@@ -557,9 +557,9 @@ func present_blind(delta: float) -> void:
 			var left := game.seconds_left()
 			# The strip's own words, so the two clocks on a hunter's screen never disagree by
 			# the second one rounds down and the other up.
-			_blindfold_label.text = "Blindfolded while the props hide\n%s" % DotScoreStrip.clock_text(left)
+			_blindfold_label.text = "Blindfolded while the props hide\n%s" % GSScoreStrip.clock_text(left)
 			# The hide is when a new loadout goes straight into the hands (PhGame.rearm_if_allowed).
-			if loadout_offered and not DotPlatform.has_touch():
+			if loadout_offered and not GSPlatform.has_touch():
 				_blindfold_label.text += "\n%s  Choose your loadout" % _key(&"dot_menu_loadout")
 
 
@@ -585,14 +585,14 @@ func crosshair_opacity(fraction: float) -> float:
 	if not _fades:
 		return 1.0
 	# Through a Variant: named directly, an older dot-ui without it fails to compile this script.
-	var crosshair: Variant = DotCrosshair
+	var crosshair: Variant = GSCrosshair
 	return float((crosshair as Script).call(&"opacity_for_aim", fraction))
 
 
-## dot-ui's DotCrosshair as a plain dot (API 14; aim fade and scope stay on `modulate`), else the old square.
+## dot-ui's GSCrosshair as a plain dot (API 14; aim fade and scope stay on `modulate`), else the old square.
 func _make_crosshair() -> Control:
-	if DotAddonApi.build_level("dot_ui") >= 14:
-		var shape: Variant = DotCrosshair
+	if GSAddonApi.build_level("dot_ui") >= 14:
+		var shape: Variant = GSCrosshair
 		var cross := (shape as GDScript).new() as Control
 		cross.name = "Crosshair"
 		cross.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

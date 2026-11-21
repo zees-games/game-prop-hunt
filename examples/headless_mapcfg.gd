@@ -1,4 +1,4 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 ## A map's file sets the whitelisted round cvars and the next map gets the previous values back.
 ## Run: godot --headless --path . res://examples/headless_mapcfg.tscn
@@ -10,13 +10,13 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
 func _run() -> void:
 	print("mg-prop-hunt: per-map cvars")
-	if not ResourceLoader.exists(DotGameMapConfig.SCRIPT_PATH):
+	if not ResourceLoader.exists(GSGameMapConfig.SCRIPT_PATH):
 		print("SKIPPED: dot-map is not linked")
 		get_tree().quit(0)
 		return
@@ -28,12 +28,12 @@ func _run() -> void:
 	_check(keys.has("ph_round_seconds") and keys.has("mp_killcam_time") and not keys.has("sv_cheats"), "the module whitelists round cvars only")
 	_check(game_id == "mg-prop-hunt", "the files are read from cfg/game/mg-prop-hunt")
 
-	var console := DotConsole.new()
+	var console := GSConsole.new()
 	add_child(console)
-	console.cvar("ph_round_seconds", "300", "", DotConVar.FLAG_ARCHIVE)
-	console.cvar("ph_hide_seconds", "30", "", DotConVar.FLAG_ARCHIVE)
-	DotAddonConfig.config_root = ProjectSettings.globalize_path("res://examples/fixtures/mapcfg")
-	var cfg := DotGameMapConfig.for_console(game_id, console, keys)
+	console.cvar("ph_round_seconds", "300", "", GSConVar.FLAG_ARCHIVE)
+	console.cvar("ph_hide_seconds", "30", "", GSConVar.FLAG_ARCHIVE)
+	GSAddonConfig.config_root = ProjectSettings.globalize_path("res://examples/fixtures/mapcfg")
+	var cfg := GSGameMapConfig.for_console(game_id, console, keys)
 	var got := cfg.apply("ph_short_house")
 	_check(not got.is_empty(), "a map's file applies something (%s)" % [got])
 	_check(console.find_cvar("ph_round_seconds").get_float() == 120.0 and console.find_cvar("ph_hide_seconds").get_float() == 15.0, "the file's values are set")

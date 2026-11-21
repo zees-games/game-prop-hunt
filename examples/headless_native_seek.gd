@@ -1,11 +1,11 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 const PhSeek := preload("../game/ph_bots_seek.gd")
 const PhPlayer := preload("../game/ph_player.gd")
 
-## The seeking hunters' senses in one dot-sim call a tick ([code]DotSimHunterSeek[/code],
+## The seeking hunters' senses in one dot-sim call a tick ([code]GSSimHunterSeek[/code],
 ## [member PhSeek.seek_mode]) play exactly as the script's: two seeded servers of the same round in
 ## lockstep, one asking in script and one native, each in its own physics world, must match to the
 ## bit every tick (hunters' places, aims, doubt, tests and searches; props' places and lives).
@@ -26,7 +26,7 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -38,7 +38,7 @@ func _run() -> void:
 	_entered += 1
 	print("the hunters' senses are native by default, and the library has them")
 	_check(PhSeek.seek_mode == "native", "PhBots.seek_mode is native without the game turning it on")
-	if not DotSim.has(&"seek") or not DotSim.has(&"sight"):
+	if not GSSim.has(&"seek") or not GSSim.has(&"sight"):
 		print("  dot-sim's seek module is not loaded: the native half is skipped")
 		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
@@ -82,7 +82,7 @@ func _make_game(id: String, tag: String) -> PhGame:
 	game.register_service = false
 	view.add_child(game)
 	game.set_physics_process(false)
-	var _set := DotBotSettings.of(game).set_difficulty("medium")
+	var _set := GSBotSettings.of(game).set_difficulty("medium")
 	return game
 
 

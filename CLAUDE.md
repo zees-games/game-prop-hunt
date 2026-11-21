@@ -27,22 +27,22 @@ game/
   ph_props.gd        the prop catalogue (props/catalogue.json): sizes, models, recolour, parts
   ph_materials.gd    the surfaces a box is drawn with: Kenney's grid under pastels, the rest made in code
   ph_catalogue.gd    every map the server has, the built-in practice house, which is next
-  ph_controller.gd   DotFpsController with the blindfold modifier
+  ph_controller.gd   GSFpsController with the blindfold modifier
   ph_player.gd       one person: a body or a disguise, its hull, hitboxes, health, reveal, beacon
   ph_game.gd         the simulation: the draw, hide/seek, disguises, taunts, decoys, beacons
   ph_bots.gd         the stand-ins: hide as what belongs there, search, test what looks wrong
-  ph_rules.gd        a DotMatchRules whose outcome is whatever PhGame decided
+  ph_rules.gd        a GSMatchRules whose outcome is whatever PhGame decided
   ph_loadout.gd      a hunter's loadout as dot-loadout data (B)
   ph_projectiles.gd  grenades in flight and where they go off; ph_projectile_view.gd draws them
-  ph_killcam.gd      the round's last moment: every drawn frame into dot-replay's DotKillcamBuffer, replayed from the finder's eyes (or a hidden prop's on a time-out)
+  ph_killcam.gd      the round's last moment: every drawn frame into dot-replay's GSKillcamBuffer, replayed from the finder's eyes (or a hidden prop's on a time-out)
   ph_hud.gd          the clock, hints, health, what you are, the taunt meter, the blindfold (dot-ui pieces)
   ph_audio.gd        the round's cues (made in code) and taunts played from a prop
-  ph_client.gd       one local player, alone or against a server; third person as a prop; its platform wiring (loading cover, settings, console, Tab, M, pointer, input block) is dot-game's `DotGameClient` (`platform`)
+  ph_client.gd       one local player, alone or against a server; third person as a prop; its platform wiring (loading cover, settings, console, Tab, M, pointer, input block) is dot-game's `GSGameClient` (`platform`)
   ph_flashlight.gd   dot-flashlight's config and binder (`ph_flashlight_*`, key L: F is the hunter's melee) and the map-ambient start rule; either side may use it, the server owns it, a lit beam gives a prop away
   ph_bindings.gd     every key, as dot-menu bindings; ph_settings.gd the Escape menu
-  ph_module.gd       the DotGameModule: cvars, ph_status / ph_maps / ph_taunts / ph_map, stand-ins
+  ph_module.gd       the GSGameModule: cvars, ph_status / ph_maps / ph_taunts / ph_map, stand-ins
   ph_services.gd     chat, voice and moderation over dot-game's base
-  ph_progress.gd     stats and achievements; ph_vote.gd the map vote; ph_spectate.gd who watches whom (free roam is on by default: G, `mp_freeroam`, `mp_forcecamera`; the camera is the client's `DotSpectatorFreeCam`, the server holds only the mode)
+  ph_progress.gd     stats and achievements; ph_vote.gd the map vote; ph_spectate.gd who watches whom (free roam is on by default: G, `mp_freeroam`, `mp_forcecamera`; the camera is the client's `GSSpectatorFreeCam`, the server holds only the mode)
   net/               the codec (MAP, DISGUISE, TAUNT, DECOY…), the link, the player behaviour,
                      the bridge, and PhInterest (the blindfold on the wire)
 props/               kits.json (which Kenney models, at what scale), catalogue.json (measured)
@@ -71,18 +71,18 @@ Short forms; the reasoning is in the linked file.
 
 **Config, workbench and noblock**
 
-- Every `PhConfig` field is a `ph_<field>` cvar, a key in one of four `cfg/game/mg-prop-hunt/config_<round|props|hunters|maps>/game.yml` files (`PhConfig.CFG_FILES` maps each `@export_group`; every key is shipped commented out at its default by `addons/dot_game/qa/dot_game_cfg_templates.gd`, which `headless_config` holds in step; operator override under `cfg/server/...`; a key in the wrong file stops a dedicated boot) and a workbench set per file (the `ph_ambient*` cvars are a fifth, "ambience", started once the module has bound them), through dot-game's `DotGameConfigBinder` (`ph_config_diff`, `ph_config_dump`); an unknown key stops a dedicated boot. The older names (`ph_side_choice`, `ph_autobhop`, `ph_reveal_points`, `ph_min_players`, `sv_map_rotation_file`) are aliases of a field, and `PhModule._on_config_field` pushes an edit into what the world copied (taunts, disguise rules, damage rules, movement). The movement numbers travel in the HELLO (`PhConfig.movement_floats`), so a client predicts with the server's; the death/freeze camera, debris lifetime and bot budgets stay in code. [suite](examples/headless_config.gd)
-- `mp_teamblock` 0 / `mp_enemyblock` 1 and `!block` / `!noblock` come from dot-game's `DotGameNoblock`, sides from `PhGame.team_of_side`. Players never collide here (the layout, and a disguise's hull is its prop's), so `body_rules` stays non-solid and no block setting changes anything physical.
+- Every `PhConfig` field is a `ph_<field>` cvar, a key in one of four `cfg/game/mg-prop-hunt/config_<round|props|hunters|maps>/game.yml` files (`PhConfig.CFG_FILES` maps each `@export_group`; every key is shipped commented out at its default by `addons/dot_game/qa/dot_game_cfg_templates.gd`, which `headless_config` holds in step; operator override under `cfg/server/...`; a key in the wrong file stops a dedicated boot) and a workbench set per file (the `ph_ambient*` cvars are a fifth, "ambience", started once the module has bound them), through dot-game's `GSGameConfigBinder` (`ph_config_diff`, `ph_config_dump`); an unknown key stops a dedicated boot. The older names (`ph_side_choice`, `ph_autobhop`, `ph_reveal_points`, `ph_min_players`, `sv_map_rotation_file`) are aliases of a field, and `PhModule._on_config_field` pushes an edit into what the world copied (taunts, disguise rules, damage rules, movement). The movement numbers travel in the HELLO (`PhConfig.movement_floats`), so a client predicts with the server's; the death/freeze camera, debris lifetime and bot budgets stay in code. [suite](examples/headless_config.gd)
+- `mp_teamblock` 0 / `mp_enemyblock` 1 and `!block` / `!noblock` come from dot-game's `GSGameNoblock`, sides from `PhGame.team_of_side`. Players never collide here (the layout, and a disguise's hull is its prop's), so `body_rules` stays non-solid and no block setting changes anything physical.
 
 **Hunters, decoys and stand-ins**
 
 - A shot landing in a map prop's box and not on a player is a decoy, charged per pellet (`PhGame._charge_for_decoys`, `decoy_penalty`, `decoy_penalty_min`). [design](docs/design.md#decision-3-a-wrong-guess-costs-and-the-furniture-decides-what-is-wrong)
 - A map may set its own share of hunters (`players_per_hunter`, `PhConfig.hunters_for(players, per)`; the server's least and most still hold), as it sets its round and hide; `headless_bots` holds each map to its own band, not only the mean; a one-round shift is noise (any body in the physics space re-rolls a knife-edge round), so judge a map on its own 48 (`--map`). [history](docs/history.md#the-schools-toys-were-not-the-schools-problem-2026-10-13)
-- Stand-ins are `ph_bots.gd` on dot-bot (`DotBotNav`, `DotBotHiding`, `DotBotSearch`, `DotBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing; the map's spots come from dot-npc-ai's annotator (`ph_nav_annotator.gd`, `ph_bot_nav`). Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
+- Stand-ins are `ph_bots.gd` on dot-bot (`GSBotNav`, `GSBotHiding`, `GSBotSearch`, `GSBotAim`): a prop hides beside a piece of its kind and becomes it; a hunter searches and tests by suspicion, never by knowing; the map's spots come from dot-npc-ai's annotator (`ph_nav_annotator.gd`, `ph_bot_nav`). Never set `command.yaw` straight onto a target. A change to them is not done until `headless_bots` passes its bands. [bots](docs/bots.md)
 - A stand-in prop never hops while disguised (a sink in mid-air), and "hurt" is health lost under the same disguise (a new disguise's maximum is no shot). [bots](docs/bots.md#a-prop-hides-as-what-belongs-there)
 - The drawn gun holds only what the server armed (`PhClient._arm_locally` gives each `player_armed` weapon; never `give_everything`); one hunter weapon per slot (`PhGame.hunter_slot_clash` warns). [history](docs/history.md#the-hunters-weapons-were-completely-broken-2026-10-12)
-- Hunters throw the gun in hand with Q (`PhBindings.DROP_WEAPON`, ask `DROP_WEAPON`) and leave it where they die; a hunter takes one by walking over it (`sv_weapon_drop_auto` on). `PhWeaponLayer` is dot-weapon's `DotWeaponDrops` on both ends under the replicated `sv_weapon_drop*` cvars; `PhWeaponNet` carries it (WEAPON_DROP/SETTLED/GONE/LOST), and the thrower's client drops the gun from its rig on WEAPON_LOST. Known gap: a gun picked up arms the client rig with default ammunition. [suite](examples/headless_weapondrop.gd)
-- B is a hunter's loadout (dot-loadout's `DotLoadoutCommand`, `ph_loadout.gd`, owner's `mp_loadout_*`); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round. The grenade slot (5) is optional and empty by default. [design](docs/design.md#a-hunters-loadout-and-aiming)
+- Hunters throw the gun in hand with Q (`PhBindings.DROP_WEAPON`, ask `DROP_WEAPON`) and leave it where they die; a hunter takes one by walking over it (`sv_weapon_drop_auto` on). `PhWeaponLayer` is dot-weapon's `GSWeaponDrops` on both ends under the replicated `sv_weapon_drop*` cvars; `PhWeaponNet` carries it (WEAPON_DROP/SETTLED/GONE/LOST), and the thrower's client drops the gun from its rig on WEAPON_LOST. Known gap: a gun picked up arms the client rig with default ammunition. [suite](examples/headless_weapondrop.gd)
+- B is a hunter's loadout (dot-loadout's `GSLoadoutCommand`, `ph_loadout.gd`, owner's `mp_loadout_*`); a choice is in the hands at once only in the hide (`PhGame.rearm_if_allowed`), else next round. The grenade slot (5) is optional and empty by default. [design](docs/design.md#a-hunters-loadout-and-aiming)
 - Grenades fly in `ph_projectiles.gd` (FC's), server and solo; one LAUNCH per throw and a client flies a copy that decides nothing; a blast that hurts no prop by furniture is one decoy (`PhGame.blast_cost`). [design](docs/design.md#grenades)
 - Right mouse aims down the sights (`PhBindings.AIM`; quick melee F); the lens zooms from `PhClient.base_fov`, where the menu's field of view binds, never the camera; the aim bit is in the command (see the Aim-down-sights line below). [design](docs/design.md#a-hunters-loadout-and-aiming)
 - `PhClient.correct_drawn` brings the drawn gun to the server's count once quiet 0.6 s (offline the world's rig, online the owner-only `net_magazine`/`net_reserve`). [hud](docs/hud.md)
@@ -97,8 +97,8 @@ Short forms; the reasoning is in the linked file.
 **Taunts, beacons, sides**
 
 - Taunts start with the seek, play from where the prop stands to `taunt_range`; standing still `auto_taunt_seconds` (60, as game-hide-n-seek) taunts for you. The list is `taunts/taunts.json`. [design](docs/design.md#decision-4-taunts-are-a-choice-with-a-price-and-standing-still-is-not-free)
-- The last prop pings (`beacon_props_left` 1); the time beacon (`beacon_seconds_left`) is off by default because it decided rounds the props had held (`DotFxBeacon`). [design](docs/design.md#decision-5-the-end-of-a-round-finds-the-last-props)
-- Sides are `DotTeamRotation` (RANDOM, QUEUE, SWAP); `!hunter`/`!prop`/`!any` are wishes. Stats are `PhProgress` over dot-stats and dot-achievements. [design](docs/design.md#sides-points-and-stats)
+- The last prop pings (`beacon_props_left` 1); the time beacon (`beacon_seconds_left`) is off by default because it decided rounds the props had held (`GSFxBeacon`). [design](docs/design.md#decision-5-the-end-of-a-round-finds-the-last-props)
+- Sides are `GSTeamRotation` (RANDOM, QUEUE, SWAP); `!hunter`/`!prop`/`!any` are wishes. Stats are `PhProgress` over dot-stats and dot-achievements. [design](docs/design.md#sides-points-and-stats)
 - `PhGame` has no `var rotation` (it shadowed `Node3D.rotation`); the draw's memory is `hunter_history`. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
 **HUD and menus**
@@ -107,11 +107,11 @@ Short forms; the reasoning is in the linked file.
 - **Sound follows the map document** (box `mat` → footsteps by surface, `ceiling`/`roof` boxes → indoor zones, `PhAudio.MAP_SOUND` beds); levels by dot-audio's `loudness.sh`, −17 LUFS. [hud](docs/hud.md#sound)
 - **H is help and M is the map list** (dot-menu's stock keys): nothing in `PhBindings` may default to either; `headless_run` and `dedicated` check it. A map choice never reaches `_on_taunt_picked`. [hud](docs/hud.md)
 
-- **A round ends on its last moment** (`PhKillcam`): the last hider found (the hunter's eyes) or the clock running out (a prop still hidden) is replayed, then dot-ui's `DotWinnerReveal` names the winning side and its best three, then the Tab board. `mp_killcam_time` (REPLICATED, 0 off by default, 7 is the usual length) is added to the intermission on the server (`PhGame.apply_intermission`, not when the intermission is 0); `reduce_motion` (General, Comfort) shows the reveal's last frame at once. `requires.floor.json` asks for dot-ui 13 (weapon icons, `ph_weapon_icons.gd`; the HUD sprite over the counter, loadout cards, `cl_weapon_icons`). The banner shows the killing weapon's icon: DEATH carries `weapon_id` (no protocol version; client and server change together), `PhKillcam` wires `icon_provider` to `PhWeaponIcons`. `tools/shot.sh --view=killcam --seconds=2|9.5` renders both (`--ph-killcam-seconds=7` for the replay). Needs dot-replay (2) and dot-ui (9).
+- **A round ends on its last moment** (`PhKillcam`): the last hider found (the hunter's eyes) or the clock running out (a prop still hidden) is replayed, then dot-ui's `GSWinnerReveal` names the winning side and its best three, then the Tab board. `mp_killcam_time` (REPLICATED, 0 off by default, 7 is the usual length) is added to the intermission on the server (`PhGame.apply_intermission`, not when the intermission is 0); `reduce_motion` (General, Comfort) shows the reveal's last frame at once. `requires.floor.json` asks for dot-ui 13 (weapon icons, `ph_weapon_icons.gd`; the HUD sprite over the counter, loadout cards, `cl_weapon_icons`). The banner shows the killing weapon's icon: DEATH carries `weapon_id` (no protocol version; client and server change together), `PhKillcam` wires `icon_provider` to `PhWeaponIcons`. `tools/shot.sh --view=killcam --seconds=2|9.5` renders both (`--ph-killcam-seconds=7` for the replay). Needs dot-replay (2) and dot-ui (9).
 
 **Maps and drawing**
 
-- Boxes are batched by material, tint and 12 m chunk (Compatibility lights a mesh with at most eight omni lights); props are one `MultiMeshInstance3D` per model part; opaque boxes also get dot-lighting's `DotContactShade` (by path, API 4), and unbreakable block furniture too (`PhMap._shades_floor`). [drawing](docs/drawing.md#contact-shade)
+- Boxes are batched by material, tint and 12 m chunk (Compatibility lights a mesh with at most eight omni lights); props are one `MultiMeshInstance3D` per model part; opaque boxes also get dot-lighting's `GSContactShade` (by path, API 4), and unbreakable block furniture too (`PhMap._shades_floor`). [drawing](docs/drawing.md#contact-shade)
 - Rooms are pastel over Kenney's grid (`PhMaterials.PASTELS`), furniture keeps Kenney's colours except where `props/kits.json` recolours a kit; check both renderers. [drawing](docs/drawing.md)
 - A spawn is written before a room is furnished: `headless_maps` catches one inside furniture, and mg-prop-hunt-maps' builder moves them. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 - Nothing stands in a doorway or out in a hallway: mg-prop-hunt-maps' builder refuses it; `headless_bots` holds every hiding place reachable from the props' start. [history](docs/history.md#the-bots-did-not-know-how-to-play-and-the-school-was-in-the-way-2026-10-12)
@@ -119,7 +119,7 @@ Short forms; the reasoning is in the linked file.
 
 **Delivery**
 
-- **Workshop maps** (`provides.json` `accepts`: kinds `["map"]`, `map_kinds` `["prophunt"]`; no props, because a disguise is a measured hull, see [not-yet](docs/not-yet.md)): a pack `map` entry's `scene` is a prop-hunt map DOCUMENT whose `id` equals the entry's. `PhCatalogue.follow_content` reads `DotContentIndex.shared()` on every `playable()`, so solo (M, vote, change-map) lists it as "Name [Pack]" and an online session sees none; the game's own ids win and a bad document is refused cleanly. `PhVote` follows the index through dot-vote's `follow_content`, so `maps_fn` returns only the game's own maps. `headless_workshop` holds it; `tools/shot.sh --view=maps` renders it. [delivery](docs/delivery.md#the-workshop-solo-only)
+- **Workshop maps** (`provides.json` `accepts`: kinds `["map"]`, `map_kinds` `["prophunt"]`; no props, because a disguise is a measured hull, see [not-yet](docs/not-yet.md)): a pack `map` entry's `scene` is a prop-hunt map DOCUMENT whose `id` equals the entry's. `PhCatalogue.follow_content` reads `GSContentIndex.shared()` on every `playable()`, so solo (M, vote, change-map) lists it as "Name [Pack]" and an online session sees none; the game's own ids win and a bad document is refused cleanly. `PhVote` follows the index through dot-vote's `follow_content`, so `maps_fn` returns only the game's own maps. `headless_workshop` holds it; `tools/shot.sh --view=maps` renders it. [delivery](docs/delivery.md#the-workshop-solo-only)
 - No `class_name` anywhere in `game/`: a mounted pack cannot register one. [delivery](docs/delivery.md)
 - `game.yml` does not name the maps pack; the owner names it in dot-server-deploy's `cfg/content.yml`, and `PhModule._add_delivered_maps` mounts it at load and after `ph_reload`. [delivery](docs/delivery.md)
 - Under MANUAL `PhVote` opens a passed rock-the-vote itself, and `_game_load` refreshes the map list after `_add_delivered_maps`; `dedicated` arms both. [delivery](docs/delivery.md)
@@ -127,7 +127,7 @@ Short forms; the reasoning is in the linked file.
 - `project.godot` carries no comments; `PhConfig.gravity` goes onto the world's own space (a project setting does not travel in a pack); the renderer is `gl_compatibility`. [delivery](docs/delivery.md#project-settings)
 - A shell that lacks an addon, or a stale class cache, fails the delivered client's parse: dot-server-deploy's `prophunt_client` finds it. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
-- **A map reaches a client as GameSpice Core's `DotWireDoc`** (`PhMapDoc.encode`/`decode`/`digest` are thin: the game normalises and validates, the deflate framing and its refusals are the addon's, API 41).
+- **A map reaches a client as GameSpice Core's `GSWireDoc`** (`PhMapDoc.encode`/`decode`/`digest` are thin: the game normalises and validates, the deflate framing and its refusals are the addon's, API 41).
 
 ## Visual QA
 
@@ -158,6 +158,6 @@ Without `maps/` linked in (CI clones this repository alone) `headless_maps` chec
 1. **Put it live.** Tag the addons above, rebuild the shell, publish the maps pack before the game.
 2. **Try it in a browser**, with people: how long a hide should be and how much a decoy should cost are numbers only play settles.
 
-**Per-map settings** (`PhModule._map_config_keys`, dot-game's `DotGameMapConfig`): `cfg/game/mg-prop-hunt/dot_map/map/<map>.yml` (globs such as `ph_%.yml`; `cfg/server/...` overrides) may set the `ph_*` round tunables and `mp_killcam_time`; the next map restores them. The client predicts with none of them, so it wires nothing. `examples/headless_mapcfg` checks it. No `ph_*` BSP is in dot-map's store, so the shipped `ph_%.yml` is a commented template, not converter output.
+**Per-map settings** (`PhModule._map_config_keys`, dot-game's `GSGameMapConfig`): `cfg/game/mg-prop-hunt/dot_map/map/<map>.yml` (globs such as `ph_%.yml`; `cfg/server/...` overrides) may set the `ph_*` round tunables and `mp_killcam_time`; the next map restores them. The client predicts with none of them, so it wires nothing. `examples/headless_mapcfg` checks it. No `ph_*` BSP is in dot-map's store, so the shipped `ph_%.yml` is a commented template, not converter output.
 
 - Publish: `tools/publish.sh --version V` (or `--bump patch`) wraps dot-cloud's publish_pack.sh with this pack's id, exclusions and lock; pass `--site` and `--token-file`.

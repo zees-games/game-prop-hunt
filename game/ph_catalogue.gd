@@ -25,7 +25,7 @@ var refused: Dictionary = {}
 var workshop: Dictionary = {}
 
 ## The Workshop's index and the `map_kind`s taken from it; see [method follow_content].
-var content_index: DotContentIndex = null
+var content_index: GSContentIndex = null
 var content_kinds: PackedStringArray = PackedStringArray()
 
 var _order: Array[StringName] = []
@@ -60,7 +60,7 @@ func load_from(directory: String) -> int:
 	loaded += _read_directory(USER_MAPS)
 	_rebuild_order()
 
-	DotLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
+	GSLog.info(CHANNEL, "maps loaded", {"maps": maps.size(), "refused": refused.size()})
 	return loaded
 
 
@@ -69,7 +69,7 @@ func load_from(directory: String) -> int:
 func add_directory(root: String) -> int:
 	var loaded := _read_directory(root)
 	_rebuild_order()
-	DotLog.info(CHANNEL, "maps added", {"from": root, "read": loaded, "maps": maps.size()})
+	GSLog.info(CHANNEL, "maps added", {"from": root, "read": loaded, "maps": maps.size()})
 	return loaded
 
 
@@ -77,7 +77,7 @@ func _read_directory(root: String) -> int:
 	var dir := DirAccess.open(root)
 
 	if dir == null:
-		DotLog.info(CHANNEL, "no map directory here", {"looked_at": root})
+		GSLog.info(CHANNEL, "no map directory here", {"looked_at": root})
 		return 0
 
 	var files := PackedStringArray()
@@ -100,7 +100,7 @@ func _read_directory(root: String) -> int:
 
 		if not parsed.ok:
 			refused[file] = parsed.error.message
-			DotLog.warn(CHANNEL, "a map was refused", {
+			GSLog.warn(CHANNEL, "a map was refused", {
 				"file": file, "why": parsed.error.message, "detail": parsed.error.detail,
 			})
 			continue
@@ -135,7 +135,7 @@ func _rebuild_order() -> void:
 ## Takes the maps subscribed packs provide, for the index's current session only. Opt-in.
 ## A pack's map is a prop-hunt map document named by the entry's `scene` path, with `map_kind` one of [param accepted_kinds] ("*" every kind, empty none).
 ## Synced on every read, since the index filters by session and a game that goes online loses them with no signal; [method playable] is the read everything goes through.
-func follow_content(index: DotContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
+func follow_content(index: GSContentIndex, accepted_kinds: PackedStringArray = PackedStringArray()) -> void:
 	content_index = index
 	content_kinds = accepted_kinds
 	sync_content()
@@ -183,14 +183,14 @@ func sync_content() -> void:
 		_rebuild_order()
 
 
-func _workshop_doc(entry: DotContentEntry) -> Dictionary:
+func _workshop_doc(entry: GSContentEntry) -> Dictionary:
 	if _workshop_docs.has(entry.key):
 		return _workshop_docs[entry.key]
 
 	var path := entry.path("scene")
 	var text := FileAccess.get_file_as_string(path) if path != "" else ""
 	var parsed := PhMapDoc.parse_json(text, path) if text != "" \
-		else DotResult.fail(DotError.CODE_IO, "empty or unreadable", path)
+		else GSResult.fail(GSError.CODE_IO, "empty or unreadable", path)
 	var doc: Dictionary = {}
 
 	if parsed.ok:
@@ -198,7 +198,7 @@ func _workshop_doc(entry: DotContentEntry) -> Dictionary:
 		doc["id"] = entry.id
 	else:
 		refused[entry.key] = parsed.error.message
-		DotLog.warn(CHANNEL, "a Workshop map was refused", {
+		GSLog.warn(CHANNEL, "a Workshop map was refused", {
 			"entry": entry.key, "why": parsed.error.message,
 		})
 
@@ -298,12 +298,12 @@ func playable(allowed: PackedStringArray) -> Array[StringName]:
 
 ## The next map: drawn from [param stream] when shuffling, in order otherwise, and never the
 ## same one twice running when there is a choice.
-func next_map(allowed: PackedStringArray, shuffle: bool, stream: DotRandomStream,
+func next_map(allowed: PackedStringArray, shuffle: bool, stream: GSRandomStream,
 		previous: StringName) -> Dictionary:
 	var ids := drawable(allowed)
 
 	if ids.is_empty():
-		DotLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
+		GSLog.warn(CHANNEL, "no map matches the allowed list; playing practice", {
 			"allowed": ",".join(allowed),
 		})
 		return maps.get(PRACTICE, practice())

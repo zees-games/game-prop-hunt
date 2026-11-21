@@ -8,7 +8,7 @@ extends RefCounted
 class Flying extends RefCounted:
 	## This game's: the server's number for it, so a client's copy and the server's are one.
 	var id: int = 0
-	var spawn: DotWeaponSpawn = null
+	var spawn: GSWeaponSpawn = null
 	var position: Vector3 = Vector3.ZERO
 	var velocity: Vector3 = Vector3.ZERO
 	var age_ticks: int = 0
@@ -41,21 +41,21 @@ const MAX_BOUNCES := 12
 const THROWER_GRACE_TICKS := 8
 
 ## Emitted where a projectile went off, everywhere (a client draws the burst from it).
-signal detonated(at: Vector3, spawn: DotWeaponSpawn)
+signal detonated(at: Vector3, spawn: GSWeaponSpawn)
 
 ## This game's: emitted on the authority after dot-combat resolved the blast, with the shot it
 ## resolved (its `damages` are who it hurt), for what the blast costs and what it throws.
-signal blasted(at: Vector3, spawn: DotWeaponSpawn, shot: DotShot)
+signal blasted(at: Vector3, spawn: GSWeaponSpawn, shot: GSShot)
 
 ## Emitted when one is launched, for whoever tells clients about it.
 signal launched(flying: Flying)
 
 ## What the `sticks` param is read from: a spawn carries the weapon's id and the definition
 ## carries the rule. Null leaves every fused spawn a bouncer.
-var catalogue: DotWeaponCatalogue = null
+var catalogue: GSWeaponCatalogue = null
 
 var _live: Array[Flying] = []
-var _combat: DotCombatManager = null
+var _combat: GSCombatManager = null
 var _gravity: float = 20.0
 var _next_id: int = 1
 
@@ -64,20 +64,20 @@ func set_gravity(gravity: float) -> void:
 	_gravity = gravity
 
 
-func setup(combat: DotCombatManager, gravity: float = 20.0) -> void:
+func setup(combat: GSCombatManager, gravity: float = 20.0) -> void:
 	_combat = combat
 	_gravity = gravity
 
 
 ## Takes everything a tick of weapon use produced. Server side (and solo).
-func accept(outcome: DotWeaponOutcome) -> void:
+func accept(outcome: GSWeaponOutcome) -> void:
 	for spawn in outcome.spawns:
 		var _f := launch(spawn)
 
 
 ## Starts [param spawn] flying. [param id] is the server's number for it, on a client; 0 takes
 ## the next.
-func launch(spawn: DotWeaponSpawn, id: int = 0) -> Flying:
+func launch(spawn: GSWeaponSpawn, id: int = 0) -> Flying:
 	var f := Flying.new()
 	if id > 0:
 		f.id = id
@@ -97,16 +97,16 @@ func launch(spawn: DotWeaponSpawn, id: int = 0) -> Flying:
 ## The bodies a projectile launched at [param spawn]'s origin passes through: dot-combat's answer
 ## for a shot from the same muzzle, so the policy is written once. Called by name, because a
 ## delivered pack runs on the host's dot-combat and an older one must still load this.
-func _passes_at_launch(spawn: DotWeaponSpawn) -> Array:
+func _passes_at_launch(spawn: GSWeaponSpawn) -> Array:
 	if _combat == null or not _combat.has_method(&"pass_through_sets"):
 		return []
 
-	var shot := DotShot.make(spawn.id, spawn.owner_entity, spawn.tick, 0)
+	var shot := GSShot.make(spawn.id, spawn.owner_entity, spawn.tick, 0)
 	shot.origin = spawn.origin
 	return Array(_combat.call(&"pass_through_sets", shot))
 
 
-func _sticks(spawn: DotWeaponSpawn) -> bool:
+func _sticks(spawn: GSWeaponSpawn) -> bool:
 	if spawn.meta.has(&"sticks"):
 		return bool(spawn.meta[&"sticks"])
 
@@ -176,7 +176,7 @@ func _due(f: Flying) -> bool:
 
 
 ## A fused projectile met something: stick to it or bounce off it.
-func _touch(f: Flying, hit: DotHitbox.Hit) -> void:
+func _touch(f: Flying, hit: GSHitbox.Hit) -> void:
 	var normal := hit.normal
 
 	if normal.length_squared() < 0.0001:
@@ -218,7 +218,7 @@ func _follow(f: Flying) -> void:
 	f.position = f.stuck_to.global_position + f.stuck_offset
 
 
-func _body_of(hit: DotHitbox.Hit) -> Node3D:
+func _body_of(hit: GSHitbox.Hit) -> Node3D:
 	if hit.blocked or hit.hitbox == null:
 		return null
 
@@ -228,7 +228,7 @@ func _body_of(hit: DotHitbox.Hit) -> Node3D:
 
 ## Traces one tick of flight, a swept segment rather than a point test: a wall is thinner than a fast grenade's step.
 ## The trace is dot-combat's (`PhGame._build_combat`), so a grenade bounces off a sofa as a shot stops on it.
-func _sweep(f: Flying, step: Vector3) -> DotHitbox.Hit:
+func _sweep(f: Flying, step: Vector3) -> GSHitbox.Hit:
 	if _combat == null or _combat.trace == null:
 		return null
 
@@ -259,11 +259,11 @@ func _sweep(f: Flying, step: Vector3) -> DotHitbox.Hit:
 	return hit if hit.ok() else null
 
 
-## Turns an arrival into an ordinary [DotShot] with a splash and lets dot-combat do the rest.
+## Turns an arrival into an ordinary [GSShot] with a splash and lets dot-combat do the rest.
 ## The impact is set by hand and `max_range` is 0 so nothing re-traces it; no believed origin is pinned, so the blast is not moved back to the thrower.
 func _detonate(f: Flying, at: Vector3) -> void:
 	if _combat != null and _combat.is_authority:
-		var shot := DotShot.make(f.spawn.id, f.spawn.owner_entity, f.spawn.tick, 0)
+		var shot := GSShot.make(f.spawn.id, f.spawn.owner_entity, f.spawn.tick, 0)
 		shot.origin = at
 		shot.direction = f.velocity.normalized() if f.velocity != Vector3.ZERO else Vector3.DOWN
 		shot.damage = 0.0

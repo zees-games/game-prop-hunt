@@ -45,7 +45,7 @@ func _ready() -> void:
 		await get_tree().physics_frame
 		if game.phase == PhGame.Phase.SEEK or (game.bots.nav.is_ready() and not game.bots.spots.is_empty()):
 			break
-	var nav: DotBotNav = game.bots.nav
+	var nav: GSBotNav = game.bots.nav
 	if not nav.is_ready():
 		print("nav not ready")
 		get_tree().quit(1)

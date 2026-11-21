@@ -3,14 +3,14 @@ extends RefCounted
 const PhPaths := preload("ph_paths.gd")
 
 ## The props a map is furnished with and a player may hide as: the catalogue `tools/measure_props.gd` measured out of the vendored models.
-## One size per prop, read from `props/catalogue.json` on every machine: hull, health and hitbox derive from it ([DotPropDisguise]), and a headless server cannot measure meshes.
+## One size per prop, read from `props/catalogue.json` on every machine: hull, health and hitbox derive from it ([GSPropDisguise]), and a headless server cannot measure meshes.
 ## Drawn as parts, not scenes: [method parts] gives a model's meshes for a [MultiMeshInstance3D] per mesh (a few dozen draw calls per school); a disguised player uses [method instance] because it moves.
 
 const CHANNEL := "ph.props"
 
 const CATALOGUE := "res://props/catalogue.json"
 
-## The part-shaped collision `tools/measure_props.gd` cuts with dot-props' [DotPropPieces]: a tree as trunk, branches and leaf clumps, a table as top and legs.
+## The part-shaped collision `tools/measure_props.gd` cuts with dot-props' [GSPropPieces]: a tree as trunk, branches and leaf clumps, a table as top and legs.
 ## A map prop not in it collides as its box; a disguise never uses these, its hull and hitbox being functions of the size.
 const PIECES := "res://props/pieces.json"
 
@@ -46,7 +46,7 @@ func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 	var parsed: Variant = JSON.parse_string(text) if text != "" else null
 
 	if not (parsed is Dictionary):
-		DotLog.error(CHANNEL, "the prop catalogue would not read", {"path": path})
+		GSLog.error(CHANNEL, "the prop catalogue would not read", {"path": path})
 		return 0
 
 	props.clear()
@@ -90,7 +90,7 @@ func load_file(path: String = CATALOGUE, pieces_path: String = PIECES) -> int:
 			"offset": _v3(entry.get("offset")),
 			"disguise": bool(entry.get("disguise", true)),
 			"breaks": float(entry.get("breaks", 0.0)),
-			"pieces": DotPropPieces.decode(all_pieces.get(String(id), [])),
+			"pieces": GSPropPieces.decode(all_pieces.get(String(id), [])),
 		}
 		order.append(id)
 
@@ -131,7 +131,7 @@ func shapes_of(id: StringName) -> Array:
 		cube.size = size
 		out.append([cube, Transform3D(Basis.IDENTITY, Vector3(0.0, size.y * 0.5, 0.0))])
 	else:
-		for shape in DotPropPieces.shapes(pieces):
+		for shape in GSPropPieces.shapes(pieces):
 			out.append([shape, Transform3D.IDENTITY])
 
 	_shapes[id] = out
@@ -266,7 +266,7 @@ static func _scene(model_path: String) -> PackedScene:
 		_scenes[model_path] = load(path) as PackedScene if ResourceLoader.exists(path) else null
 
 		if _scenes[model_path] == null:
-			DotLog.warn(CHANNEL, "a prop's model would not load; a box stands in", {"model": model_path})
+			GSLog.warn(CHANNEL, "a prop's model would not load; a box stands in", {"model": model_path})
 
 	return _scenes[model_path]
 

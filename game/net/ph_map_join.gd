@@ -34,7 +34,7 @@ func part(told: Dictionary) -> Variant:
 		_joined = PackedByteArray()
 
 	if index != _next or int(told["count"]) != _count or int(told["total"]) != _total:
-		DotLog.warn(CHANNEL, "a map piece arrived out of order; the map is dropped", {
+		GSLog.warn(CHANNEL, "a map piece arrived out of order; the map is dropped", {
 			"index": index, "expected": _next, "count": told["count"],
 		})
 		_next = -1
@@ -49,7 +49,7 @@ func part(told: Dictionary) -> Variant:
 	_next = 0
 
 	if _joined.size() != _total:
-		DotLog.warn(CHANNEL, "a map's pieces do not add up; the map is dropped", {
+		GSLog.warn(CHANNEL, "a map's pieces do not add up; the map is dropped", {
 			"bytes": _joined.size(), "expected": _total,
 		})
 		return null
@@ -64,7 +64,7 @@ func _decode(encoded: PackedByteArray) -> Variant:
 	var decoded := PhMapDoc.decode(encoded)
 
 	if not decoded.ok:
-		DotLog.warn(CHANNEL, "the server sent a map this build cannot build", {
+		GSLog.warn(CHANNEL, "the server sent a map this build cannot build", {
 			"why": decoded.error.message, "detail": decoded.error.detail,
 		})
 		return null

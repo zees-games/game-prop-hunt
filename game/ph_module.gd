@@ -6,26 +6,26 @@ const AMBIENT_KIND := "ambience"
 const PhAvatars := preload("ph_avatars.gd")
 const PhMapDoc := preload("ph_map_doc.gd")
 
-## This game as a module a dedicated server loads; [DotGameModule] holds the netcode, bridge, roster and tick.
-## No `class_name`: [method DotModuleHost.load_module] takes a path, and a pack's globals are not registered in the host.
+## This game as a module a dedicated server loads; [GSGameModule] holds the netcode, bridge, roster and tick.
+## No `class_name`: [method GSModuleHost.load_module] takes a path, and a pack's globals are not registered in the host.
 
-# No `const CHANNEL`: [DotGameModule] declares one and a subclass cannot redeclare it, and a second
+# No `const CHANNEL`: [GSGameModule] declares one and a subclass cannot redeclare it, and a second
 # channel would split one module's records across two places an operator must turn up separately.
 
 ## Seconds between checks of how many people are in the round.
 const ROSTER_INTERVAL := 2.0
 
-## Where the services keep punishments; empty is [DotGameServices]'s default, the real store.
+## Where the services keep punishments; empty is [GSGameServices]'s default, the real store.
 ## Static because dot-server constructs the module from a path, so no instance exists to set a field on;
 ## `examples/dedicated.tscn` points it elsewhere so a run does not append to the real store.
 static var punishments_file: String = ""
 
 ## The `ph_bots` cvar, held so the tick does not look it up sixty times a second.
-var _bots: DotConVar = null
+var _bots: GSConVar = null
 
 ## How many stand-ins, from how many people: dot-server's one rule for every game. See
 ## [method _keep_the_round_full].
-var _quota: DotBotQuota = null
+var _quota: GSBotQuota = null
 
 var _since_roster_check: float = 0.0
 
@@ -37,7 +37,7 @@ func _module_name() -> String:
 	return "prophunt"
 
 
-## The cvars a map's per-map file may set (dot-game's DotGameMapConfig); the file is cfg/game/mg-prop-hunt/dot_map/map/<map>.yml.
+## The cvars a map's per-map file may set (dot-game's GSGameMapConfig); the file is cfg/game/mg-prop-hunt/dot_map/map/<map>.yml.
 func _map_config_keys() -> Dictionary:
 	return {
 		"ph_hide_seconds": {"type": "float", "min": 0.0, "max": 600.0},
@@ -74,8 +74,8 @@ func _game_missing_hint() -> String:
 
 ## The netcode's numbers. Tick rate comes from the world so `sv_tickrate` reaches it; a number written
 ## here would run the netcode at a rate the operator did not choose.
-func _net_config() -> DotNetConfig:
-	var config := DotNetConfig.new()
+func _net_config() -> GSNetConfig:
+	var config := GSNetConfig.new()
 	config.tick_rate = (game as PhGame).tick_rate
 	config.snapshot_rate = PhGame.NET_SNAPSHOT_RATE
 	config.world_extent = PhGame.NET_WORLD_EXTENT
@@ -94,8 +94,8 @@ func _make_bridge() -> Node:
 	return PhNetBridge.new()
 
 
-## Chat, voice and moderation, over [DotGameServices].
-## The bridge is the link (`send_chat`, `send_voice`); [DotGameModule] assigns `voice_relay_fn`, checks
+## Chat, voice and moderation, over [GSGameServices].
+## The bridge is the link (`send_chat`, `send_voice`); [GSGameModule] assigns `voice_relay_fn`, checks
 ## `check_admission` and has the roster follow this layer so a leaver is forgotten everywhere.
 func _make_services() -> Node:
 	var services := PhServices.new()
@@ -104,22 +104,22 @@ func _make_services() -> Node:
 	return services
 
 
-## Profiles, avatars and admission: [DotPlatformIdentity] over this game's one-slot schema.
+## Profiles, avatars and admission: [GSPlatformIdentity] over this game's one-slot schema.
 ## Authentication is the host's `dot_auth_server`, not this layer's; with it off everybody is a guest
 ## with a profile of their own, which is what a LAN server is.
 func _make_identity() -> Node:
-	var identity_layer := DotPlatformIdentity.new()
+	var identity_layer := GSPlatformIdentity.new()
 	identity_layer.avatar_schema = PhAvatars.schema()
 	identity_layer.stock_avatar_fn = PhAvatars.stock_avatar
 	identity_layer.avatar_translate_fn = PhAvatars.from_site
 	return identity_layer
 
 
-func _game_load() -> DotResult:
+func _game_load() -> GSResult:
 	var world := game as PhGame
 
 	if world == null:
-		return DotResult.fail(DotError.CODE_STATE, "The registered game is not an PhGame.")
+		return GSResult.fail(GSError.CODE_STATE, "The registered game is not an PhGame.")
 
 	add_command("ph_status", _cmd_status, "Show the round, the map and who is hiding as what")
 	add_command("ph_net", _cmd_net, "Show what the netcode is doing")
@@ -154,12 +154,12 @@ func _game_load() -> DotResult:
 	# 2 every team-mate in the line; dot-combat's cvar. NOTIFY so players know; REPLICATED because every
 	# client's manager predicts its tracers under it (the client follows it through its link).
 	if world.combat != null:
-		var _passthrough := world.combat.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+		var _passthrough := world.combat.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 	_build_vote(world)
 
 	# B, a hunter's loadout: `/loadout` and its notice, and the owner's mp_loadout_menu,
-	# mp_loadout_allow and mp_loadout_fixed (dot-loadout's DotLoadoutCommand). Absent on a host
+	# mp_loadout_allow and mp_loadout_fixed (dot-loadout's GSLoadoutCommand). Absent on a host
 	# whose dot-loadout predates it, and then B says the server did not answer.
 	if world.loadout_command != null:
 		world.loadout_command.call(&"bind", self)
@@ -174,10 +174,10 @@ func _game_load() -> DotResult:
 		"Automatic stand-ins: 1 keeps as many as bot_quota and bot_quota_mode say, 0 none at all."
 	)
 
-	# `bot_quota` and `bot_quota_mode` are dot-server's [DotBotQuota], so they mean the same on every server.
+	# `bot_quota` and `bot_quota_mode` are dot-server's [GSBotQuota], so they mean the same on every server.
 	# The default is this game's `minimum_players` in fill mode: stand-ins top the round up, a person who
 	# joins takes a stand-in's place. `ph_bots` stays the switch it always was.
-	_quota = DotBotQuota.install(self, world.config.minimum_players)
+	_quota = GSBotQuota.install(self, world.config.minimum_players)
 
 	# Started here, not in the world's `_ready`: `start()` builds the map, and doing that before the bridge
 	# exists leaves nothing listening to `world_rebuilt`, so players stand on floors no client was told about.
@@ -193,7 +193,7 @@ func _game_load() -> DotResult:
 	world.start()
 
 	log_info("the map is up", world.describe())
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## The killcam's cvars: its length and its camera.
@@ -201,74 +201,74 @@ func _bind_killcam(world: PhGame) -> void:
 	# REPLICATED: the clients play the killcam, the server only lengthens the intermission for it.
 	var killcam := add_cvar("mp_killcam_time", _number(world.config.killcam_seconds),
 		"Seconds the killcam of a round's last moment plays, added to the intermission (0 for none)",
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 	_killcam_cvar = killcam
 	if killcam != null:
 		# Any length, 0 for none; below 0 or not a number is refused with the reason, not clamped.
-		var _v := killcam.with_validator(func(value: String) -> DotResult:
+		var _v := killcam.with_validator(func(value: String) -> GSResult:
 			if not value.is_valid_float() or value.to_float() < 0.0:
-				return DotResult.fail(DotError.CODE_INVALID,
+				return GSResult.fail(GSError.CODE_INVALID,
 					"mp_killcam_time is %s; it takes seconds, 0 or more (0 for none)." % value)
-			return DotResult.success(null))
+			return GSResult.success(null))
 		killcam.changed.connect(func(_old: String, new_value: String) -> void:
 			world.config.killcam_seconds = new_value.to_float()
 			world.apply_intermission())
 
 	# REPLICATED: where the clients' killcam camera sits (0 the killer's eye, 1 behind the killer).
 	var _camera := add_cvar("mp_killview_camera", "0",
-		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay DotKillcamFraming)",
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+		"Killcam camera: 0 the killer's eye, 1 behind the killer (dot-replay GSKillcamFraming)",
+		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 
 ## The rule sets of the player, body and ambience addons, each as cvars: server-side only, or REPLICATED where a client draws or predicts under it.
 func _bind_rule_cvars(world: PhGame) -> void:
 	# sv_falldamage and its tunables: dot-combat's, on by default in this game. Server-side
 	# only, so no REPLICATED: the damage is the server's and arrives as health.
-	var _fall := world.fall_rules.bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY)
+	var _fall := world.fall_rules.bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY)
 
 	# dot-player-controller's mp_forceview: first or third person, the player's choice or one
 	# held. REPLICATED, because each client places its own camera under it.
 	var _views := world.view_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# sv_mobile_*, sv_aim_assist*, sv_autofire*: dot-mobile's touch controls. REPLICATED, because the phone's overlay follows them.
 	var _mobile := world.mobile_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# Dead bodies: dot-player-char's sv_ragdoll* set. The server only picks each death's reaction
 	# from them; REPLICATED, because the clients draw the bodies (see the client's netcode).
 	var _ragdolls := world.ragdoll_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 	# The map's toys: dot-props' sv_toys* set. REPLICATED, because a client hides the toys the
 	# server took away.
 	var _toys := world.toy_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED
 	)
 
 	# sv_weapon_drop*: dot-weapon's drop rules. REPLICATED, because the drop key and the pickup reach follow them.
-	var _drops := world.drop_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	var _drops := world.drop_rules.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 	# zee_ads_rules: spread and pace while aimed are part of the prediction, so the numbers cross as one JSON cvar.
-	var _ads := world.ads_rules.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED)
+	var _ads := world.ads_rules.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED)
 
 	# ph_ambient*: REPLICATED, because each client plays its own ambience under the server's intent; the directory cvar stays local.
 	var _ambient := world.ambient_rules.bind_cvars(
-		add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY | DotConVar.FLAG_REPLICATED,
-		DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY
+		add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY | GSConVar.FLAG_REPLICATED,
+		GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY
 	)
 
 
 ## The maps the SERVER names for this game, fetched and added to the catalogue; returns how many documents.
-## The owner names them in the deployment's map config (`cfg/content.yml`, [member DotGameDescriptor.maps]),
-## and [DotGameContent] fetches each pack. Called after EVERY catalogue load: `load_from` forgets what was read before.
+## The owner names them in the deployment's map config (`cfg/content.yml`, [member GSGameDescriptor.maps]),
+## and [GSGameContent] fetches each pack. Called after EVERY catalogue load: `load_from` forgets what was read before.
 func _add_delivered_maps(world: PhGame) -> int:
 	if server == null or world.catalogue == null:
 		return 0
 
 	var read := 0
 
-	for root in await DotGameContent.map_dirs(server, "maps"):
+	for root in await GSGameContent.map_dirs(server, "maps"):
 		read += world.catalogue.add_directory(root)
 
 	return read
@@ -291,7 +291,7 @@ func _wire_identity() -> void:
 ## What a session looks like: what dot-platform resolved for them, or the stock person.
 ## Through the platform module's `player_for`, never the hub by a key made here: the hub keys by scoped
 ## profile key, so a `u<session>` lookup finds nobody and reads as "no avatar". Duck-typed; no platform is a configuration.
-func _avatar_for(session_id: int) -> DotAvatar:
+func _avatar_for(session_id: int) -> GSAvatar:
 	var session := server.session_by_userid(session_id) if server != null else null
 	var platform: Object = server.modules.get_module("platform") \
 		if server != null and server.modules != null else null
@@ -299,8 +299,8 @@ func _avatar_for(session_id: int) -> DotAvatar:
 	if session != null and platform != null and platform.has_method("player_for"):
 		var player: Variant = platform.call("player_for", session)
 
-		if player is Object and (player as Object).get("avatar") is DotAvatar:
-			return (player as Object).get("avatar") as DotAvatar
+		if player is Object and (player as Object).get("avatar") is GSAvatar:
+			return (player as Object).get("avatar") as GSAvatar
 
 	if identity != null and identity.has_method("avatar_for"):
 		return identity.call("avatar_for", String(PhNetBridge.player_key(session_id)))
@@ -308,7 +308,7 @@ func _avatar_for(session_id: int) -> DotAvatar:
 	return null
 
 
-func _on_profile(event: DotEvent) -> void:
+func _on_profile(event: GSEvent) -> void:
 	var session_id := event.get_int("userid")
 	var session := server.session_by_userid(session_id) if server != null else null
 	var link := bridge as PhNetBridge
@@ -322,7 +322,7 @@ func _on_profile(event: DotEvent) -> void:
 func _add_tunables(world: PhGame) -> void:
 	# [b]How the stand-ins aim and shoot is dot-bot's[/b]: `bot_difficulty` and every `bot_*`
 	# setting it bundles, the names every game in the family uses. On the game as metadata.
-	var _bot_cvars := DotBotSettings.of(world).bind_cvars(add_cvar, DotConVar.FLAG_NOTIFY, add_command)
+	var _bot_cvars := GSBotSettings.of(world).bind_cvars(add_cvar, GSConVar.FLAG_NOTIFY, add_command)
 
 
 ## Older cvar names kept for shipped server configs and map files: alias -> PhConfig field.
@@ -335,33 +335,33 @@ const ALIASES := {
 }
 
 ## dot-workbench over the config; the F9 panel off a dedicated server, the HTTP page only with `workbench.enabled`.
-var workbench: DotGameWorkbench = null
+var workbench: GSGameWorkbench = null
 
-var _killcam_cvar: DotConVar = null
+var _killcam_cvar: GSConVar = null
 
 
 ## Every [PhConfig] field as a `ph_<field>` cvar, a cfg/ yml key and a workbench set, the cfg/ diff commands, and the older names as aliases that follow the field.
 func _bind_config(world: PhGame) -> void:
 	var _fl := world.flashlight_conf()
 	if world.flashlight_binder != null:
-		var _flash_cvars := world.flashlight_binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE, console.has_name)
+		var _flash_cvars := world.flashlight_binder.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE, console.has_name)
 		world.flashlight_binder.bind_commands(add_command)
 	var binder := world.config_binder
 	if binder == null:
 		return
-	workbench = DotGameWorkbench.new()
+	workbench = GSGameWorkbench.new()
 	workbench.name = "Workbench"
 	workbench.dedicated = DisplayServer.get_name() == "headless"
 	workbench.listen_host_fn = func() -> bool: return DisplayServer.get_name() != "headless"
 	workbench.permit_fn = func(actor: Variant, flag: String) -> bool:
 		return server != null and server.admins != null and actor is String \
 			and bool(server.admins.uid_has_permission(actor, flag))
-	for set: DotProfileSet in binder.profile_sets():
+	for set: GSProfileSet in binder.profile_sets():
 		workbench.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	if world.flashlight_binder != null:
-		for set: DotProfileSet in world.flashlight_binder.profile_sets():
+		for set: GSProfileSet in world.flashlight_binder.profile_sets():
 			workbench.add_set(set, "Flashlight")
-	var ambient_set := DotGameWorkbench.cvar_set(console, PhAmbience.cvar_types(), AMBIENT_KIND)
+	var ambient_set := GSGameWorkbench.cvar_set(console, PhAmbience.cvar_types(), AMBIENT_KIND)
 	if ambient_set != null:
 		workbench.add_set(ambient_set, "Ambience (ph_ambient*)")
 	add_child(workbench)
@@ -369,10 +369,10 @@ func _bind_config(world: PhGame) -> void:
 	# Off until the owner sets sv_workbench_remote 1; then flagged admins edit from a client.
 	if started.ok and net != null:
 		var _served := workbench.serve_remote(net)
-	var runtime: DotProfileRuntime = workbench.api.runtime if started.ok and workbench.api != null else null
+	var runtime: GSProfileRuntime = workbench.api.runtime if started.ok and workbench.api != null else null
 	if not started.ok:
 		log_warn("the workbench did not start", {"why": started.error.message})
-	binder.bind_cvars(add_cvar, DotConVar.FLAG_ARCHIVE | DotConVar.FLAG_NOTIFY,
+	binder.bind_cvars(add_cvar, GSConVar.FLAG_ARCHIVE | GSConVar.FLAG_NOTIFY,
 		func(name: String) -> bool: return console.has_name(name))
 	binder.bind_commands(add_command)
 	for alias: String in ALIASES:
@@ -383,7 +383,7 @@ func _bind_config(world: PhGame) -> void:
 		if world.flashlight_binder != null:
 			world.flashlight_binder.attach(runtime)
 		if ambient_set != null:
-			var _applied := DotGameWorkbench.bind_cvar_set(ambient_set, runtime, console)
+			var _applied := GSGameWorkbench.bind_cvar_set(ambient_set, runtime, console)
 
 
 ## An older cvar name for a config field: it reports the field and writes through the field's own cvar.
@@ -466,10 +466,10 @@ func _noblock_side(id: Variant) -> Variant:
 
 
 ## mp_forcecamera, once bound. See where the module binds dot-spectate's cvars.
-var _force_camera_cvar: DotConVar = null
+var _force_camera_cvar: GSConVar = null
 
 
-## Nothing to undo: [DotModule] removes the commands and [DotGameModule] tears down the netcode, bridge and
+## Nothing to undo: [GSModule] removes the commands and [GSGameModule] tears down the netcode, bridge and
 ## roster in reverse. The world is NOT freed here; it predates the module and `module reload` keeps the map.
 func _game_unload() -> void:
 	if workbench != null:
@@ -485,7 +485,7 @@ func _game_unload() -> void:
 		vote = null
 
 
-## The server slept or woke. The vote's director follows it on its own (DotGameModule finds
+## The server slept or woke. The vote's director follows it on its own (GSGameModule finds
 ## it); the map ballot's timer is this game's, so it starts again here on waking.
 func _game_hibernation(hibernating: bool) -> void:
 	if not hibernating and vote != null:
@@ -564,13 +564,13 @@ func _keep_the_round_full() -> void:
 
 
 ## Names for the stand-ins, so a scoreboard of four of them is readable: this game's own
-## furniture names through dot-bot's [DotBotNames], never one already in [param world] (drawn
+## furniture names through dot-bot's [GSBotNames], never one already in [param world] (drawn
 ## at random they could double up).
 static func _bot_name(world: PhGame) -> String:
 	var taken: Array = []
 	for id: StringName in world.players:
 		taken.append((world.players[id] as PhPlayer).display_name)
-	return DotBotNames.pick(taken, world.players.size(), PhGame.BOT_NAMES)
+	return GSBotNames.pick(taken, world.players.size(), PhGame.BOT_NAMES)
 
 
 ## Joins the bridge's chat seam to the services layer's router.
@@ -622,7 +622,7 @@ func _wire_progress(world: PhGame) -> void:
 
 
 func _on_say_requested(peer_id: int, channel_id: StringName, text: String) -> void:
-	var said: DotResult = services.call("say", peer_id, channel_id, text)
+	var said: GSResult = services.call("say", peer_id, channel_id, text)
 
 	if said.ok:
 		return
@@ -644,12 +644,12 @@ func _on_chat_command(peer_id: int, command: String, args: PackedStringArray) ->
 		return
 
 	for reply in server.run_command_as_uid(
-		session.uid(), command, args, DotCmdContext.Source.CHAT
+		session.uid(), command, args, GSCmdContext.Source.CHAT
 	):
 		bridge.call("notice", peer_id, reply)
 
 
-func _cmd_reload(ctx: DotCmdContext) -> void:
+func _cmd_reload(ctx: GSCmdContext) -> void:
 	var world := game as PhGame
 
 	if world == null or world.catalogue == null:

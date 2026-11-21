@@ -1,10 +1,10 @@
-extends DotGameCheckSuite
+extends GSGameCheckSuite
 
 const PhBots := preload("../game/ph_bots.gd")
 const PhConfig := preload("../game/ph_config.gd")
 const PhGame := preload("../game/ph_game.gd")
 
-## A hunter's doubt walk over the map's own pieces in dot-sim ([code]DotSimPropDoubt[/code], [member PhBots.native_doubt]) keeps exactly the pieces
+## A hunter's doubt walk over the map's own pieces in dot-sim ([code]GSSimPropDoubt[/code], [member PhBots.native_doubt]) keeps exactly the pieces
 ## the script keeps, in the same order: seeded pieces, eyes, forwards and fields of view against [method PhBots.doubt_script_kept], then real maps
 ## as a server builds them, with pieces broken and restored through the bots' own table. With no library the native half is skipped;
 ## [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Line of sight, the cleared list and oddness stay the script's and are not asked here.
@@ -20,7 +20,7 @@ var _finished := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -32,7 +32,7 @@ func _run() -> void:
 	_entered += 1
 	print("the doubt walk is native by default, and the library has it")
 	_check(PhBots.native_doubt, "PhBots.native_doubt is on without the game turning it on")
-	if not DotSim.has(&"doubt"):
+	if not GSSim.has(&"doubt"):
 		print("  dot-sim's doubt module is not loaded: the native half is skipped")
 		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
@@ -70,7 +70,7 @@ func _seeded() -> void:
 		var basis := Basis(Vector3.UP, rng.randf_range(-PI, PI))
 		props.append({"id": &"piece", "transform": Transform3D(basis, at), "size": Vector3(rng.randf_range(0.1, 2.0), rng.randf_range(0.0, 3.0), rng.randf_range(0.1, 2.0)), "broken": rng.randf() < 0.1})
 
-	var table: RefCounted = ClassDB.instantiate(DotSim.MODULES[&"doubt"])
+	var table: RefCounted = ClassDB.instantiate(GSSim.MODULES[&"doubt"])
 	var middles := PackedVector3Array()
 	for prop: Dictionary in props:
 		middles.append((prop["transform"] as Transform3D).origin + Vector3(0.0, (prop["size"] as Vector3).y * 0.5, 0.0))

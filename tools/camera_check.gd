@@ -1,6 +1,6 @@
 extends Node
 
-## The cameras and bodies in the real offline game: the third-person and spectator chase cameras flown round the start and every checkpoint (dot-core's DotCameraCheck), `mp_forceview` through the view key's path, and with `--render` the player's eyes before and after.
+## The cameras and bodies in the real offline game: the third-person and spectator chase cameras flown round the start and every checkpoint (dot-core's GSCameraCheck), `mp_forceview` through the view key's path, and with `--render` the player's eyes before and after.
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop.
 ##   tools/camera_check.sh [--render]   # headless; exit 1 on a failure; frames in screenshots/cameras/
 
@@ -35,11 +35,11 @@ func _run() -> void:
 	_client.third_person = false
 	_client.toggle_view()
 	_check(_client.third_person, "the view key goes to third person")
-	game.view_rules.force_view = DotPlayerViewRules.FIRST_ONLY
+	game.view_rules.force_view = GSPlayerViewRules.FIRST_ONLY
 	_check(not _client.third_person, "mp_forceview 1 puts the camera back on the eye")
 	_client.toggle_view()
 	_check(not _client.third_person, "and the key does nothing")
-	game.view_rules.force_view = DotPlayerViewRules.ANY
+	game.view_rules.force_view = GSPlayerViewRules.ANY
 
 	print("%s" % ("all passed" if not _failed else "FAILED"))
 	get_tree().quit(1 if _failed else 0)
@@ -48,7 +48,7 @@ func _run() -> void:
 func _fly(game: PhGame) -> void:
 	# Beside every wall, tree and piece of furniture of the house: found, not listed.
 	var mask: int = _client.game.physics.layer_mask(&"world") | _client.game.physics.layer_mask(&"prop")
-	var pivots := DotCameraCheck.pivots_near_walls(_client.get_viewport().world_3d, AABB(Vector3(-80, -10, -80), Vector3(160, 40, 160)), mask, 1.6, 2.5, 3.0, 50)
+	var pivots := GSCameraCheck.pivots_near_walls(_client.get_viewport().world_3d, AABB(Vector3(-80, -10, -80), Vector3(160, 40, 160)), mask, 1.6, 2.5, 3.0, 50)
 	var world := _client.get_viewport().world_3d
 	var cases := {
 		"third_person": Vector3(0.0, PhClient.CHASE_UP, PhClient.CHASE_BACK),
@@ -57,14 +57,14 @@ func _fly(game: PhGame) -> void:
 	for name in cases:
 		var total := {}
 		for pivot in pivots:
-			total = DotCameraCheck.add(total, DotCameraCheck.fly(world, DotCameraCheck.orbit_path(pivot), cases[name], mask))
-		_check(DotCameraCheck.passed(total), "%s round %d places in the house: %s" % [name, pivots.size(), DotCameraCheck.summary(total)])
+			total = GSCameraCheck.add(total, GSCameraCheck.fly(world, GSCameraCheck.orbit_path(pivot), cases[name], mask))
+		_check(GSCameraCheck.passed(total), "%s round %d places in the house: %s" % [name, pivots.size(), GSCameraCheck.summary(total)])
 
 
 func _views(game: PhGame) -> void:
 	DirAccess.make_dir_recursive_absolute("screenshots/cameras")
 	var me: PhPlayer = _client.get("player")
-	var fade: DotCameraFade = _client.get("_fade")
+	var fade: GSCameraFade = _client.get("_fade")
 	var camera: Camera3D = _client.get("camera")
 
 	_client.third_person = false

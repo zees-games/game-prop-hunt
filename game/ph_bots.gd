@@ -59,8 +59,8 @@ func drive() -> void:
 
 
 ## This tick's command for [param player], starting from where it looks.
-func _command_for(player: PhPlayer) -> DotFpsCommand:
-	var command := DotFpsCommand.new()
+func _command_for(player: PhPlayer) -> GSFpsCommand:
+	var command := GSFpsCommand.new()
 	command.yaw = player.controller.state.yaw
 	command.pitch = player.controller.state.pitch
 	aim_of(player).view_from(command.yaw, command.pitch)
@@ -71,8 +71,8 @@ func _state_of(player: PhPlayer) -> Dictionary:
 	if not _state.has(player.player_id):
 		var seed := hash(String(player.player_id))
 		_state[player.player_id] = {
-			"aim": DotBotAim.new(seed, settings()),
-			"stream": DotRandomStream.new(seed, &"ph_bot"),
+			"aim": GSBotAim.new(seed, settings()),
+			"stream": GSRandomStream.new(seed, &"ph_bot"),
 			"goal": Vector3.INF, "path": PackedVector3Array(), "corner": 0, "path_at": -INF,
 			"mode": &"", "stuck": [player.controller.state.position, now()],
 			"spot": {}, "bad": [], "sprint": false,
@@ -83,11 +83,11 @@ func _state_of(player: PhPlayer) -> Dictionary:
 	return _state[player.player_id]
 
 
-func aim_of(player: PhPlayer) -> DotBotAim:
+func aim_of(player: PhPlayer) -> GSBotAim:
 	return _state_of(player)["aim"]
 
 
-func _hide(player: PhPlayer, command: DotFpsCommand) -> void:
+func _hide(player: PhPlayer, command: GSFpsCommand) -> void:
 	var state := _state_of(player)
 	var t := now()
 	var phase: int = game.get("phase")
@@ -172,13 +172,13 @@ func _settle(player: PhPlayer, spot: Dictionary) -> void:
 func _become_nearest(player: PhPlayer) -> void:
 	var map: Node3D = game.get("map")
 	var catalogue: Object = game.get("props_catalogue")
-	var rules: DotPropDisguiseRules = game.get("rules")
+	var rules: GSPropDisguiseRules = game.get("rules")
 	var at := player.controller.state.position
 	var best: StringName = &""
 	var best_d := INF
 	for prop: Dictionary in (map.get("props") as Array):
 		var d := at.distance_to((prop["transform"] as Transform3D).origin)
-		if d < best_d and bool(catalogue.call("may_disguise", prop["id"])) and DotPropDisguise.may_take(prop["size"], rules).ok:
+		if d < best_d and bool(catalogue.call("may_disguise", prop["id"])) and GSPropDisguise.may_take(prop["size"], rules).ok:
 			best_d = d
 			best = prop["id"]
 	if best != &"":
@@ -248,14 +248,14 @@ func _pick_spot(player: PhPlayer, state: Dictionary, near: float = INF, kind: St
 		var length := nav.path_length(start, spot_at) if nav.is_ready() else at.distance_to(spot_at)
 		return length < maxf(left - 3.0, 6.0) * speed * 0.85
 
-	var stream: DotRandomStream = state["stream"]
+	var stream: GSRandomStream = state["stream"]
 	# With annotations it looks hard at the best of them: the pool is already scored for being
 	# tucked in, out of sight and among its kind, so a bot that knows the map takes the top few.
 	var skill := settings().profile.map_knowledge
-	var chosen := DotBotHiding.choose(pool, at, threats if near == INF else PackedVector3Array(), taken, stream,
+	var chosen := GSBotHiding.choose(pool, at, threats if near == INF else PackedVector3Array(), taken, stream,
 		skill, reachable)
 	if chosen.is_empty() and int(state.get("retries", 0)) >= 3:
-		chosen = DotBotHiding.choose(pool, at, threats, taken, stream, settings().profile.map_knowledge)
+		chosen = GSBotHiding.choose(pool, at, threats, taken, stream, settings().profile.map_knowledge)
 	state["retries"] = int(state.get("retries", 0)) + 1
 
 	if chosen.is_empty():
@@ -269,7 +269,7 @@ func _pick_spot(player: PhPlayer, state: Dictionary, near: float = INF, kind: St
 
 ## A hidden prop during the seek: keeps still; moves only when shot, or before a forced taunt
 ## with no hunter near; taunts now and then of its own accord.
-func _hidden_tick(player: PhPlayer, state: Dictionary, command: DotFpsCommand) -> void:
+func _hidden_tick(player: PhPlayer, state: Dictionary, command: GSFpsCommand) -> void:
 	var t := now()
 	var at := player.controller.state.position
 	var profile := settings().profile
@@ -289,7 +289,7 @@ func _hidden_tick(player: PhPlayer, state: Dictionary, command: DotFpsCommand) -
 	if was.y == top and health < was.x - 0.01:
 		var threat: Vector3 = state["hunter_at"] if state["hunter_at"] != Vector3.INF else at + Vector3(0.0, 0.0, 1.0)
 		var taken := PackedVector3Array()
-		var away := DotBotHiding.flee_spot(spots, at, threat, threat + Vector3(0.0, PhPlayer.EYE_HEIGHT, 0.0), _los, taken, 25.0, 7.0, 0.5)
+		var away := GSBotHiding.flee_spot(spots, at, threat, threat + Vector3(0.0, PhPlayer.EYE_HEIGHT, 0.0), _los, taken, 25.0, 7.0, 0.5)
 		if away.is_empty():
 			var dir := Vector3(at.x - threat.x, 0.0, at.z - threat.z).normalized()
 			away = {"at": nav.closest(at + dir * 8.0), "prop": -1, "kind": player.disguise.prop_id, "yaw": player.controller.state.yaw, "kin": 1}
@@ -303,9 +303,9 @@ func _hidden_tick(player: PhPlayer, state: Dictionary, command: DotFpsCommand) -
 	# another place close by, of its kind if there is one, when no hunter is in sight now.
 	# With a hunter watching, keeping still and taking the taunt is the lesser risk.
 	var watched_now := t - float(state["hunter_seen_at"]) < 3.0
-	var taunts: DotPropTaunts = game.get("taunts")
+	var taunts: GSPropTaunts = game.get("taunts")
 	var meter := taunts.meter(player.player_id, t) if taunts != null else 0.0
-	var stream: DotRandomStream = state["stream"]
+	var stream: GSRandomStream = state["stream"]
 	var cfg := config_of()
 	var every := float(cfg.get("bot_relocate_seconds"))
 	# Now and then, with no hunter seen for a good while (one far off), a prop of a kind that
@@ -348,17 +348,17 @@ func _watch_for_hunters(player: PhPlayer, state: Dictionary) -> void:
 			return
 
 
-func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
+func _seek(player: PhPlayer, command: GSFpsCommand) -> void:
 	var state := _state_of(player)
 	var t := now()
 	var profile := settings().profile
 	var at := player.controller.state.position
-	var stream: DotRandomStream = state["stream"]
+	var stream: GSRandomStream = state["stream"]
 	var aim := aim_of(player)
 
 	if state["search"] == null:
 		state["search"] = _new_search(profile)
-	var search: DotBotSearch = state["search"]
+	var search: GSBotSearch = state["search"]
 
 	var careful := player.health != null and player.health.health < player.health.max_health * 0.4
 
@@ -422,8 +422,8 @@ func _seek(player: PhPlayer, command: DotFpsCommand) -> void:
 
 
 ## A hunter's search over the map's places; with annotations, the good ones weigh most.
-func _new_search(profile: DotBotProfile) -> DotBotSearch:
-	var search := DotBotSearch.new()
+func _new_search(profile: GSBotProfile) -> GSBotSearch:
+	var search := GSBotSearch.new()
 	var sweep := float(config_of().get("bot_sweep")) if _nav_places else 0.0
 	search.setup(_places, maxf(profile.map_knowledge, sweep))
 	if _nav_places:
@@ -435,7 +435,7 @@ func _new_search(profile: DotBotProfile) -> DotBotSearch:
 
 
 ## Shoots the prop it has marked and closes in when it is far.
-func _chase(player: PhPlayer, command: DotFpsCommand, state: Dictionary, prey: PhPlayer, t: float, at: Vector3) -> void:
+func _chase(player: PhPlayer, command: GSFpsCommand, state: Dictionary, prey: PhPlayer, t: float, at: Vector3) -> void:
 	var middle := prey.controller.state.position + Vector3(0.0, minf(prey.hull_height(), 1.4) * 0.5, 0.0)
 	if state["prey"] != prey.player_id:
 		state["why"] = "prey %s marked %s face %s moving %.1f" % [prey.player_id, prey.marked, not prey.is_disguised(), Vector2(prey.controller.state.velocity.x, prey.controller.state.velocity.z).length()]
@@ -443,7 +443,7 @@ func _chase(player: PhPlayer, command: DotFpsCommand, state: Dictionary, prey: P
 	state["prey_seen_at"] = t
 	state["prey_at"] = prey.controller.state.position
 	var fire: bool = shoot(player, command, prey.entity_id, middle, prey.controller.state.velocity)
-	command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
+	command.set_button(GSFpsCommand.BUTTON_USER_0, fire)
 	var d := at.distance_to(prey.controller.state.position)
 	if d > 5.0:
 		var _close := _walk_to(player, command, state, prey.controller.state.position, d > 10.0, false)
@@ -451,7 +451,7 @@ func _chase(player: PhPlayer, command: DotFpsCommand, state: Dictionary, prey: P
 
 
 ## A test under way: keep firing at the piece for its moment. True while it still holds the turn.
-func _keep_testing(player: PhPlayer, command: DotFpsCommand, state: Dictionary, careful: bool, t: float, aim: DotBotAim) -> bool:
+func _keep_testing(player: PhPlayer, command: GSFpsCommand, state: Dictionary, careful: bool, t: float, aim: GSBotAim) -> bool:
 	var test: Dictionary = state["test"]
 	if test.is_empty():
 		return false
@@ -466,7 +466,7 @@ func _keep_testing(player: PhPlayer, command: DotFpsCommand, state: Dictionary, 
 				state["found"] = target.player_id
 				state["found_at"] = t
 		var fire: bool = shoot(player, command, int(test["id"]), point, Vector3.ZERO)
-		command.set_button(DotFpsCommand.BUTTON_USER_0, fire)
+		command.set_button(GSFpsCommand.BUTTON_USER_0, fire)
 		return true
 	var cleared: Dictionary = state["cleared"]
 	cleared[test["key"]] = t
@@ -477,7 +477,7 @@ func _keep_testing(player: PhPlayer, command: DotFpsCommand, state: Dictionary, 
 
 
 ## The place the hunter is walking to, picked again when it is reached, stale or seen.
-func _goal_place(player: PhPlayer, state: Dictionary, search: DotBotSearch, at: Vector3, t: float, stream: DotRandomStream) -> Dictionary:
+func _goal_place(player: PhPlayer, state: Dictionary, search: GSBotSearch, at: Vector3, t: float, stream: GSRandomStream) -> Dictionary:
 	var place: Dictionary = state.get("goal_place", {})
 	if place.is_empty() or at.distance_to(place["at"]) < 1.2 or t - float(place.get("since", t)) > 25.0 \
 			or float(place.get("seen_at", -INF)) > float(place.get("picked_at", -INF)):
@@ -583,9 +583,9 @@ func _start_test(player: PhPlayer, state: Dictionary, careful: bool) -> bool:
 
 
 ## Aims at [param at] (target [param id]) and says whether to fire this tick: dot-bot's
-## [DotBotAim], so the view turns at `bot_turn_rate`, the first shots miss by `bot_aim_error`
+## [GSBotAim], so the view turns at `bot_turn_rate`, the first shots miss by `bot_aim_error`
 ## and settle, and the trigger waits `bot_reaction` after first sight.
-func shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
+func shoot(player: PhPlayer, command: GSFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
 	var aim := aim_of(player)
 	var eye := player.eye_position()
 	var t := now()
@@ -600,7 +600,7 @@ func shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, veloc
 
 
 ## Walks [param player] along the mesh to [param goal]. Returns true when there.
-func _walk_to(player: PhPlayer, command: DotFpsCommand, state: Dictionary, goal: Vector3, sprint: bool, look: bool = true) -> bool:
+func _walk_to(player: PhPlayer, command: GSFpsCommand, state: Dictionary, goal: Vector3, sprint: bool, look: bool = true) -> bool:
 	var at := player.controller.state.position
 	var flat := Vector2(goal.x - at.x, goal.z - at.z).length()
 
@@ -631,7 +631,7 @@ func _walk_to(player: PhPlayer, command: DotFpsCommand, state: Dictionary, goal:
 	# Slow for the last metre, or a body overshoots the place beside the piece.
 	if flat < 1.0:
 		command.move *= clampf(flat, 0.35, 1.0)
-	command.set_button(DotFpsCommand.BUTTON_SPRINT, sprint)
+	command.set_button(GSFpsCommand.BUTTON_SPRINT, sprint)
 	_unstick(player, command, state)
 	return false
 
@@ -647,7 +647,7 @@ func _next_corner(state: Dictionary, at: Vector3) -> Vector3:
 
 
 ## Moves along [param world_dir] (flat) whatever way the view is turned.
-static func _walk(command: DotFpsCommand, world_dir: Vector3) -> void:
+static func _walk(command: GSFpsCommand, world_dir: Vector3) -> void:
 	var flat := Vector3(world_dir.x, 0.0, world_dir.z)
 	if flat.length() < 0.01:
 		command.move = Vector2.ZERO
@@ -660,7 +660,7 @@ static func _walk(command: DotFpsCommand, world_dir: Vector3) -> void:
 
 
 ## Turns toward [param point] at the bot's turn rate.
-func _look(player: PhPlayer, command: DotFpsCommand, point: Vector3) -> void:
+func _look(player: PhPlayer, command: GSFpsCommand, point: Vector3) -> void:
 	var view := aim_of(player).look_at_point(player.eye_position(), point, dt())
 	command.yaw = view.x
 	command.pitch = clampf(view.y, -60.0, 60.0)
@@ -669,17 +669,17 @@ func _look(player: PhPlayer, command: DotFpsCommand, point: Vector3) -> void:
 ## Steps aside, then asks for a fresh path, when it has not moved in a second. Never a hop:
 ## a disguised prop that hops is a sink in mid-air (the first play test's sliding, jumping
 ## furniture in the hallway was stand-ins doing exactly that). A hop only as a person.
-func _unstick(player: PhPlayer, command: DotFpsCommand, state: Dictionary) -> void:
+func _unstick(player: PhPlayer, command: GSFpsCommand, state: Dictionary) -> void:
 	var mark: Array = state["stuck"]
 	var at := player.controller.state.position
 	var t := now()
 	if t - float(mark[1]) < 1.0:
 		return
 	var stuck := Vector2(at.x - (mark[0] as Vector3).x, at.z - (mark[0] as Vector3).z).length() < 0.3
-	if stuck and player.controller.state.mode == DotFpsState.Mode.GROUND:
-		var stream: DotRandomStream = state["stream"]
+	if stuck and player.controller.state.mode == GSFpsState.Mode.GROUND:
+		var stream: GSRandomStream = state["stream"]
 		if int(state.get("stuck_count", 0)) % 2 == 0 and not player.is_disguised():
-			command.set_button(DotFpsCommand.BUTTON_JUMP, true)
+			command.set_button(GSFpsCommand.BUTTON_JUMP, true)
 		else:
 			state["sidestep_until"] = t + 0.7
 			state["sidestep_side"] = 1.0 if stream.next_unit() < 0.5 else -1.0

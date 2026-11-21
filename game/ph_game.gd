@@ -14,7 +14,7 @@ const PhFlashlight := preload("ph_flashlight.gd")
 
 ## The simulation: headless, authoritative, and the only thing that decides anything.
 ## A round is hiding then seeking: hunters stand blindfolded for [member PhConfig.hide_seconds] while props turn into furniture, then hunt.
-## The round and sides are dot-match's (via [PhRules]), hunters come from [DotTeamRotation], disguises from dot-props; the map and rules are this game's.
+## The round and sides are dot-match's (via [PhRules]), hunters come from [GSTeamRotation], disguises from dot-props; the map and rules are this game's.
 
 
 ## Where this world publishes itself, so a module can find it. A registry name and not an
@@ -93,7 +93,7 @@ signal blast_drawn(at: Vector3, weapon_id: StringName)
 @export var register_service: bool = true
 
 var props_catalogue: PhProps = null
-var combat: DotCombatManager = null
+var combat: GSCombatManager = null
 ## Whether a player may be hurt or eliminated now: `func(player_id: StringName) -> bool`, assigned by the module.
 ## A seat behind its client's loading cover is frozen by that client, so a shot or fall must not end it.
 ## Unset offline, where bots are never loading.
@@ -101,61 +101,61 @@ var harm_gate: Callable = Callable()
 
 ## Guns lying about (`ph_weapon_layer.gd`), built on both ends, and the `sv_weapon_drop*` rules it runs under: bound by the module, REPLICATED.
 var weapon_layer: PhWeaponLayer = null
-var drop_rules: DotWeaponDropRules = _walk_over_drops()
-var random: DotRandomManager = null
-var physics: DotPhysicsLayout = null
-var taunts: DotPropTaunts = null
-var rules: DotPropDisguiseRules = null
+var drop_rules: GSWeaponDropRules = _walk_over_drops()
+var random: GSRandomManager = null
+var physics: GSPhysicsLayout = null
+var taunts: GSPropTaunts = null
+var rules: GSPropDisguiseRules = null
 
 ## A hunter's loadout (dot-loadout): primary and secondary from `ph_loadout.gd`'s schema, keyed by [method storage_key]; null if none kept.
-var loadouts: DotLoadoutManager = null
+var loadouts: GSLoadoutManager = null
 
-## The B menu's server half (dot-loadout's `DotLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
+## The B menu's server half (dot-loadout's `GSLoadoutCommand`): the `/loadout` command, its notice and the `mp_loadout_*` cvars the module binds.
 ## Untyped and loaded by path because a host whose dot-loadout predates API 2 has no such class; null there, and B is not offered.
 var loadout_command: Object = null
 
 ## dot-player-controller's `mp_forceview`: views switchable (0), held first person (1) or third (2); module-bound (REPLICATED), client-followed.
 ## No `mp_solidplayers` here: a disguised player is the shape of their prop, and the rule's standing hull would be the wrong one.
-var view_rules: DotPlayerViewRules = DotPlayerViewRules.new()
+var view_rules: GSPlayerViewRules = GSPlayerViewRules.new()
 
 ## dot-mobile's `sv_mobile_*`, `sv_aim_assist*`, `sv_autofire*` (module-bound, REPLICATED, client-followed); auto-fire stays off, as shooting real furniture costs a hunter health.
-var mobile_rules: DotMobileRules = DotMobileRules.new()
+var mobile_rules: GSMobileRules = GSMobileRules.new()
 
 ## What a dead body does: dot-player-char's `sv_ragdoll*` cvars, module-bound (REPLICATED), client-followed. A person's body only; a prop's death is `PhConfig.prop_death` (docs/design.md, "A death").
-var ragdoll_rules: DotPlayerRagdollRules = DotPlayerRagdollRules.new()
+var ragdoll_rules: GSPlayerRagdollRules = GSPlayerRagdollRules.new()
 
 ## dot-props' `sv_toys*` (whether a map's toys are there, how many simulate, how hard a walk pushes one): module-bound (REPLICATED), client-followed.
-var toy_rules: DotPropBodyRules = DotPropBodyRules.new()
+var toy_rules: GSPropBodyRules = GSPropBodyRules.new()
 
 ## The ambience cvars (`ph_ambient*`): bound by the module (REPLICATED), followed by a client through its link.
-var ambient_rules: DotAmbienceRules = PhAmbience.make_rules()
+var ambient_rules: GSAmbienceRules = PhAmbience.make_rules()
 
 ## Binds [member config] to cvars, the cfg/ yml layers and the workbench; made by the server scene or the client.
-var config_binder: DotGameConfigBinder = null
+var config_binder: GSGameConfigBinder = null
 
 ## The flashlight's config and binder, made on first use so a suite that builds a game by hand still has one.
-var flashlight_config: DotFlashlightConfig = null
-var flashlight_binder: DotGameConfigBinder = null
+var flashlight_config: GSFlashlightConfig = null
+var flashlight_binder: GSGameConfigBinder = null
 
 ## The workbench's profile rows, made on first ask: the bridge's profile link must exist before the netcode seals, the workbench after.
-var profile_runtime: DotProfileRuntime = null
+var profile_runtime: GSProfileRuntime = null
 
 
-func ensure_runtime() -> DotProfileRuntime:
+func ensure_runtime() -> GSProfileRuntime:
 	if profile_runtime == null:
-		profile_runtime = DotProfileRuntime.new()
+		profile_runtime = GSProfileRuntime.new()
 		profile_runtime.permit = func(actor: Variant, _flag: String) -> bool:
 			return typeof(actor) == TYPE_STRING_NAME and actor == &"local"
 	return profile_runtime
 
 ## Players never collide with each other here (see [method _build_physics]), so this stays non-solid and no `mp_solidplayers` is bound: a disguised player's hull is their prop's. It exists so dot-game's noblock wiring has a game to feed; with `solid` false nothing it decides is physical.
-var body_rules: DotPlayerBodyRules = DotPlayerBodyRules.new()
+var body_rules: GSPlayerBodyRules = GSPlayerBodyRules.new()
 
 ## `sv_falldamage*`: landing hard hurts. On in this game (dot-combat's default is off); the
 ## server applies it through [member combat], a client never does.
-var fall_rules: DotFallDamageRules = make_fall_rules()
+var fall_rules: GSFallDamageRules = make_fall_rules()
 
-## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `DotGameClient.add_noblock`.
+## dot-team's block rules (`!block`, `!noblock`, `mp_teamblock`), set by the server module or `GSGameClient.add_noblock`.
 var block_rules: Object = null:
 	set(value):
 		if block_rules != null and block_rules.is_connected(&"changed", body_rules.refresh):
@@ -173,7 +173,7 @@ var seek_elapsed: float = 0.0
 
 var phase: int = Phase.IDLE
 
-var entities := DotEntityTable.new()
+var entities := GSEntityTable.new()
 
 ## What the server last said about numbers a client cannot count. Negative is "count it".
 var remote_props: int = -1
@@ -209,7 +209,7 @@ func _ready() -> void:
 	body_rules.solid = false
 
 	if not valid.ok:
-		DotLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
+		GSLog.error(CHANNEL, "the configuration is not usable", {"why": valid.error.message})
 		return
 
 	_round_seed = config.seed_value
@@ -242,7 +242,7 @@ func _ready() -> void:
 		for root in solo_map_dirs("maps"):
 			var _added := catalogue.add_directory(root)
 		# The Workshop's maps, solo only by the index's own session (an online session lists none).
-		catalogue.follow_content(DotContentIndex.shared(), PhCatalogue.accepted_map_kinds())
+		catalogue.follow_content(GSContentIndex.shared(), PhCatalogue.accepted_map_kinds())
 		# A "Play map" link starts solo on its map; one the catalogue lacks falls through to the rotation.
 		next_map_id = solo_start_map()
 		# Laid out now, not on the first round: a warmup on an empty world is
@@ -250,16 +250,16 @@ func _ready() -> void:
 		_lay_out_map()
 
 	if register_service:
-		DotRegistry.register(SERVICE, self)
+		GSRegistry.register(SERVICE, self)
 
-	DotLog.info(CHANNEL, "world ready", config.describe())
+	GSLog.info(CHANNEL, "world ready", config.describe())
 
 
 ## The `<pack>/<subdir>` map-pack directories mounted for a host running this game with no server (the client shell's Solo play).
-## Read the way the module reads its server's ([DotGameContent]); empty on a server, in a suite or from the repository.
+## Read the way the module reads its server's ([GSGameContent]); empty on a server, in a suite or from the repository.
 ## Duck-typed, because a delivered game may not name a host's class.
 static func solo_map_dirs(subdir: String) -> PackedStringArray:
-	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	var host: Object = GSRegistry.get_service(SOLO_SERVICE)
 	if host == null or not host.has_method(&"map_dirs"):
 		return PackedStringArray()
 	return host.call(&"map_dirs", subdir)
@@ -268,7 +268,7 @@ static func solo_map_dirs(subdir: String) -> PackedStringArray:
 ## The map the client shell was asked to start solo on (`--solo-map`, a hotspot "Play map" link): its
 ## `start_map`, or empty with no host, no such property or none asked. Duck-typed like [method solo_map_dirs].
 static func solo_start_map() -> StringName:
-	var host: Object = DotRegistry.get_service(SOLO_SERVICE)
+	var host: Object = GSRegistry.get_service(SOLO_SERVICE)
 	if host == null or not (&"start_map" in host):
 		return &""
 	return StringName(str(host.get(&"start_map")))
@@ -277,14 +277,14 @@ static func solo_start_map() -> StringName:
 func _exit_tree() -> void:
 	bots.release()
 	if register_service:
-		DotRegistry.unregister_instance(SERVICE, self)
+		GSRegistry.unregister_instance(SERVICE, self)
 
 
 ## Three layers: the building, the people, and the furniture.
 ## People do not collide with people: shoving is a race decided by who walked into whom, drawn in the past on every client.
 ## A hunter walking through a prop is a far smaller tell than one stuck against an invisible sofa.
 func _build_physics() -> void:
-	physics = DotPhysicsLayout.custom(&"prophunt", [&"world", &"player", &"prop", &"toy", &"footprint"])
+	physics = GSPhysicsLayout.custom(&"prophunt", [&"world", &"player", &"prop", &"toy", &"footprint"])
 
 	for layer in physics.layers:
 		match layer.id:
@@ -303,12 +303,12 @@ func _build_physics() -> void:
 	var built := physics.build()
 
 	if not built.ok:
-		DotLog.error(CHANNEL, "the collision layout would not build", {"why": built.error.message})
+		GSLog.error(CHANNEL, "the collision layout would not build", {"why": built.error.message})
 		physics = null
 
 
 func _build_random() -> void:
-	random = DotRandomManager.new()
+	random = GSRandomManager.new()
 	random.name = "Random"
 	random.register_as_service = false
 	add_child(random)
@@ -321,7 +321,7 @@ func _build_props() -> void:
 	var count := props_catalogue.load_file()
 
 	if count == 0:
-		DotLog.error(CHANNEL, "no props: nobody can hide as anything", {})
+		GSLog.error(CHANNEL, "no props: nobody can hide as anything", {})
 
 
 func _build_map() -> void:
@@ -337,37 +337,37 @@ func _build_map() -> void:
 
 
 func _build_combat() -> void:
-	combat = DotCombatManager.new()
+	combat = GSCombatManager.new()
 	combat.name = "Combat"
 	combat.is_authority = authoritative
 	combat.register_service = false
 
-	var damage_rules := DotDamageRules.new()
+	var damage_rules := GSDamageRules.new()
 	damage_rules.friendly_fire = config.friendly_fire
 	damage_rules.self_damage = true
 	damage_rules.hit_groups = true
 	combat.rules = damage_rules
 
-	var settings := DotCombatConfig.new()
+	var settings := GSCombatConfig.new()
 	settings.lag_compensation = false
 	combat.config = settings
 
 	# A shot stops on a wall AND on a piece of furniture: the furniture is what a hunter is
 	# shooting at, and a shot through a sofa would be a shot that cannot cost anybody anything.
-	var trace := DotTracePhysics.for_world(get_world_3d())
+	var trace := GSTracePhysics.for_world(get_world_3d())
 
 	if physics != null:
 		trace.collision_mask = physics.layer_mask(&"world") | physics.layer_mask(&"prop")
 
 	combat.trace = trace
-	combat.resolver = DotDamageResolver.with_rules(damage_rules)
-	combat.resolver.hit_groups = DotHitGroup.defaults()
+	combat.resolver = GSDamageResolver.with_rules(damage_rules)
+	combat.resolver.hit_groups = GSHitGroup.defaults()
 	combat.resolver.team_of = func(entity_id: int) -> int:
 		return team_of(entities.key_for_id(entity_id))
 	# The one place every hurt passes (a hunter's shot, a blast, a decoy's charge on the hunter,
 	# the fall): a round counts the living from health, so refusing here keeps a covered seat
 	# alive in the count as well.
-	combat.resolver.adjust = func(damage: DotDamage) -> void:
+	combat.resolver.adjust = func(damage: GSDamage) -> void:
 		if not can_be_harmed(entities.key_for_id(damage.victim)):
 			damage.refuse("still loading")
 
@@ -377,16 +377,16 @@ func _build_combat() -> void:
 	projectiles.setup(combat, config.gravity)
 	projectiles.catalogue = weapon_catalogue()
 	projectiles.blasted.connect(_on_blast)
-	projectiles.detonated.connect(func(at: Vector3, spawn: DotWeaponSpawn) -> void:
+	projectiles.detonated.connect(func(at: Vector3, spawn: GSWeaponSpawn) -> void:
 		blast_drawn.emit(at, spawn.id if spawn != null else &""))
 
 
 func _build_match() -> void:
-	match_node = DotMatch.new()
+	match_node = GSMatch.new()
 	match_node.name = "Match"
 	match_node.register_service = false
 
-	var match_config := DotMatchConfig.new()
+	var match_config := GSMatchConfig.new()
 	match_config.tick_rate = tick_rate
 	match_config.auto_start = false
 	match_config.log_transitions = false
@@ -394,7 +394,7 @@ func _build_match() -> void:
 	match_config.balance_between_rounds = false
 	match_node.config = match_config
 
-	var match_rules: DotMatchRules = PhRules.make()
+	var match_rules: GSMatchRules = PhRules.make()
 	apply_intermission(match_rules)
 	match_rules.warmup_sec = config.warmup_seconds
 	match_rules.countdown_sec = 0.0
@@ -405,15 +405,15 @@ func _build_match() -> void:
 	match_node.rules = match_rules
 
 	# Scoped to the match node, which finds nothing: this game places its own players.
-	match_node.spawns_ref = DotNodeRef.of_path(^".")
+	match_node.spawns_ref = GSNodeRef.of_path(^".")
 	add_child(match_node)
 
 	match_node.round_started.connect(_on_round_started)
 	match_node.round_ended.connect(_on_round_ended)
 
-	var teams: Array[DotTeam] = [
-		DotTeam.make(PROPS, TEAM_NAMES[0], TEAM_COLOURS[0]),
-		DotTeam.make(HUNTERS, TEAM_NAMES[1], TEAM_COLOURS[1]),
+	var teams: Array[GSTeam] = [
+		GSTeam.make(PROPS, TEAM_NAMES[0], TEAM_COLOURS[0]),
+		GSTeam.make(HUNTERS, TEAM_NAMES[1], TEAM_COLOURS[1]),
 	]
 	match_node.teams.teams = teams
 	match_node.teams.force_balance = false
@@ -428,7 +428,7 @@ func _decision() -> Dictionary:
 
 ## The taunt list, on both ends: the server decides when a taunt plays, every client plays it.
 func _build_taunts() -> void:
-	taunts = DotPropTaunts.new()
+	taunts = GSPropTaunts.new()
 	taunts.auto_after = config.auto_taunt_seconds
 	taunts.auto_radius = config.auto_taunt_radius
 	taunts.cooldown = config.taunt_cooldown
@@ -443,15 +443,15 @@ func _build_taunts() -> void:
 		var _added := taunts.add_all(list)
 
 	if taunts.order.is_empty():
-		DotLog.warn(CHANNEL, "no taunts; a prop can only be found by shooting", {"file": config.taunt_file})
+		GSLog.warn(CHANNEL, "no taunts; a prop can only be found by shooting", {"file": config.taunt_file})
 
 
 func taunt_ids() -> Array[StringName]:
 	return taunts.order if taunts != null else ([] as Array[StringName])
 
 
-static func make_fall_rules() -> DotFallDamageRules:
-	var rules := DotFallDamageRules.new()
+static func make_fall_rules() -> GSFallDamageRules:
+	var rules := GSFallDamageRules.new()
 	rules.enabled = true
 	# Hiding high on props is core play: only a very long drop (about 40 m/s) kills outright.
 	rules.lethal_speed = 40.0
@@ -486,7 +486,7 @@ func add_player(
 		var applied := physics.apply_to(player, &"player")
 
 		if not applied.ok:
-			DotLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
+			GSLog.warn(CHANNEL, "a player could not be put on its collision layer", {"why": applied.error.message})
 
 		player.controller.set_collision_mask(physics.collision_mask(&"player"))
 
@@ -494,11 +494,11 @@ func add_player(
 			player.weapons.wall_extra_mask = player.controller.tunables.collision_mask
 
 	var opened := entities.open(
-		DotEntity.KIND_PLAYER, player, &"", player_id, float(_tick) / float(maxi(tick_rate, 1))
+		GSEntity.KIND_PLAYER, player, &"", player_id, float(_tick) / float(maxi(tick_rate, 1))
 	)
-	player.entity_id = (opened.value as DotEntityHandle).id if opened.ok else 0
+	player.entity_id = (opened.value as GSEntityHandle).id if opened.ok else 0
 
-	var health := DotHealth.new()
+	var health := GSHealth.new()
 	health.name = "Health"
 	health.max_health = config.prop_body_health
 	health.health = health.max_health
@@ -509,20 +509,20 @@ func add_player(
 		combat.register_health(player.entity_id, health)
 
 	if combat != null and player.controller != null:
-		var fall := DotFallDamage.new()
+		var fall := GSFallDamage.new()
 		fall.name = "FallDamage"
 		fall.rules = fall_rules
 		fall.victim = player.entity_id
-		fall.controller = DotNodeRef.of_path(player.controller.get_path())
-		fall.controller.mode = DotNodeRef.Mode.ABSOLUTE
-		fall.combat = DotNodeRef.of_path(combat.get_path())
-		fall.combat.mode = DotNodeRef.Mode.ABSOLUTE
+		fall.controller = GSNodeRef.of_path(player.controller.get_path())
+		fall.controller.mode = GSNodeRef.Mode.ABSOLUTE
+		fall.combat = GSNodeRef.of_path(combat.get_path())
+		fall.combat.mode = GSNodeRef.Mode.ABSOLUTE
 		# Nobody is hurt between rounds (the intermission).
 		fall.context_checks = {&"protected": func() -> bool: return phase == Phase.IDLE}
 		player.add_child(fall)
 		player.build_hitboxes(combat)
 
-	health.died.connect(func(damage: DotDamage) -> void: _on_player_died(player, damage))
+	health.died.connect(func(damage: GSDamage) -> void: _on_player_died(player, damage))
 
 	players[player_id] = player
 	sides[player_id] = side
@@ -531,10 +531,10 @@ func add_player(
 		var seated := match_node.add_player(String(player_id), display_name, _tick, side)
 
 		if not seated.ok:
-			DotLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
+			GSLog.error(CHANNEL, "dot-match refused a player", {"id": String(player_id), "why": seated.error.message})
 
 	place_one(player)
-	DotLog.debug(CHANNEL, "player joined", {"id": String(player_id), "side": side})
+	GSLog.debug(CHANNEL, "player joined", {"id": String(player_id), "side": side})
 	player_added.emit(player_id)
 	return player
 
@@ -575,7 +575,7 @@ func remove_player(player_id: StringName) -> void:
 
 	if combat != null and is_instance_valid(combat) and player.entity_id != 0:
 		combat.forget(player.entity_id)
-		var _closed := entities.close(player.entity_id, DotEntityTable.REASON_OWNER_LEFT)
+		var _closed := entities.close(player.entity_id, GSEntityTable.REASON_OWNER_LEFT)
 
 	if match_node != null:
 		match_node.remove_player(String(player_id))
@@ -724,7 +724,7 @@ func _on_round_started(number: int) -> void:
 	_set_phase(Phase.HIDE)
 	round_began.emit(number, map.id())
 
-	DotLog.info(CHANNEL, "round began", {
+	GSLog.info(CHANNEL, "round began", {
 		"number": number, "map": String(map.id()), "seed": _round_seed,
 		"players": players.size(), "hunters": ", ".join(_names(players_on(HUNTERS))),
 	})
@@ -741,7 +741,7 @@ func _on_round_ended(number: int, winner: int, _outcome: int) -> void:
 		progress.on_round_over(winner)
 
 	round_over.emit(number, winner, _winner_name)
-	DotLog.info(CHANNEL, "round over", {"number": number, "winner": _winner_name})
+	GSLog.info(CHANNEL, "round over", {"number": number, "winner": _winner_name})
 
 
 ## A player's wish, from chat. Server side. Takes effect at the next draw.
@@ -761,16 +761,16 @@ static func _names(of: Array[PhPlayer]) -> PackedStringArray:
 ## The map menu's change: [param id] now, not after this map's rounds. The next map is set and
 ## a fresh round begins on it (dot-match's `begin_round_now`: the round called off has no
 ## winner); with no match running it is simply built. Authority only.
-func change_map_now(id: StringName) -> DotResult:
+func change_map_now(id: StringName) -> GSResult:
 	if not authoritative:
-		return DotResult.fail(DotError.CODE_STATE, "Only the server changes the map.")
+		return GSResult.fail(GSError.CODE_STATE, "Only the server changes the map.")
 	if catalogue == null or not catalogue.playable(config.map_ids).has(id):
-		return DotResult.fail(DotError.CODE_INVALID, "There is no map called '%s' here." % id)
+		return GSResult.fail(GSError.CODE_INVALID, "There is no map called '%s' here." % id)
 	next_map_id = id
 	if match_node == null or not match_node.begin_round_now(_tick):
 		_lay_out_map()
-	DotLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
-	return DotResult.success(id)
+	GSLog.info(CHANNEL, "map changed from the map menu", {"map": String(id)})
+	return GSResult.success(id)
 
 
 func _lay_out_map() -> void:
@@ -798,7 +798,7 @@ func _lay_out_map() -> void:
 
 ## Builds [param doc] as the map. What the server does between rounds, and what a client does
 ## when it is sent one.
-func build_map(doc: Dictionary) -> DotResult:
+func build_map(doc: Dictionary) -> GSResult:
 	world_clearing.emit()
 
 	# Everybody back into their own body before the furniture they were wearing goes.
@@ -808,7 +808,7 @@ func build_map(doc: Dictionary) -> DotResult:
 	var built := map.build(doc)
 
 	if not built.ok:
-		DotLog.error(CHANNEL, "a map would not build", {"id": str(doc.get("id", "?")), "why": built.error.message})
+		GSLog.error(CHANNEL, "a map would not build", {"id": str(doc.get("id", "?")), "why": built.error.message})
 		return built
 
 	map_doc = map.doc
@@ -858,7 +858,7 @@ func _arm_hunters() -> void:
 	var clash := hunter_slot_clash(config.hunter_weapons)
 	if clash != "" and clash != _warned_clash:
 		_warned_clash = clash
-		DotLog.warn(CHANNEL, "two hunter weapons share a slot, so only the last is carried", {"weapons": clash})
+		GSLog.warn(CHANNEL, "two hunter weapons share a slot, so only the last is carried", {"weapons": clash})
 
 	for player in players_on(HUNTERS):
 		# Not awaited: the round goes on into the hide, when a hunter is blindfolded and fires
@@ -872,7 +872,7 @@ func _arm_hunters() -> void:
 func arm_hunter(player: PhPlayer) -> void:
 	var kit := config.hunter_weapons
 	if loadouts != null:
-		var res: DotResult = await loadouts.active_for(storage_key(player.player_id))
+		var res: GSResult = await loadouts.active_for(storage_key(player.player_id))
 		if res.ok:
 			kit = PhLoadout.hunter_kit(config.hunter_weapons, loadouts.resolve(res.value))
 	if not is_instance_valid(player) or team_of(player.player_id) != HUNTERS:
@@ -900,21 +900,21 @@ const LOADOUT_COMMAND_SCRIPT := "res://addons/dot_loadout/integrations/dot_loado
 ## restart; the client remembers its own choice and sends it again on join), and the B menu's
 ## server half where the host's dot-loadout has it (API 2).
 func _build_loadouts() -> void:
-	loadouts = DotLoadoutManager.new()
+	loadouts = GSLoadoutManager.new()
 	loadouts.name = "Loadouts"
 	loadouts.schema = PhLoadout.schema(config.hunter_weapons, config.hunter_choices)
 	loadouts.register_service = false
-	var lc := DotLoadoutConfig.new()
+	var lc := GSLoadoutConfig.new()
 	lc.backend = "memory"
 	lc.allow_default_loadout = true
 	lc.conform_on_load = true
 	loadouts.config = lc
 	loadouts.config_file = ""
 	loadouts.load_layered_config = false
-	loadouts.store = DotLoadoutStoreMemory.new()
+	loadouts.store = GSLoadoutStoreMemory.new()
 	add_child(loadouts)
 
-	if DotAddonApi.build_level("dot_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT):
+	if GSAddonApi.build_level("dot_loadout") < 2 or not ResourceLoader.exists(LOADOUT_COMMAND_SCRIPT):
 		return
 	loadout_command = (load(LOADOUT_COMMAND_SCRIPT) as GDScript).new()
 	loadout_command.set(&"manager", loadouts)
@@ -953,7 +953,7 @@ func rearm_if_allowed(id: StringName) -> bool:
 	if not authoritative or not loadout_now_allowed(id):
 		return false
 	await arm_hunter(players[id])
-	DotLog.debug(CHANNEL, "loadout handed over at once", {"player": String(id)})
+	GSLog.debug(CHANNEL, "loadout handed over at once", {"player": String(id)})
 	return true
 
 
@@ -995,7 +995,7 @@ func _set_phase(to: int) -> void:
 		taunts.reset()
 
 	phase_changed.emit(to)
-	DotLog.debug(CHANNEL, "the round changed phase", {"phase": Phase.keys()[to]})
+	GSLog.debug(CHANNEL, "the round changed phase", {"phase": Phase.keys()[to]})
 
 
 func _advance_phase(delta: float) -> void:
@@ -1055,8 +1055,8 @@ func _check_round(seeking: bool) -> void:
 
 
 ## The intermission is the pause plus the killcam the clients play inside it, so the server never waits on one.
-func apply_intermission(rules: DotMatchRules = null) -> void:
-	var target: DotMatchRules = rules if rules != null else (match_node.rules if match_node != null else null)
+func apply_intermission(rules: GSMatchRules = null) -> void:
+	var target: GSMatchRules = rules if rules != null else (match_node.rules if match_node != null else null)
 	if target == null:
 		return
 	var pause := config.intermission_seconds
@@ -1084,7 +1084,7 @@ func _decide(winner: int, why: String) -> void:
 				if progress != null:
 					progress.on_survived(id)
 
-	DotLog.info(CHANNEL, "the round is decided", {"winner": winner, "why": why})
+	GSLog.info(CHANNEL, "the round is decided", {"winner": winner, "why": why})
 
 
 ## Queues a disguise request for the next tick; what the net bridge and an offline client call.
@@ -1145,7 +1145,7 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 		return false
 
 	var size := props_catalogue.size_of(prop_id)
-	var allowed := DotPropDisguise.may_take(size, rules)
+	var allowed := GSPropDisguise.may_take(size, rules)
 
 	if not allowed.ok:
 		refused.emit(id, allowed.error.message)
@@ -1154,7 +1154,7 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 	if player.is_disguised() and player.disguise.prop_id == prop_id:
 		return false
 
-	var next := DotPropDisguise.of(prop_id, size)
+	var next := GSPropDisguise.of(prop_id, size)
 	next.yaw = player.controller.state.yaw
 
 	if not _make_room(player, next):
@@ -1168,7 +1168,7 @@ func disguise_as(id: StringName, prop_id: StringName) -> bool:
 ## Makes sure [param player] has room for [param next]'s hull, moving them a little if needed; false when nowhere near is enough.
 ## A hull changes size in place, leaving a capsule half inside a wall that each machine would shove out differently,
 ## so the server looks first: where they stand, then a step to each side, never through a wall or off the floor.
-func _make_room(player: PhPlayer, next: DotPropDisguise) -> bool:
+func _make_room(player: PhPlayer, next: GSPropDisguise) -> bool:
 	var world := get_world_3d()
 
 	if world == null or physics == null or player.controller == null:
@@ -1239,16 +1239,16 @@ func _may_hide(player: PhPlayer, id: StringName) -> bool:
 
 ## Puts [param next] on [param player] — a new prop, or their own body — and carries the
 ## health across as a fraction, so a hurt prop cannot heal by finding a bigger one.
-func _wear(player: PhPlayer, next: DotPropDisguise) -> void:
+func _wear(player: PhPlayer, next: GSPropDisguise) -> void:
 	var old_max := player.health.max_health if player.health != null else 1.0
-	var new_max := DotPropDisguise.health(next.size, rules) if next.is_disguised() else config.prop_body_health
+	var new_max := GSPropDisguise.health(next.size, rules) if next.is_disguised() else config.prop_body_health
 
 	player.apply_disguise(next)
 
 	if player.health != null:
 		var current := player.health.health
 		player.health.max_health = new_max
-		player.health.health = DotPropDisguise.health_after(current, old_max, new_max, rules)
+		player.health.health = GSPropDisguise.health_after(current, old_max, new_max, rules)
 
 	# Wearing anything again ends a reveal.
 	if next.is_disguised() and player.set_aside != null:
@@ -1275,7 +1275,7 @@ func reveal(id: StringName) -> bool:
 			_refuse_fmt.call(id, "You can show yourself again in %d s.", int(ceilf(wait)))
 			return false
 
-		var body := DotPropDisguise.new()
+		var body := GSPropDisguise.new()
 
 		if not _make_room(player, body):
 			refused.emit(id, "There is no room to stand up here.")
@@ -1343,11 +1343,11 @@ func turn(id: StringName, how: int) -> bool:
 
 
 ## The flashlight config, made on first use.
-func flashlight_conf() -> DotFlashlightConfig:
+func flashlight_conf() -> GSFlashlightConfig:
 	if flashlight_config == null:
 		flashlight_config = PhFlashlight.make_config()
 		flashlight_binder = PhFlashlight.make_binder(flashlight_config)
-		DotLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
+		GSLog.result(CHANNEL, "flashlight config", flashlight_binder.load_layers())
 	return flashlight_config
 
 
@@ -1376,7 +1376,7 @@ func toggle_flashlight(id: StringName) -> bool:
 	var cfg := flashlight_conf()
 
 	if player == null or not player.is_alive() or player.watching \
-			or not DotFlashlightRules.allowed_on(cfg, str(map_doc.get("id", ""))):
+			or not GSFlashlightRules.allowed_on(cfg, str(map_doc.get("id", ""))):
 		return false
 
 	player.flashlight = not player.flashlight
@@ -1541,7 +1541,7 @@ func _advance_weapons() -> void:
 
 ## What shooting the furniture costs: a share of the shot's damage, off the hunter's own health.
 ## Every pellet that stopped on a real prop and none that hit a player, or a prop standing beside the chair they copied would cost the hunter who found them.
-func _charge_for_decoys(player: PhPlayer, shot: DotShot) -> void:
+func _charge_for_decoys(player: PhPlayer, shot: GSShot) -> void:
 	if config.decoy_penalty <= 0.0 or map == null:
 		return
 
@@ -1572,7 +1572,7 @@ func _charge_for_decoys(player: PhPlayer, shot: DotShot) -> void:
 
 ## Takes [param amount] off [param player] as the furniture's answer (a decoy), and tells them.
 func _charge(player: PhPlayer, amount: float) -> void:
-	var cost := DotDamage.make(0, player.entity_id, amount, null)
+	var cost := GSDamage.make(0, player.entity_id, amount, null)
 	cost.point = player.controller.state.position
 	cost.direction = player.aim_direction()
 	cost.tick = _tick
@@ -1589,7 +1589,7 @@ func _charge(player: PhPlayer, amount: float) -> void:
 ## Shooting breakable furniture breaks it. Server side.
 ## The decoy penalty is charged for every pellet first ([method _charge_for_decoys]); what breaks is the catalogue's (`props/kits.json` "breaks"),
 ## and only once the shots that landed on it add up to its number.
-func _break_furniture(shot: DotShot) -> void:
+func _break_furniture(shot: GSShot) -> void:
 	if map == null or props_catalogue == null:
 		return
 
@@ -1625,7 +1625,7 @@ func _break_furniture(shot: DotShot) -> void:
 
 		if taken >= limit and map.break_prop(index):
 			prop_broken.emit(index, shot.direction)
-			DotLog.debug(CHANNEL, "furniture broke", {"prop": String(map.prop_id(index)), "index": index})
+			GSLog.debug(CHANNEL, "furniture broke", {"prop": String(map.prop_id(index)), "index": index})
 
 
 ## A client: the server broke prop [param index]. [param quiet] for one told on joining, which
@@ -1737,7 +1737,7 @@ func _watch_world() -> void:
 			continue
 
 		if player.controller.state.position.y < map.kill_height():
-			var fall := DotDamage.make(0, player.entity_id, player.health.max_health * 10.0, null)
+			var fall := GSDamage.make(0, player.entity_id, player.health.max_health * 10.0, null)
 			fall.tick = _tick
 			fall.context = {"why": DIED_FELL}
 			var _applied := combat.apply_damage(fall)
@@ -1745,7 +1745,7 @@ func _watch_world() -> void:
 
 ## A hunter's shot against the toys: the first one on its ray, nearer than a wall, is pushed (dot-props' `shot_along`). Server side.
 ## The shot goes on to the combat, whose trace never sees a toy, so a ball is never cover and hitting one costs nothing: it is no prop anybody could be.
-func _shoot_toys(shot: DotShot) -> void:
+func _shoot_toys(shot: GSShot) -> void:
 	if not authoritative or map == null or map.toys == null or map.toys.count() == 0:
 		return
 	var directions: Array = shot.pellets if not shot.pellets.is_empty() else [shot.direction]
@@ -1761,7 +1761,7 @@ const BLAST_TOY_SPEED := 12.0
 ## A hunter's grenade went off and dot-combat resolved it ([param shot]'s damages are who it
 ## hurt). Server side and solo: the hit marker for a prop it found, the toys it throws, and what
 ## it costs when it found nobody (docs/design.md, "Grenades").
-func _on_blast(at: Vector3, spawn: DotWeaponSpawn, shot: DotShot) -> void:
+func _on_blast(at: Vector3, spawn: GSWeaponSpawn, shot: GSShot) -> void:
 	if not authoritative or spawn == null:
 		return
 
@@ -1784,12 +1784,12 @@ func _on_blast(at: Vector3, spawn: DotWeaponSpawn, shot: DotShot) -> void:
 ## What a blast at [param at] costs its thrower: nothing when it hurt a prop or when no furniture was within [param radius] in clear sight,
 ## otherwise one decoy at the blast's full [param damage] (`decoy_penalty`, at least `decoy_penalty_min`).
 ## One however many pieces it reached: a blast is one guess about one place, and a charge per piece would make a classroom of chairs a death sentence.
-func blast_cost(at: Vector3, radius: float, damage: float, shot: DotShot) -> float:
+func blast_cost(at: Vector3, radius: float, damage: float, shot: GSShot) -> float:
 	if config.decoy_penalty <= 0.0 or map == null:
 		return 0.0
 
 	if shot != null:
-		for hurt: DotDamage in shot.damages:
+		for hurt: GSDamage in shot.damages:
 			if hurt != null and not hurt.refused and hurt.health_lost > 0.0 \
 					and team_of(entities.key_for_id(hurt.victim)) == PROPS:
 				return 0.0
@@ -1832,7 +1832,7 @@ func apply_disguise_wire(id: StringName, wire: Dictionary) -> void:
 	if player == null:
 		return
 
-	player.apply_disguise(DotPropDisguise.from_wire(wire))
+	player.apply_disguise(GSPropDisguise.from_wire(wire))
 	disguise_changed.emit(id)
 
 
@@ -1847,7 +1847,7 @@ func _on_taunted_for_bots(id: StringName, _taunt_id: StringName, _forced: bool) 
 	bots.on_taunted(id)
 
 
-func _bot_aim_of(player: PhPlayer) -> DotBotAim:
+func _bot_aim_of(player: PhPlayer) -> GSBotAim:
 	return bots.aim_of(player)
 
 
@@ -1858,7 +1858,7 @@ func _bot_now() -> float:
 
 ## Aims a stand-in hunter at [param at] (target [param id]) and says whether it fires this tick.
 ## See [code]PhBots.shoot[/code].
-func _bot_shoot(player: PhPlayer, command: DotFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
+func _bot_shoot(player: PhPlayer, command: GSFpsCommand, id: int, at: Vector3, velocity: Vector3) -> bool:
 	return bots.shoot(player, command, id, at, velocity)
 
 
@@ -1867,13 +1867,13 @@ func _clear_between(from: Vector3, to: Vector3, furniture: bool = false) -> bool
 
 
 ## Hunters take a gun by walking over it: there is no use key to press, and a hunter has to keep their eyes up.
-static func _walk_over_drops() -> DotWeaponDropRules:
-	var rules := DotWeaponDropRules.new()
+static func _walk_over_drops() -> GSWeaponDropRules:
+	var rules := GSWeaponDropRules.new()
 	rules.auto_pickup = true
 	return rules
 
 
-func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
+func _on_player_died(player: PhPlayer, damage: GSDamage) -> void:
 	var by := entities.key_for_id(damage.attacker)
 	var why: StringName = damage.context.get("why", DIED_SHOT)
 
@@ -1894,7 +1894,7 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 
 	player.marked = false
 
-	if match_node != null and DotEntity.is_kind(player.entity_id, DotEntity.KIND_PLAYER):
+	if match_node != null and GSEntity.is_kind(player.entity_id, GSEntity.KIND_PLAYER):
 		match_node.report_kill(String(by), String(player.player_id), why, _tick)
 
 	if authoritative and weapon_layer != null:
@@ -1904,11 +1904,11 @@ func _on_player_died(player: PhPlayer, damage: DotDamage) -> void:
 	player.death = decide_death(player, damage)
 
 	player_died.emit(player.player_id, by, why, damage.weapon_id)
-	DotLog.debug(CHANNEL, "player died", {"id": String(player.player_id), "by": String(by), "why": String(why)})
+	GSLog.debug(CHANNEL, "player died", {"id": String(player.player_id), "by": String(by), "why": String(why)})
 
 
 ## The fall a death gets, decided once here; see [code]PhGameReport.decide_death[/code].
-func decide_death(player: PhPlayer, damage: DotDamage) -> DotPlayerDeath:
+func decide_death(player: PhPlayer, damage: GSDamage) -> GSPlayerDeath:
 	var shooter: PhPlayer = players.get(entities.key_for_id(damage.attacker)) if damage.attacker != 0 else null
 	return PhGameReport.decide_death(player, damage, shooter, ragdoll_rules, _tick)
 
@@ -1943,21 +1943,21 @@ func describe_lines() -> PackedStringArray:
 
 
 ## Every damage a weapon's shot did to somebody else, as [signal hit_landed] for the shooter, on the authority only.
-func _note_hits(shooter: PhPlayer, shot: DotShot) -> void:
+func _note_hits(shooter: PhPlayer, shot: GSShot) -> void:
 	if not authoritative or shot == null or shooter == null:
 		return
 	for damage in PhGameReport.confirmed_hits(shooter, shot):
 		var victim := entities.key_for_id(damage.victim) as StringName
 		if progress != null and players.has(victim):
 			progress.report_hit(shooter.player_id, victim, damage)
-		hit_landed.emit(shooter.player_id, damage.point, damage.lethal, damage.hit_group == DotHitGroup.HEAD)
+		hit_landed.emit(shooter.player_id, damage.point, damage.lethal, damage.hit_group == GSHitGroup.HEAD)
 
 
-static var _weapon_catalogue: DotWeaponCatalogue = null
+static var _weapon_catalogue: GSWeaponCatalogue = null
 
 
 ## The weapon table, built once; every rig shares it so its behaviour scripts load once.
-static func weapon_catalogue() -> DotWeaponCatalogue:
+static func weapon_catalogue() -> GSWeaponCatalogue:
 	if _weapon_catalogue == null:
 		_weapon_catalogue = ZeeWeaponPack.catalogue()
 		# Built under the loading cover; the first spawn then loads no script.
@@ -1975,14 +1975,14 @@ func arm(player: PhPlayer, weapon_id: StringName) -> bool:
 		rig.tick_rate = tick_rate
 		rig.catalogue = weapon_catalogue()
 		rig.wall_extra_mask = player.controller.tunables.collision_mask if player.controller != null else 0
-		rig.player_ref = DotNodeRef.of_path(player.get_path())
+		rig.player_ref = GSNodeRef.of_path(player.get_path())
 		rig.ads_rules = ads_rules
 		player.add_child(rig)
 
 		var ready_now := rig.setup()
 
 		if not ready_now.ok:
-			DotLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
+			GSLog.warn(CHANNEL, "a weapon rig would not set up", {"player": String(player.player_id), "why": ready_now.error.message})
 			player.remove_child(rig)
 			rig.queue_free()
 			return false

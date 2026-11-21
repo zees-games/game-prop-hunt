@@ -9,10 +9,10 @@ var audio: PhAudio = null
 ## Splinters and shards where furniture breaks.
 var break_fx: Node = null
 ## The rules a hunter's body comes apart by when the furniture finishes them.
-var _break_rules: DotPlayerBreakRules = null
+var _break_rules: GSPlayerBreakRules = null
 var bridge: PhNetBridge = null
 ## The player's console (the platform's).
-var console: DotConsoleController = null
+var console: GSConsoleController = null
 var link: Node = null
 ## dot-menu's loadout menu, or null on a host whose dot-menu predates it (API 6).
 var loadout_menu: Object = null
@@ -25,8 +25,8 @@ const PhWeaponIcons := preload("ph_weapon_icons.gd")
 ## How long a found prop's own pieces take to shrink away as it pops.
 const PROP_POP_SECONDS := 0.35
 ## Where the dead lie: dot-player-char's ragdolls under the game's (the server's) rules.
-var ragdolls: DotPlayerRagdolls = null
-var _sampler: DotFpsSampler = null
+var ragdolls: GSPlayerRagdolls = null
+var _sampler: GSFpsSampler = null
 ## The phone's buttons; null on a device without touch.
 var touch: PhTouch = null
 var _watch_id: int = -1
@@ -37,7 +37,7 @@ const WEAPON_ICON_DIR := "res://assets/weapon_icons"
 ## A hunter's own gun, drawn. Never decides anything: every shot is the server's.
 var weapons: ZeeWeaponRig = null
 ## The tuning panel's host: F9 solo or hosting, the admin's remote panel on a server that allows it.
-var workbench: DotGameWorkbench = null
+var workbench: GSGameWorkbench = null
 ## Whether B's choice is remembered on this device and sent again on the next join. A suite or a
 ## render turns it off: neither may write, or read back, a player's real choice.
 @export var remember_loadout: bool = true
@@ -61,18 +61,18 @@ func _avatar_figure(peer_id: int) -> Object:
 func _bind_bot_console() -> void:
 	if console != null:
 		var local: Array = console.sources()
-		if not local.is_empty() and local[0] is DotConsoleLocal:
+		if not local.is_empty() and local[0] is GSConsoleLocal:
 			var _icons := PhWeaponIcons.shared.bind_console(local[0])
 	if not _offline or console == null or game == null:
 		return
 	var sources: Array = console.sources()
-	if sources.is_empty() or not (sources[0] is DotConsoleLocal):
+	if sources.is_empty() or not (sources[0] is GSConsoleLocal):
 		return
-	var _bound := DotBotSettings.of(game).bind_console(sources[0])
+	var _bound := GSBotSettings.of(game).bind_console(sources[0])
 	var args := OS.get_cmdline_user_args()
 	var index := args.find("--bot_difficulty")
 	if index >= 0 and index + 1 < args.size():
-		DotLog.result(CHANNEL, "bot difficulty from the command line", DotBotSettings.of(game).set_difficulty(args[index + 1]))
+		GSLog.result(CHANNEL, "bot difficulty from the command line", GSBotSettings.of(game).set_difficulty(args[index + 1]))
 
 
 func _player_of(session_id: int) -> PhPlayer:
@@ -119,7 +119,7 @@ func _on_death(session_id: int, by: int, why: StringName, weapon_id: StringName 
 ## B: a hunter's primary and secondary, as cards. Solo the world's loadouts answer; connected the server does (dot-loadout's `/loadout`).
 ## A prop may choose too, kept for the round they hunt. Guarded on the host's dot-menu and dot-loadout levels, so an older shell runs without it.
 func _use_loadout_menu() -> void:
-	if DotAddonApi.build_level("dot_menu") < 6 or DotAddonApi.build_level("dot_loadout") < 2:
+	if GSAddonApi.build_level("dot_menu") < 6 or GSAddonApi.build_level("dot_loadout") < 2:
 		return
 	if settings == null or not settings.has_method(&"use_loadout"):
 		return
@@ -136,21 +136,21 @@ func _use_loadout_menu() -> void:
 ## Solo: what this player may pick, from the world's own manager.
 func loadout_offer() -> Variant:
 	if game == null or game.loadout_command == null or player == null:
-		return DotResult.fail(DotError.CODE_STATE, "Join the round first.")
+		return GSResult.fail(GSError.CODE_STATE, "Join the round first.")
 	return await game.loadout_command.call(&"offer", PhGame.storage_key(player.player_id))
 
 
 ## Solo: saves [param picks], and hands them over now while the hunters are blindfolded.
 func choose_loadout(picks: Dictionary) -> Variant:
 	if game == null or game.loadout_command == null or player == null:
-		return DotResult.fail(DotError.CODE_STATE, "Join the round first.")
+		return GSResult.fail(GSError.CODE_STATE, "Join the round first.")
 	return await game.loadout_command.call(&"choose", null, PhGame.storage_key(player.player_id), picks)
 
 
 ## A card's picture (the copied weapon silhouettes) and numbers (zee's `ZeeWeaponCards`, zee API 3).
 func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary:
 	var id := StringName(str(choice.get("id", "")))
-	if _weapon_cards == null and DotAddonApi.build_level("zee_weapons") >= 3 and ResourceLoader.exists(WEAPON_CARDS_SCRIPT):
+	if _weapon_cards == null and GSAddonApi.build_level("zee_weapons") >= 3 and ResourceLoader.exists(WEAPON_CARDS_SCRIPT):
 		_weapon_cards = load(WEAPON_CARDS_SCRIPT) as Script
 	if _weapon_defs.is_empty():
 		for def in ZeeWeaponPack.weapons():
@@ -174,26 +174,26 @@ func decorate_loadout_choice(_slot_id: String, choice: Dictionary) -> Dictionary
 ## dot-team's block rules followed from the server, or, solo, the F9 tuning panel over this process's own config.
 func _add_noblock_and_workbench() -> void:
 	if link != null and not _offline:
-		DotLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
+		GSLog.result(CHANNEL, "noblock", platform.add_noblock(game, Callable(game, "team_of_side")))
 		return
-	var wb := DotGameWorkbench.new()
+	var wb := GSGameWorkbench.new()
 	wb.name = "Workbench"
 	wb.listen_host_fn = func() -> bool: return true
 	workbench = wb
 	wb.config = {"enabled": false}
-	for set: DotProfileSet in game.config_binder.profile_sets():
+	for set: GSProfileSet in game.config_binder.profile_sets():
 		wb.add_set(set, "Game settings: %s" % set.rel_path.trim_prefix("config_"))
 	var _fl := game.flashlight_conf()
 	if game.flashlight_binder != null:
-		for set: DotProfileSet in game.flashlight_binder.profile_sets():
+		for set: GSProfileSet in game.flashlight_binder.profile_sets():
 			wb.add_set(set, "Flashlight")
 	add_child(wb)
 	var started := wb.start()
-	DotLog.result(CHANNEL, "the workbench", started)
+	GSLog.result(CHANNEL, "the workbench", started)
 	if started.ok and wb.api != null:
-		game.config_binder.attach(wb.api.runtime as DotProfileRuntime)
+		game.config_binder.attach(wb.api.runtime as GSProfileRuntime)
 		if game.flashlight_binder != null:
-			game.flashlight_binder.attach(wb.api.runtime as DotProfileRuntime)
+			game.flashlight_binder.attach(wb.api.runtime as GSProfileRuntime)
 	platform.add_workbench(wb)
 
 
@@ -210,10 +210,10 @@ func _build_settings() -> void:
 	# M: the map list. Solo a choice changes the map at once; connected the server decides by `sv_map_menu_flag`, and anybody without it gets a vote
 	# (dot-vote's map menu, wired in [PhModule]). Its choice goes to the map menu, never to the taunt list's `picked` handler.
 	platform.maps_rows_fn = func() -> Array: return game.map_rows() if game != null else []
-	platform.maps_change_fn = func(id: StringName) -> DotResult: return game.change_map_now(id)
-	DotLog.result(CHANNEL, "the platform", platform.setup())
+	platform.maps_change_fn = func(id: StringName) -> GSResult: return game.change_map_now(id)
+	GSLog.result(CHANNEL, "the platform", platform.setup())
 	# The starter set: the equipped list needs a credential the client does not hold (the server reads it).
-	DotLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
+	GSLog.result(CHANNEL, "avatar actions", platform.add_avatar_actions(net, _avatar_figure))
 	# Disguised, the keys do nothing and send nothing: there is no figure to play on, and the others would draw none.
 	if platform.avatar_actions != null:
 		var menus_block := platform.avatar_actions.blocked_fn
@@ -226,7 +226,7 @@ func _build_settings() -> void:
 	_suspend_input(platform.is_input_blocked())
 
 	settings = platform.settings as PhSettings
-	console = platform.console as DotConsoleController
+	console = platform.console as GSConsoleController
 	if settings == null:
 		return
 
@@ -248,7 +248,7 @@ func _build_settings() -> void:
 		if hud != null:
 			hud.follow_menu(settings.menu)
 		_bind_bot_console()
-		board = platform.board as DotMenuScoreboard
+		board = platform.board as GSMenuScoreboard
 		_dress_board()
 		_use_loadout_menu()
 
@@ -259,7 +259,7 @@ func _build_settings() -> void:
 func _fall(who: PhPlayer) -> void:
 	if who == null or ragdolls == null:
 		return
-	var death: DotPlayerDeath = who.death if who.death != null else DotPlayerDeath.new()
+	var death: GSPlayerDeath = who.death if who.death != null else GSPlayerDeath.new()
 	if game.physics != null:
 		# The building and the furniture: a body lands on them and on nothing else.
 		game.ragdoll_rules.collision_mask = game.physics.layer_mask(&"world") | game.physics.layer_mask(&"prop")
@@ -283,7 +283,7 @@ func _fall(who: PhPlayer) -> void:
 ## A found prop pops: its own meshes thrown the way the shot went and shrinking to nothing in
 ## [constant PROP_POP_SECONDS], in a spray of chips of its colour (`ph_debris.gd`, the debris a
 ## shot-up piece of furniture throws, which keeps its pieces whole).
-func _burst_prop(who: PhPlayer, death: DotPlayerDeath) -> PhDebris:
+func _burst_prop(who: PhPlayer, death: GSPlayerDeath) -> PhDebris:
 	var parts: Array = []
 	var bounds := AABB()
 	var seeded := false

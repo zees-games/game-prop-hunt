@@ -24,7 +24,7 @@ var _age := 0.0
 ## chips the size of a tenth of [param size] from [param centre]. [param world_mask] is the layer
 ## the pieces land on. [param seed_value] makes the throw the same for a replay.
 func burst(parts: Array, centre: Vector3, size: Vector3, direction: Vector3, world_mask: int, seed_value: int) -> void:
-	var rng := DotRandomStream.new(seed_value, &"ph_debris")
+	var rng := GSRandomStream.new(seed_value, &"ph_debris")
 	var push := direction.normalized() if direction.length() > 0.01 else Vector3.UP
 	var colour := Color(0.8, 0.8, 0.8)
 

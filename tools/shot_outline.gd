@@ -15,16 +15,16 @@ static func hull(parent: Node, feet: Vector3, radius: float, height: float) -> M
 	return shape
 
 
-## One [DotHitbox] where it is now.
-static func hitbox(parent: Node, box: DotHitbox) -> MeshInstance3D:
+## One [GSHitbox] where it is now.
+static func hitbox(parent: Node, box: GSHitbox) -> MeshInstance3D:
 	var mesh: PrimitiveMesh = null
 	match box.shape:
-		DotHitbox.Shape.CAPSULE:
+		GSHitbox.Shape.CAPSULE:
 			var capsule := CapsuleMesh.new()
 			capsule.radius = box.radius
 			capsule.height = maxf(box.height, box.radius * 2.0)
 			mesh = capsule
-		DotHitbox.Shape.SPHERE:
+		GSHitbox.Shape.SPHERE:
 			var sphere := SphereMesh.new()
 			sphere.radius = box.radius
 			sphere.height = box.radius * 2.0

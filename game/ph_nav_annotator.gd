@@ -1,4 +1,4 @@
-extends DotNpcAiNavAnnotator
+extends GSNpcAiNavAnnotator
 
 ## dot-npc-ai's map annotator, told what a prop-hunt hiding place is: beside floor furniture a prop may become, among others of its kind, out of sight and tucked in.
 ## The score is overridden rather than filtered afterwards: the base score puts a prop in an empty corner (nothing to be) and the annotator keeps only the better third, so the right places never reach the list.

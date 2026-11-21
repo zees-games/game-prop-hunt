@@ -1,6 +1,6 @@
 # Visual QA
 
-Every person, hunter weapon and catalogue prop gets its own test scene, recorded frame by frame at 60 fps and judged from the frames. The harness is dot-game's (`addons/dot_game/docs/visual-qa.md` in the dot-game repo); this game only supplies `tools/visual_qa.gd`, a subclass of `DotGameVisualQaCapture`, and a three-line `tools/visual_qa_shot.sh`. The outside cameras are the shared `DotGameVisualQaViews`.
+Every person, hunter weapon and catalogue prop gets its own test scene, recorded frame by frame at 60 fps and judged from the frames. The harness is dot-game's (`addons/dot_game/docs/visual-qa.md` in the dot-game repo); this game only supplies `tools/visual_qa.gd`, a subclass of `GSGameVisualQaCapture`, and a three-line `tools/visual_qa_shot.sh`. The outside cameras are the shared `GSGameVisualQaViews`.
 
 ## Items and clips
 

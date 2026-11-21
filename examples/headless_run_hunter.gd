@@ -84,7 +84,7 @@ func _test_hunter_weapons() -> void:
 	# Blindfolded through the hide, the counter is under the cover with everything else; seeking.
 	var hud: Node = client.get("hud")
 	hud.call("_process", 0.0)
-	var counter: DotAmmoCounter = hud.get("ammo")
+	var counter: GSAmmoCounter = hud.get("ammo")
 	_check(counter != null and not counter.visible, "no counter under the blindfold")
 	world._set_phase(PhGame.Phase.SEEK)
 	hud.call("_process", 0.0)
@@ -92,7 +92,7 @@ func _test_hunter_weapons() -> void:
 	var expected := "%d | %d" % [drawn.arsenal.current().magazine, drawn.arsenal.ammo().count(def.ammo_type)] if def != null else "?"
 	_check(counter != null and counter.visible and def != null and counter.weapon_name == def.display_name
 		and counter.count_text() == expected,
-		"a hunter's HUD has DotAmmoCounter, counting the drawn gun",
+		"a hunter's HUD has GSAmmoCounter, counting the drawn gun",
 		"%s %s, want %s" % [counter.weapon_name if counter else "-", counter.count_text() if counter else "-", expected])
 
 	_check_hunter_icons(hud, counter, def)
@@ -102,7 +102,7 @@ func _test_hunter_weapons() -> void:
 	# Bottom right, clear of the chat box and the health plate bottom left, and of the ballot
 	# top right: the anchors put it in the bottom-right quarter at any frame size.
 	_check(counter.anchor_left == 1.0 and counter.anchor_top == 1.0 and counter.offset_left >= -480.0
-		and counter.offset_top >= -120.0 and counter.get_theme_color(&"plate", DotHudPiece.THEME_TYPE).a > 0.0,
+		and counter.offset_top >= -120.0 and counter.get_theme_color(&"plate", GSHudPiece.THEME_TYPE).a > 0.0,
 		"it sits bottom right, in the game's theme, clear of the chat, the health plate and the ballot")
 
 	# A shot the server never heard: the drawn gun is five down. It holds while it could still be
@@ -133,7 +133,7 @@ func _check_wheel_step(client: Node, drawn: ZeeWeaponRig) -> void:
 	step.pressed = true
 	# The pointer is never captured headless, so only that one clause of the block is lifted.
 	client.call("_wheel_pressed", InputEventAction.new())
-	var wheel: DotWeaponWheel = client.get(&"_wheel")
+	var wheel: GSWeaponWheel = client.get(&"_wheel")
 	wheel.blocked = func() -> bool: return false
 	var slot_before: int = client.get(&"_slot")
 	var took: bool = client.call("_wheel_pressed", step)
@@ -144,12 +144,12 @@ func _check_wheel_step(client: Node, drawn: ZeeWeaponRig) -> void:
 		"the wheel steps a hunter to the next carried slot", "took %s, slot %s, want %d" % [took, slot_after, want])
 
 
-func _hunter_weapons_rest(client: Node, world: PhGame, hud: Node, counter: DotAmmoCounter) -> void:
+func _hunter_weapons_rest(client: Node, world: PhGame, hud: Node, counter: GSAmmoCounter) -> void:
 	_check(world.map.get("_furniture") is StaticBody3D, "furniture cannot be pushed out of the place a decoy is judged at")
 
 	# A hit the world confirms (offline the world is the server): the marker flashes. Before
 	# this nothing said a hunter's shot had landed at all.
-	var marker: DotHitMarker = hud.get("hit_marker")
+	var marker: GSHitMarker = hud.get("hit_marker")
 	world.hit_landed.emit(&"local", Vector3(0.0, 1.0, -4.0), false, true)
 	_check(marker != null and marker.alpha() > 0.9 and marker.headshot, "a hit the world confirms flashes the hit marker")
 
@@ -164,10 +164,10 @@ func _hunter_weapons_rest(client: Node, world: PhGame, hud: Node, counter: DotAm
 
 
 ## The HUD's weapon sprite: every mapped weapon has one, the style cvar hides it, it sits above the plate.
-func _check_hunter_icons(hud: Node, counter: DotAmmoCounter, def: DotWeaponDef) -> void:
+func _check_hunter_icons(hud: Node, counter: GSAmmoCounter, def: GSWeaponDef) -> void:
 	var icon_script: Script = load("res://game/ph_weapon_icons.gd")
-	var icons: DotWeaponIconStyle = icon_script.get("shared")
-	var icon_rect: DotWeaponIconPlate = hud.get("weapon_icon")
+	var icons: GSWeaponIconStyle = icon_script.get("shared")
+	var icon_rect: GSWeaponIconPlate = hud.get("weapon_icon")
 	var unmapped := PackedStringArray()
 	for weapon in icon_script.get("TAGS"):
 		if not icons.icon_set().has_icon(weapon):

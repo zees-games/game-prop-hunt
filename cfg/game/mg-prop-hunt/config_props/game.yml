@@ -4,7 +4,7 @@
 # --- Hiding
 # How far from the eye a prop may be copied, in metres. [0.5..10.0]
 # disguise_reach: 3.0
-# A disguise's health at one cubic metre, and how fast it rises with size. See [DotPropDisguiseRules]: a cabi... [1.0..1000.0]
+# A disguise's health at one cubic metre, and how fast it rises with size. See [GSPropDisguiseRules]: a cabi... [1.0..1000.0]
 # prop_health_scale: 190.0
 #  [0.0..1.0]
 # prop_health_exponent: 0.45

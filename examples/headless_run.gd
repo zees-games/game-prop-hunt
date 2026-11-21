@@ -11,7 +11,7 @@ const CHECKS := 212
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -90,7 +90,7 @@ func _test_config() -> void:
 
 	var timing := PhGame.new()
 	timing.config = PhConfig.new()
-	var pause := DotMatchRules.new()
+	var pause := GSMatchRules.new()
 	_check(is_zero_approx(timing.config.killcam_seconds), "the killcam is off by default")
 	timing.apply_intermission(pause)
 	_check(is_equal_approx(pause.intermission_sec, timing.config.intermission_seconds), "no killcam, the intermission as it was")
@@ -273,7 +273,7 @@ func _test_disguise() -> void:
 	var client: Node = PhClient.new()
 	for who: PhPlayer in [hunter, prop]:
 		who.figure = PhFigure.new()
-		who.figure.person = DotHumanoidFigure.new()
+		who.figure.person = GSHumanoidFigure.new()
 	client.set(&"game", game)
 	client.set(&"_offline", true)
 	client.set(&"player", hunter)
@@ -282,7 +282,7 @@ func _test_disguise() -> void:
 	_check(hunter_fig != null and hunter.figure != null and client.call(&"_avatar_figure", 0) == null,
 		"a disguised player has no figure for an avatar action, an undisguised one does")
 	client.free()
-	# The figure steps its clip by game time (DotHumanoidFigure.frame_delta), which stamps the frame it ran in.
+	# The figure steps its clip by game time (GSHumanoidFigure.frame_delta), which stamps the frame it ran in.
 	# In the tree, as a live player's figure is: posing one outside it reads a global transform that is not there.
 	hunter.add_child(hunter.figure)
 	_check(hunter.figure.is_inside_tree(), "the figure being posed is in the tree")
@@ -295,14 +295,14 @@ func _test_disguise() -> void:
 		who.figure = null
 
 	var size := game.props_catalogue.size_of(&"furniture_chair")
-	var hull := DotPropDisguise.hull(size, game.rules)
+	var hull := GSPropDisguise.hull(size, game.rules)
 	_check(is_equal_approx(prop.controller.tunables.radius, hull.x) and is_equal_approx(prop.controller.tunables.stand_height, hull.y),
 		"the controller sweeps the chair's hull (r %.2f, h %.2f)" % [hull.x, hull.y])
-	_check(is_equal_approx(prop.health.max_health, DotPropDisguise.health(size, game.rules)),
+	_check(is_equal_approx(prop.health.max_health, GSPropDisguise.health(size, game.rules)),
 		"and has a chair's health (%d)" % int(prop.health.max_health))
 
-	var box := prop.hitboxes.get_node("Prop") as DotHitbox
-	_check(box.enabled and (prop.hitboxes.get_node("Chest") as DotHitbox).enabled == false
+	var box := prop.hitboxes.get_node("Prop") as GSHitbox
+	_check(box.enabled and (prop.hitboxes.get_node("Chest") as GSHitbox).enabled == false
 		and box.half_extents.is_equal_approx(size * 0.5), "its hitbox is the chair's box and not a person's")
 
 	_check(not game.disguise_as(prop.player_id, &"furniture_ceiling_fan"), "a ceiling fan cannot be worn")
@@ -342,11 +342,11 @@ func _test_the_flashlight() -> void:
 	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0]
 	_check(cfg.key == "L" and game.flashlight_binder != null, "the key is L (F is the quick melee) and the config has a binder", cfg.key)
 
-	cfg.default_state = DotFlashlightConfig.START_ON
+	cfg.default_state = GSFlashlightConfig.START_ON
 	prop.flashlight_ready = false
 	await _step(game, 2)
 	_check(prop.flashlight, "a map that starts lit lights the player")
-	cfg.default_state = DotFlashlightConfig.START_OFF
+	cfg.default_state = GSFlashlightConfig.START_OFF
 	prop.flashlight_ready = false
 	await _step(game, 2)
 	_check(not prop.flashlight, "and one that starts dark does not")
@@ -358,7 +358,7 @@ func _test_the_flashlight() -> void:
 	cfg.allowed_maps = PackedStringArray(["no_such_map"])
 	_check(not game.toggle_flashlight(prop.player_id) and not prop.flashlight, "a map outside allowed_maps has no light")
 	cfg.allowed_maps = PackedStringArray()
-	cfg.default_state = DotFlashlightConfig.START_DARK
+	cfg.default_state = GSFlashlightConfig.START_DARK
 	_finished()
 
 
@@ -403,7 +403,7 @@ func _test_room() -> void:
 	var before := prop.controller.state.position
 	_check(game.disguise_as(prop.player_id, &"furniture_bookcase_closed"), "a cabinet against a wall may become a bookcase")
 	var moved := prop.controller.state.position.x - before.x
-	var hull := DotPropDisguise.hull(game.props_catalogue.size_of(&"furniture_bookcase_closed"), game.rules)
+	var hull := GSPropDisguise.hull(game.props_catalogue.size_of(&"furniture_bookcase_closed"), game.rules)
 	_check(moved > 0.02 and prop.controller.state.position.x - hull.x >= -10.0 - 0.01,
 		"and is moved off the wall by enough for its hull", "moved %.2f m, hull %.2f" % [moved, hull.x])
 
@@ -458,13 +458,13 @@ func _test_lean_on_the_floor() -> void:
 	var asked := 0
 	var tried := 0
 	for id: StringName in game.props_catalogue.props:
-		if not game.props_catalogue.may_disguise(id) or not DotPropDisguise.may_take(game.props_catalogue.size_of(id), game.rules).ok:
+		if not game.props_catalogue.may_disguise(id) or not GSPropDisguise.may_take(game.props_catalogue.size_of(id), game.rules).ok:
 			continue
 		tried += 1
 		var parts: Array = game.props_catalogue.parts(id)
 		for way: Array in turns:
 			# Its own body again, directly: reveal's cooldown is another test's business.
-			prop.apply_disguise(DotPropDisguise.new())
+			prop.apply_disguise(GSPropDisguise.new())
 			prop.place_at(spot, 0.0)
 			await _step(game, 1)
 			if not game.disguise_as(prop.player_id, id):
@@ -596,19 +596,19 @@ func _test_the_aim_button() -> void:
 	var up := game.weapon_command_for(hunter)
 	hunter.aiming = false
 	var down := game.weapon_command_for(hunter)
-	hunter.controller.apply_command(DotFpsCommand.new())
-	_check(up.is_pressed(DotWeaponCommand.BUTTON_AIM) and not down.is_pressed(DotWeaponCommand.BUTTON_AIM),
+	hunter.controller.apply_command(GSFpsCommand.new())
+	_check(up.is_pressed(GSWeaponCommand.BUTTON_AIM) and not down.is_pressed(GSWeaponCommand.BUTTON_AIM),
 		"the body's flag is the weapon command's aim button")
 
 	# The spread: first shots of a held trigger with the sights down, then up for longer than they take to rise.
 	var spreads := func(aim: bool) -> float:
-		var command := DotWeaponCommand.new()
-		command.set_button(DotWeaponCommand.BUTTON_AIM, aim)
+		var command := GSWeaponCommand.new()
+		command.set_button(GSWeaponCommand.BUTTON_AIM, aim)
 		var tick := 100000
 		for i in range(TICK_RATE * 2):
 			tick += 1
 			var _o := rig.simulate_tick(command, tick)
-		command.set_button(DotWeaponCommand.BUTTON_ATTACK, true)
+		command.set_button(GSWeaponCommand.BUTTON_ATTACK, true)
 		var total := 0.0
 		var shots := 0
 		for i in range(TICK_RATE):
@@ -618,7 +618,7 @@ func _test_the_aim_button() -> void:
 			for shot in outcome.shots:
 				total += shot.spread
 				shots += 1
-			command.set_button(DotWeaponCommand.BUTTON_ATTACK, i % 2 == 1)
+			command.set_button(GSWeaponCommand.BUTTON_ATTACK, i % 2 == 1)
 		return total / float(maxi(shots, 1))
 	var hip_spread: float = spreads.call(false)
 	var aimed_spread: float = spreads.call(true)
@@ -652,7 +652,7 @@ func _test_toys() -> void:
 	var beach := box.toy(1)
 	var o0 := beach.body.global_position
 	var health := hunter.health.health
-	var shot := DotShot.make(&"test", hunter.entity_id, game.current_tick(), 0)
+	var shot := GSShot.make(&"test", hunter.entity_id, game.current_tick(), 0)
 	shot.origin = o0 + Vector3(-5.0, 0.0, 0.0)
 	shot.direction = Vector3(1.0, 0.0, 0.0)
 	shot.damage = 25.0
@@ -728,7 +728,7 @@ func _test_breaking() -> void:
 	var away := Vector3.INF
 	for k in range(16):
 		var spot := Vector3(middle.x, 0.05, middle.z) + Vector3(cos(TAU * k / 16.0), 0.0, sin(TAU * k / 16.0)) * 2.5
-		var probe := DotPropDisguise.of(&"x", plant["size"])
+		var probe := GSPropDisguise.of(&"x", plant["size"])
 		if game._clear_between(spot + Vector3(0.0, 1.6, 0.0), middle + (spot - middle).normalized() * 0.3 * probe.size.x, true) \
 				and game._clear_between(spot + Vector3(0.0, 0.3, 0.0), spot + Vector3(0.0, 1.7, 0.0), true):
 			away = spot
@@ -781,7 +781,7 @@ func _test_grenades() -> void:
 	var launched: Array = []
 	game.projectiles.launched.connect(func(f: RefCounted) -> void: launched.append(f))
 	var blasts: Array = []
-	game.projectiles.blasted.connect(func(at: Vector3, _spawn: DotWeaponSpawn, shot: DotShot) -> void: blasts.append([at, shot]))
+	game.projectiles.blasted.connect(func(at: Vector3, _spawn: GSWeaponSpawn, shot: GSShot) -> void: blasts.append([at, shot]))
 	var cost: Array = []
 	game.decoy_hit.connect(func(_id: StringName, amount: float) -> void: cost.append(amount))
 	var health := prop.health.health
@@ -793,7 +793,7 @@ func _test_grenades() -> void:
 		_fire(hunter, i < 6)
 		await _step(game, 1)
 		for f: RefCounted in launched:
-			furthest = maxf(furthest, (f.get(&"position") as Vector3).distance_to((f.get(&"spawn") as DotWeaponSpawn).origin))
+			furthest = maxf(furthest, (f.get(&"position") as Vector3).distance_to((f.get(&"spawn") as GSWeaponSpawn).origin))
 		if not blasts.is_empty():
 			break
 	_fire(hunter, false)
@@ -805,7 +805,7 @@ func _test_grenades() -> void:
 
 	# By the bookcase with nobody near: one decoy, at the frag's full damage.
 	var frag := ZeeWeaponPack.catalogue().get_def(&"frag")
-	var tuning := frag.tuning as DotWeaponBallistics
+	var tuning := frag.tuning as GSWeaponBallistics
 	# Everybody in the kitchen, well out of its reach: a prop the first frag only hurt, left
 	# where it was, was 5.3 m from this one and took its splash.
 	for i in range(2):
@@ -838,8 +838,8 @@ func _test_grenades() -> void:
 
 
 ## A grenade lying at [param at], two ticks from going off, thrown by [param thrower].
-func _still_grenade(at: Vector3, thrower: PhPlayer, tuning: DotWeaponBallistics) -> DotWeaponSpawn:
-	var spawn := DotWeaponSpawn.make(&"frag", at, Vector3.ZERO, thrower.entity_id)
+func _still_grenade(at: Vector3, thrower: PhPlayer, tuning: GSWeaponBallistics) -> GSWeaponSpawn:
+	var spawn := GSWeaponSpawn.make(&"frag", at, Vector3.ZERO, thrower.entity_id)
 	spawn.fuse_ticks = 2
 	spawn.life_ticks = TICK_RATE * 4
 	spawn.splash_radius = tuning.splash_radius
@@ -910,8 +910,8 @@ func _test_interest() -> void:
 	prop.player_id = &"u2"
 	game.sides[&"u1"] = PhGame.HUNTERS
 	game.sides[&"u2"] = PhGame.PROPS
-	var watcher := DotNetIdentity.new()
-	var seen := DotNetIdentity.new()
+	var watcher := GSNetIdentity.new()
+	var seen := GSNetIdentity.new()
 	hunter.add_child(watcher)
 	prop.add_child(seen)
 
@@ -944,16 +944,16 @@ func _test_bots() -> void:
 	await _step(game, TICK_RATE * 6)
 	_check(game.phase == PhGame.Phase.SEEK or game.phase == PhGame.Phase.IDLE, "and the round goes on without anybody at the keyboard")
 
-	# A stand-in hunter's shot is dot-bot's DotBotAim: turned onto the prop at bot_turn_rate,
+	# A stand-in hunter's shot is dot-bot's GSBotAim: turned onto the prop at bot_turn_rate,
 	# fired only bot_reaction after it first saw it. Driven through the game's own _bot_shoot.
 	var hunter: PhPlayer = game.players_on(PhGame.HUNTERS)[0] if not game.players_on(PhGame.HUNTERS).is_empty() else null
-	var profile := DotBotSettings.of(game).profile
+	var profile := GSBotSettings.of(game).profile
 	if hunter != null:
 		var eye := hunter.eye_position()
 		var behind := eye + Vector3(-8.0, -0.4, 6.0)
 		var first := -1.0
 		var fastest := 0.0
-		var command := DotFpsCommand.new()
+		var command := GSFpsCommand.new()
 		command.yaw = hunter.controller.state.yaw
 		var start: float = game._bot_now()
 		for i in range(TICK_RATE * 2):
@@ -979,7 +979,7 @@ func _test_the_client() -> void:
 	client.set(&"config_file", "user://cfg/headless-none.json")
 	add_child(client)
 		# The map must not be drawn, or steered, while it is still being built.
-	var platform: DotGameClient = client.get("platform")
+	var platform: GSGameClient = client.get("platform")
 	var covered := platform != null and platform.gate != null and not platform.is_shown() \
 		and platform.is_input_blocked()
 	for i in 240:
@@ -992,7 +992,7 @@ func _test_the_client() -> void:
 		"the loading cover is up at the start and lifts once the player is in, with the console built",
 		str(platform.describe()) if platform != null else "no platform")
 
-	var fx: DotFxBreak = client.get("break_fx").break_fx
+	var fx: GSFxBreak = client.get("break_fx").break_fx
 	fx.config.headless = true
 	var client_game: PhGame = client.get("game")
 	client_game.prop_broken.emit(0, Vector3.FORWARD)
@@ -1008,20 +1008,20 @@ func _test_the_client() -> void:
 		"a player and a HUD bound to the world")
 	client.call("open_taunts")
 	var menu: Variant = (client.get("settings") as Node).get("menu") if client.get("settings") != null else null
-	_check(menu != null and (menu as DotMenu).picker.is_open(), "the taunt picker opens")
+	_check(menu != null and (menu as GSMenu).picker.is_open(), "the taunt picker opens")
 	if menu != null:
-		(menu as DotMenu).picker.close()
+		(menu as GSMenu).picker.close()
 	var snapshot: Dictionary = client.call("board_snapshot")
 	_check((snapshot["players"] as Array).size() >= 2, "the board lists the room")
 	var tab := InputEventKey.new()
 	tab.physical_keycode = KEY_TAB
 	tab.pressed = true
-	(menu as DotMenu).handle_event(tab)
-	var board: DotMenuScoreboard = client.get("board")
+	(menu as GSMenu).handle_event(tab)
+	var board: GSMenuScoreboard = client.get("board")
 	_check(board != null and board.is_open() and board.rows().any(func(r: Dictionary) -> bool: return bool(r.get("you", false))),
 		"Tab holds the scoreboard up, with this player picked out")
 	tab.pressed = false
-	(menu as DotMenu).handle_event(tab)
+	(menu as GSMenu).handle_event(tab)
 
 		# A round started the way dot-match starts one, with this keyboard drawn to hunt. The round arms its hunters and THEN begins the hide,
 		# so the client dropping every gun at the start of a hide left a hunter seeking with a gun nobody could see.
@@ -1046,22 +1046,22 @@ func _test_the_client() -> void:
 	var aimed: float = (hud.get("_crosshair") as Control).modulate.a
 	hud.call("set_aim", 1.0, true)
 	var scope: Control = hud.get("scope")
-	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or DotAddonApi.build_level("dot_ui") < 5)
+	_check(is_equal_approx(hip, 1.0) and (aimed < 0.01 or GSAddonApi.build_level("dot_ui") < 5)
 		and (hud.get("_crosshair") as Control).modulate.a == 0.0 and is_equal_approx(float(scope.get("fraction")), 1.0)
 		and bool(hud.get("loadout_offered")) == (client.get("loadout_menu") != null),
 		"the crosshair is whole at the hip, gone down the sights, a scope replaces it; B is named when offered",
 		"hip %.2f aimed %.2f" % [hip, aimed])
 	hud.call("set_aim", 0.0, false)
-	var strip: DotScoreStrip = hud.get("strip")
-	var vitals: DotVitals = hud.get("vitals")
+	var strip: GSScoreStrip = hud.get("strip")
+	var vitals: GSVitals = hud.get("vitals")
 	_check(
-		strip.clock == DotScoreStrip.clock_text(world.seconds_left()) and strip.sides
+		strip.clock == GSScoreStrip.clock_text(world.seconds_left()) and strip.sides
 		and strip.left_score == world.alive_on(PhGame.PROPS) and strip.right_score == world.alive_on(PhGame.HUNTERS),
-		"the clock is DotScoreStrip's, with the props and hunters still up as its plates",
+		"the clock is GSScoreStrip's, with the props and hunters still up as its plates",
 		str(strip.describe())
 	)
 	# Christian's first play test: a darker HUD by default, restyled live by the menu's theme.
-	var themed: DotMenu = (client.get("settings") as Node).get("menu")
+	var themed: GSMenu = (client.get("settings") as Node).get("menu")
 	var accent: Color = (load("res://game/ph_hud.gd") as GDScript).get("MAP_COLOUR")
 	var plate := strip.colour(&"plate")
 	_check(plate.get_luminance() < 0.1 and plate.a >= 0.7 and strip.colour(&"highlight") == accent,
@@ -1077,22 +1077,22 @@ func _test_the_client() -> void:
 	hud.call("_process", 0.0)
 	_check(
 		vitals.visible and vitals.is_low() and vitals.fill_colour == world.side_colour(PhGame.HUNTERS),
-		"health is DotVitals in the side's colour, red at a quarter", str(vitals.describe())
+		"health is GSVitals in the side's colour, red at a quarter", str(vitals.describe())
 	)
 	me.health.health = me.health.max_health
 
 	# An undisguised prop is prompted with the disguise key as the player has it bound.
 	world._set_side(&"local", PhGame.PROPS)
 	hud.call("_process", 0.0)
-	var prompt: DotKeyPrompt = hud.get("prompt")
+	var prompt: GSKeyPrompt = hud.get("prompt")
 	var bound := str(client.call("_key", &"ph_disguise"))
 	_check(
 		not me.is_disguised() and prompt.visible and prompt.key == bound and bound != "",
-		"an undisguised prop is prompted by DotKeyPrompt with the bound disguise key", prompt.text()
+		"an undisguised prop is prompted by GSKeyPrompt with the bound disguise key", prompt.text()
 	)
 
-	var chat: DotGameChatClient = client.get("chat")
-	var w: DotChatWindow = chat.window
+	var chat: GSGameChatClient = client.get("chat")
+	var w: GSChatWindow = chat.window
 	var log_top := w.margin_bottom + w.entry_height + float(w.max_lines) * (w.line_height + w.line_gap)
 	var plate_bottom := -(vitals.offset_top + vitals.footprint().end.y)
 	_check(
@@ -1103,9 +1103,9 @@ func _test_the_client() -> void:
 
 	# A pack naming these classes does not parse on a shell whose dot-ui predates them, so
 	# the requires.json dot-ci derives must ask for dot-ui 4, and nothing may lower it.
-	var asks := DotAddonApi.derive()
+	var asks := GSAddonApi.derive()
 	_check(
-		int(asks.get("dot_ui", 0)) >= 13 and FileAccess.file_exists("res://" + DotAddonApi.FLOOR_FILE),
+		int(asks.get("dot_ui", 0)) >= 13 and FileAccess.file_exists("res://" + GSAddonApi.FLOOR_FILE),
 		"the pack asks a shell for dot-ui level 13, the weapon icons (requires.floor.json)",
 		str(asks.get("dot_ui"))
 	)
@@ -1132,7 +1132,7 @@ func _test_offline_trigger() -> void:
 	client.call("_adopt", me)
 	client.set("_firing", true)
 	me.simulate(game.current_tick() + 1, 1.0 / float(TICK_RATE))
-	var pressed := game.weapon_command_for(me).is_pressed(DotWeaponCommand.BUTTON_ATTACK)
+	var pressed := game.weapon_command_for(me).is_pressed(GSWeaponCommand.BUTTON_ATTACK)
 	_check(me.sampler != null and pressed, "the world's weapon command has the trigger the client holds")
 	client.free()
 	_finished()
@@ -1142,9 +1142,9 @@ func _test_help_and_menu() -> void:
 	_section("H opens help, and the Escape menu has Help and Leave")
 	var settings := PhSettings.new()
 	add_child(settings)
-	var built: DotResult = settings.setup(DotSettingsStoreMemory.new())
-	var keys: DotMenuBindings = settings.bindings
-	_check(built.ok and keys != null and keys.key_for(DotMenuBindings.HELP_ACTION) == "H", "help is on H")
+	var built: GSResult = settings.setup(GSSettingsStoreMemory.new())
+	var keys: GSMenuBindings = settings.bindings
+	_check(built.ok and keys != null and keys.key_for(GSMenuBindings.HELP_ACTION) == "H", "help is on H")
 	_check(keys.defaults_on("H").size() == 1, "and nothing else in the table defaults to H",
 		str(keys.defaults_on("H").map(func(r: Dictionary) -> String: return str(r["label"]))))
 	# The right mouse button aims (the family's Aim row); zee's quick melee moved to F.
@@ -1159,7 +1159,7 @@ func _test_help_and_menu() -> void:
 		"%s %s" % [keys.key_for(&"dot_menu_weapon_previous"), keys.key_for(&"dot_menu_weapon_next")])
 	# Chat is two rows, so help lists Y and U and the Controls page moves them.
 	var _t := settings.settings.set_value(&"bind_chat", "J")
-	_check(keys.key_for(PhBindings.CHAT) == "J" and DotInputBinding.describe_action(PhBindings.CHAT) == "J"
+	_check(keys.key_for(PhBindings.CHAT) == "J" and GSInputBinding.describe_action(PhBindings.CHAT) == "J"
 		and keys.key_for(PhBindings.CHAT_TEAM) == "U", "chat (Y) and team chat (U) are rows: rebinding one moves its key",
 		"%s %s" % [keys.key_for(PhBindings.CHAT), keys.key_for(PhBindings.CHAT_TEAM)])
 	var h := InputEventKey.new()

@@ -27,7 +27,7 @@ class FakeBridge extends RefCounted:
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -44,7 +44,7 @@ func _test_throw_and_pickup() -> void:
 	var game := await _seek_round()
 	var layer = game.weapon_layer
 	var hunter: PhPlayer = game.players[&"u300"]
-	var rules: DotWeaponDropRules = game.drop_rules
+	var rules: GSWeaponDropRules = game.drop_rules
 	if not _check(layer != null and hunter.weapons != null, "the game builds a layer and the hunter is armed"):
 		return
 	_check(layer.drops.is_authority, "the server layer is authoritative")
@@ -110,12 +110,12 @@ func _test_wire() -> void:
 	await _physics_frame()
 	await _physics_frame()
 	var mirror = client.weapon_layer
-	_check(not client_net.apply(PhEvents.Kind.LAUNCH, DotNetReader.new(PackedByteArray()), mirror),
+	_check(not client_net.apply(PhEvents.Kind.LAUNCH, GSNetReader.new(PackedByteArray()), mirror),
 		"another game event is left to the bridge")
 	var id: int = layer.throw_for(&"u300")
 	_check(id > 0 and bridge.wire.size() >= 1, "a throw puts events on the wire", str(bridge.wire.size()))
 	for item in bridge.wire:
-		var _ok := client_net.apply(item[1], DotNetReader.new(item[2]), mirror)
+		var _ok := client_net.apply(item[1], GSNetReader.new(item[2]), mirror)
 	bridge.wire.clear()
 	_check(mirror.drops.count() == 1 and mirror.drops.has_drop(id), "the client draws the same drop under the same id")
 	_check(lost.size() == 1, "the thrower is told the gun left their hands")
@@ -128,7 +128,7 @@ func _test_wire() -> void:
 
 ## A hunter dies the way a fall kills: damage from nobody, stamped with the tick.
 func _fell(game: PhGame, victim: PhPlayer) -> void:
-	var fall := DotDamage.make(0, victim.entity_id, 10000.0, null)
+	var fall := GSDamage.make(0, victim.entity_id, 10000.0, null)
 	fall.tick = game._tick
 	fall.context = {"why": PhGame.DIED_FELL}
 	var _applied := game.combat.apply_damage(fall)
