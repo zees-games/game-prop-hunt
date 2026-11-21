@@ -127,6 +127,8 @@ Short forms; the reasoning is in the linked file.
 - `project.godot` carries no comments; `PhConfig.gravity` goes onto the world's own space (a project setting does not travel in a pack); the renderer is `gl_compatibility`. [delivery](docs/delivery.md#project-settings)
 - A shell that lacks an addon, or a stale class cache, fails the delivered client's parse: dot-server-deploy's `prophunt_client` finds it. [history](docs/history.md#the-first-days-2026-10-09-to-10-11)
 
+- **A map reaches a client as GameSpice Core's `DotWireDoc`** (`PhMapDoc.encode`/`decode`/`digest` are thin: the game normalises and validates, the deflate framing and its refusals are the addon's, API 41).
+
 ## Visual QA
 
 A change to a person, weapon or prop is judged from frames: `tools/visual_qa.gd`, [docs/visual-qa.md](docs/visual-qa.md). Record the touched items, read the sheets, fix what a player would call wrong.
