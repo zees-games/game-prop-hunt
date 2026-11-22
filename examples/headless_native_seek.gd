@@ -40,7 +40,7 @@ func _run() -> void:
 	_check(PhSeek.seek_mode == "native", "PhBots.seek_mode is native without the game turning it on")
 	if not GSSim.has(&"seek") or not GSSim.has(&"sight"):
 		print("  gs-sim's seek module is not loaded: the native half is skipped")
-		_check((OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
+		_check(OS.get_environment("GS_SIM_REQUIRE_NATIVE") != "1", "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		_finished += 1
 		_report_sections(_entered, _finished, 1, 2)
 		return
