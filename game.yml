@@ -16,6 +16,7 @@ version: 0.0.0
 kind: pack
 
 name: Prop Hunt
+icon: branding/icon.png
 max_players: 24
 
 scene: scenes/ph_server.tscn
