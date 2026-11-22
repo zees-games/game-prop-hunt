@@ -178,6 +178,7 @@ The bots are simple: a bot prop walks to the nearest thing it can be and stays t
 
 | Asset | Author / source | License | Where |
 | --- | --- | --- | --- |
+| Godot Engine logo (boot splash) | Andrea Calabró, [godotengine.org](https://godotengine.org/press/) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) | `branding/splash.png` |
 | Furniture | Kenney, Furniture Kit | CC0 | each kit's licence |
 | Food, bottles, kitchenware | Kenney, Food Kit | CC0 | each kit's licence |
 | Crates, barrels, buckets, camp | Kenney, Survival Kit | CC0 | each kit's licence |
