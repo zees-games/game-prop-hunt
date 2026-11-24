@@ -7,9 +7,9 @@
 			"id": "gamemann/game-prop-hunt",
 			"into": "",
 			"kind": "pack",
-			"manifest_sha256": "99e2017fbf34302158773b7dbcbfc9c7a567cac309ab88442bc80d271065d613",
+			"manifest_sha256": "09806f7b765bb72984bf9816523d631dba6317c3e539fd12b1eee73a01eac48a",
 			"optional": false,
-			"version": "0.1.19"
+			"version": "0.1.22"
 		}
 	]
 }

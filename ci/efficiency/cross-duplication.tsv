@@ -20,7 +20,6 @@ game/ph_killcam.gd	138
 game/ph_map_doc.gd	87
 game/ph_materials.gd	340
 game/ph_player.gd	49
-game/ph_progress.gd	91
 game/ph_props.gd	72
 game/ph_services.gd	83
 tools/measure_props.gd	109

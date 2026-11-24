@@ -1,13 +1,8 @@
-extends Node
-
-const PhPlayer := preload("ph_player.gd")
+extends GSStatsPlayerProgress
 
 ## What a player keeps from a round: the numbers this game produces, and what they earn.
 ## Numbers (rounds survived as furniture; props found and real chairs shot) are declared once in [method schema] and reported by gs-stats as a DELTA, so two servers reporting one player add up.
-## Achievements are rules over them through [GSAchievementStatsLink]; stand-ins are never counted. Filed under the scoped profile key when there is one ([member durable_key_fn]), else the world's id.
-
-const CHANNEL := "ph.progress"
-
+## Achievements are rules over them through [GSAchievementStatsLink]; stand-ins are never counted. Filed under the scoped profile key when there is one ([member durable_key_fn]), else the world's id. The shared parts are [GSStatsPlayerProgress]'s.
 
 ## Rounds a player was in from the start to the end, and won.
 const ROUNDS_PLAYED := &"ph.rounds_played"
@@ -34,40 +29,11 @@ const DEATHS := &"ph.deaths"
 ## The published skill figure the site orders by (gs-stats' GSStatsRank).
 const RANK_SCORE := &"rank_score"
 
-signal earned(player_id: StringName, title: String, points: int)
-
-const REPORT_INTERVAL := 60.0
-
-var _report_timer: Timer
-
-var stats: GSStatsTracker = null
-
-## The skill rank: weighted lifetime figures, filed when a round ends.
-var rank: GSStatsRank = null
-
-## Kills and hits by body zone, through gs-stats' event feed.
-var feed: GSStatsEventFeed = null
-var achievements: GSAchievementTracker = null
-var link: GSAchievementStatsLink = null
-
-## The world's own dictionaries, shared. See [PhSpectate] for why not a reference to it.
-var players: Dictionary = {}
+## The world's own side dictionary, shared. See [PhSpectate] for why not a reference to it.
 var sides: Dictionary = {}
-
-## Players present when this round began. Only they have played it.
-var _in_round: Dictionary = {}
 
 ## player id -> props they found this round, for [constant BEST_ROUND_FOUND].
 var _round_found: Dictionary = {}
-
-## `func(player_id: StringName) -> String`: the durable key to file this player under, or
-## "" for none. Set by the module from gs-platform; see the class note.
-var durable_key_fn: Callable = Callable()
-
-## World id -> the key their numbers are filed under, and back. Fixed at [method record]'s
-## first reading for them.
-var _keys: Dictionary = {}
-var _ids: Dictionary = {}
 
 
 static func ids() -> Array[StringName]:
@@ -82,33 +48,23 @@ static func ids() -> Array[StringName]:
 ## rounds played are inputs to a ratio rather than figures anybody reads.
 static func schema() -> GSStatsSchema:
 	var out := GSStatsSchema.new()
-	_add(out, ROUNDS_PLAYED, GSStatsDef.Kind.COUNTER, "Rounds played", "rounds", false)
-	_add(out, ROUNDS_WON, GSStatsDef.Kind.COUNTER, "Rounds won", "rounds", true)
-	_add(out, PROP_ROUNDS, GSStatsDef.Kind.COUNTER, "Rounds as a prop", "rounds", true)
-	_add(out, HUNTER_ROUNDS, GSStatsDef.Kind.COUNTER, "Rounds as a hunter", "rounds", true)
-	_add(out, SURVIVED, GSStatsDef.Kind.COUNTER, "Rounds survived hidden", "rounds", true)
-	_add(out, PROPS_FOUND, GSStatsDef.Kind.COUNTER, "Props found", "props", true)
-	_add(out, BEST_ROUND_FOUND, GSStatsDef.Kind.BEST, "Most props found in a round", "props", true)
-	_add(out, TIMES_FOUND, GSStatsDef.Kind.COUNTER, "Times found", "times", true)
-	_add(out, DISGUISES, GSStatsDef.Kind.COUNTER, "Disguises", "props", true)
-	_add(out, TAUNTS, GSStatsDef.Kind.COUNTER, "Taunts", "taunts", true)
-	_add(out, FORCED_TAUNTS, GSStatsDef.Kind.COUNTER, "Taunts forced by standing still", "taunts", false)
-	_add(out, DECOYS_SHOT, GSStatsDef.Kind.COUNTER, "Shots at the furniture", "shots", true)
-	_add(out, DECOY_DEATHS, GSStatsDef.Kind.COUNTER, "Beaten by the furniture", "deaths", true)
-	_add(out, DEATHS, GSStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
+	add_def(out, ROUNDS_PLAYED, GSStatsDef.Kind.COUNTER, "Rounds played", "rounds", false)
+	add_def(out, ROUNDS_WON, GSStatsDef.Kind.COUNTER, "Rounds won", "rounds", true)
+	add_def(out, PROP_ROUNDS, GSStatsDef.Kind.COUNTER, "Rounds as a prop", "rounds", true)
+	add_def(out, HUNTER_ROUNDS, GSStatsDef.Kind.COUNTER, "Rounds as a hunter", "rounds", true)
+	add_def(out, SURVIVED, GSStatsDef.Kind.COUNTER, "Rounds survived hidden", "rounds", true)
+	add_def(out, PROPS_FOUND, GSStatsDef.Kind.COUNTER, "Props found", "props", true)
+	add_def(out, BEST_ROUND_FOUND, GSStatsDef.Kind.BEST, "Most props found in a round", "props", true)
+	add_def(out, TIMES_FOUND, GSStatsDef.Kind.COUNTER, "Times found", "times", true)
+	add_def(out, DISGUISES, GSStatsDef.Kind.COUNTER, "Disguises", "props", true)
+	add_def(out, TAUNTS, GSStatsDef.Kind.COUNTER, "Taunts", "taunts", true)
+	add_def(out, FORCED_TAUNTS, GSStatsDef.Kind.COUNTER, "Taunts forced by standing still", "taunts", false)
+	add_def(out, DECOYS_SHOT, GSStatsDef.Kind.COUNTER, "Shots at the furniture", "shots", true)
+	add_def(out, DECOY_DEATHS, GSStatsDef.Kind.COUNTER, "Beaten by the furniture", "deaths", true)
+	add_def(out, DEATHS, GSStatsDef.Kind.COUNTER, "Deaths", "deaths", false)
 	GSStatsHitzones.declare(out)
 	GSStatsRank.declare(out, RANK_SCORE, "Rank score")
 	return out
-
-
-static func _add(
-	out: GSStatsSchema, id: StringName, kind: GSStatsDef.Kind, display: String,
-	unit: String, publish: bool
-) -> void:
-	var def := GSStatsDef.make(id, kind, display)
-	def.unit = unit
-	def.publish = publish
-	out.stats.append(def)
 
 
 ## What a player can earn, as rules over [method schema]'s numbers.
@@ -167,224 +123,34 @@ static func _sum(
 	return out
 
 
-## Turns the backbone report on or off at run time (the family cvar `stats_report`); the cvar is registered after this tracker is built, so setup() alone cannot see it.
-func set_reporting(on: bool) -> GSResult:
-	if stats == null:
-		return GSResult.fail(GSError.CODE_STATE, "There is no stats tracker.")
-
-	if achievements != null:
-		achievements.report_to_backbone = on
-
-	if not on:
-		stats.report_to_backbone = false
-		return GSResult.success(false)
-
-	stats.report_to_backbone = true
-	stats.define_on_start = true
-
-	if not stats.reporter.is_available():
-		stats.report_to_backbone = false
-		GSLog.warn(CHANNEL, "stats reporting needs a backbone client with STATS_WRITE; staying off")
-		return GSResult.fail(GSError.CODE_STATE, "No backbone client to report stats through.")
-
-	if _report_timer == null:
-		_report_timer = Timer.new()
-		_report_timer.name = "StatsReportTimer"
-		_report_timer.wait_time = REPORT_INTERVAL
-		_report_timer.autostart = true
-		_report_timer.timeout.connect(func() -> void: stats.flush())
-		add_child(_report_timer)
-
-	return GSResult.success(true)
+func _label() -> String:
+	return "prophunt"
 
 
-## [param directory] empty keeps achievement progress in memory; see
-## [member PhConfig.progress_directory]. [param report] is [member PhConfig.report_progress].
-func setup(directory: String, report: bool) -> GSResult:
-	stats = GSStatsTracker.new()
-	stats.name = "Stats"
-	stats.schema = schema()
-	stats.report_to_backbone = report
-	stats.define_on_start = report
-	add_child(stats)
-	feed = GSStatsEventFeed.new(stats)
-	feed.key_of = func(id: Variant) -> StringName: return _key(StringName(str(id)))
+func _make_schema() -> GSStatsSchema:
+	return schema()
 
-	var counted := stats.start()
 
-	if not counted.ok:
-		return counted.wrap("prophunt stats")
+func _make_catalogue() -> Object:
+	return catalogue()
 
-	achievements = GSAchievementTracker.new()
-	achievements.name = "Achievements"
-	achievements.catalogue = catalogue()
-	achievements.report_to_backbone = report
-	# Not published: a server and a client in one process — every suite here — would fight
-	# over one registry name, and the link below is handed the tracker directly.
-	achievements.register_as = &""
 
-	if directory != "":
-		var file_store := GSAchievementStoreFile.new()
-		file_store.directory = directory
-		achievements.store = file_store
-	else:
-		achievements.store = GSAchievementStoreMemory.new()
+func _rank_stat() -> StringName:
+	return RANK_SCORE
 
-	add_child(achievements)
 
-	var awarded := achievements.start()
-
-	if not awarded.ok:
-		return awarded.wrap("prophunt achievements")
-
-	achievements.unlocked.connect(_on_unlocked)
-
-	link = GSAchievementStatsLink.new()
-	link.name = "StatsLink"
-	link.tracker = achievements
-	link.stats = stats
-	add_child(link)
-
-	rank = GSStatsRank.new()
-	rank.stat_id = RANK_SCORE
-	rank.terms = [
+func _rank_terms() -> Array:
+	return [
 		{"stat": String(PROPS_FOUND), "weight": 1.0},
 		{"stat": String(SURVIVED), "weight": 1.5},
 		{"stat": String(ROUNDS_WON), "weight": 2.0},
 		{"stat": String(DECOY_DEATHS), "weight": -0.25},
 		{"stat": String(DEATHS), "weight": -0.05},
 	]
-	rank.record_fn = func(who: Variant, stat: StringName, value: float) -> void: record(StringName(str(who)), stat, value)
-	rank.key_fn = func(who: Variant) -> StringName: return _key(StringName(str(who)))
-
-	return link.start().wrap("prophunt's stats-to-achievements link")
 
 
-## Files one reading for one person, and starts counting for them the first time.
-## Begun lazily, on the first number, which keeps stand-ins out: a player is added before a bridge or client marks them one, so a join-time check would see every bot as a person.
-## The memory and file stores load synchronously, so the tracker has them before the reading that follows.
-func record(player_id: StringName, stat: StringName, value: float = 1.0) -> void:
-	if stats == null:
-		return
-
-	var body: PhPlayer = players.get(player_id)
-
-	if body == null or body.is_bot:
-		return
-
-	var key := _key(player_id)
-
-	if not stats.has_player(key):
-		_load_baseline(player_id)
-		stats.begin(key, body.display_name)
-		_begin(key)
-
-	var filed := stats.record(key, stat, value)
-
-	if not filed.ok:
-		# WARN: a number a player earned that nobody will ever see. It is a schema or a key
-		# that is wrong, and it only ever happens for a reason worth looking at.
-		GSLog.warn(CHANNEL, "a reading was refused", {
-			"player": String(player_id), "stat": String(stat), "why": filed.error.message,
-		})
-
-
-## A landed hit by body zone; a trace that met no hitbox has no zone.
-func report_hit(attacker: StringName, victim: StringName, damage: GSDamage) -> void:
-	if feed == null or damage.hit_group == GSHitGroup.GENERIC:
-		return
-	var side := StringName(str(damage.context.get(GSHitzone.CONTEXT_SIDE, "")))
-	var _ok := feed.report_hit(attacker, victim, String(damage.weapon_id), damage.hit_group, damage.health_lost, damage.lethal, side)
-
-
-## Files a kill for the head-to-head table.
-func report_kill(killer: StringName, victim: StringName) -> void:
-	if feed != null:
-		var _ok := feed.report_kill(killer, victim)
-
-
-## Reads the player's stored lifetime totals before this session's figures are flushed into the store (reading later would count them twice). The file store answers without suspending.
-func _load_baseline(player_id: StringName) -> void:
-	if rank != null and stats.store != null:
-		rank.load_baseline(stats.store, player_id)
-
-
-## Files the player's rank_score on their lifetime baseline plus this session.
-func _publish_rank(player_id: StringName) -> void:
-	if rank == null or rank.mode != GSStatsRank.MODE_WEIGHTED or stats == null or not stats.has_player(_key(player_id)):
-		return
-	var _s := rank.publish_lifetime(player_id, session_values(player_id), stats.schema)
-
-
-## The key a player's numbers are filed under. Asked of [member durable_key_fn] once, then
-## remembered; see the class note.
-func _key(player_id: StringName) -> StringName:
-	if _keys.has(player_id):
-		return _keys[player_id]
-
-	var key := player_id
-
-	if durable_key_fn.is_valid():
-		var durable := str(durable_key_fn.call(player_id))
-
-		if durable != "":
-			key = StringName(durable)
-
-	_keys[player_id] = key
-	_ids[key] = player_id
-	return key
-
-
-## Loads somebody's lifetime progress. A statement call, never assigned: the tracker's
-## `begin` is a coroutine, and this is the family's pattern for starting one from code that
-## is not — `await` inside, a bare call outside.
-func _begin(player_id: StringName) -> void:
-	var began: GSResult = await achievements.begin(String(player_id))
-
-	if not began.ok:
-		# WARN: this player will earn nothing this session, and they will not be told why.
-		GSLog.warn(CHANNEL, "achievement progress could not be loaded", {
-			"player": String(player_id), "why": began.error.message,
-		})
-
-
-## Saves somebody's progress as they go. See [method _begin].
-func _end(player_id: StringName) -> void:
-	var ended: GSResult = await achievements.end(String(player_id))
-
-	if not ended.ok:
-		GSLog.warn(CHANNEL, "achievement progress could not be saved", {
-			"player": String(player_id), "why": ended.error.message,
-		})
-
-
-## Stops counting for somebody who left, and saves what they earned.
-func leave(player_id: StringName) -> void:
-	_in_round.erase(player_id)
+func _on_leave(player_id: StringName) -> void:
 	_round_found.erase(player_id)
-
-	var key: StringName = _keys.get(player_id, player_id)
-	_keys.erase(player_id)
-	_ids.erase(key)
-
-	if stats == null or not stats.has_player(key):
-		return
-
-	var _values := stats.end(key)
-	if rank != null:
-		rank.forget(player_id)
-	link.forget(String(key))
-	_end(key)
-
-
-func session_values(player_id: StringName) -> GSStatsValues:
-	return stats.session_values(_keys.get(player_id, player_id)) \
-		if stats != null else GSStatsValues.new()
-
-
-## The key [param player_id]'s numbers are filed under. For a console command and a suite.
-func filed_under(player_id: StringName) -> StringName:
-	return _keys.get(player_id, player_id)
 
 
 func on_round_began() -> void:
@@ -412,7 +178,7 @@ func on_round_over(winner: int) -> void:
 		if found > 0:
 			record(id, BEST_ROUND_FOUND, float(found))
 
-		_publish_rank(id)
+		publish_rank(id)
 
 	_in_round.clear()
 	_round_found.clear()
@@ -453,33 +219,3 @@ func on_died(player_id: StringName, by: StringName, why: StringName) -> void:
 	if int(sides.get(by, 0)) == 2 and int(sides.get(player_id, 0)) == 1:
 		record(by, PROPS_FOUND)
 		_round_found[by] = int(_round_found.get(by, 0)) + 1
-
-
-func _on_unlocked(player: String, achievement: GSAchievement) -> void:
-	# INFO: what an admin keeps. "I did the thing and was not told" is answered here.
-	GSLog.info(CHANNEL, "an achievement was unlocked", {
-		"player": player, "achievement": String(achievement.id), "points": achievement.points,
-	})
-	# Back to the world's id: the world tells the player, and the world knows them by that.
-	earned.emit(_ids.get(StringName(player), StringName(player)),
-		achievement.display_name, achievement.points)
-
-
-func describe() -> Dictionary:
-	return {
-		"tracking": stats.players().size() if stats != null else 0,
-		"in_round": _in_round.size(),
-		"achievements": achievements.catalogue.size() if achievements != null else 0,
-	}
-
-
-func describe_lines() -> PackedStringArray:
-	var out := PackedStringArray()
-
-	if stats != null:
-		out.append_array(stats.describe_lines())
-
-	if achievements != null:
-		out.append_array(achievements.describe_lines())
-
-	return out
